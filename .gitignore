@@ -1,0 +1,21 @@
+# CMake generated files
+CMakeCache.txt
+
+# Makefile files
+CMakeFiles/
+Makefile
+cmake_install.cmake
+./*/CMakeFiles/
+./*/Makefile
+./*/cmake_install.cmake
+
+# Xcode files
+CMakeScripts/
+*.xcodeproj/
+*.build/
+.DS_Store
+
+# Executables
+bin/
+*.a
+
