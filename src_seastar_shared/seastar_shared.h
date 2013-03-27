@@ -1,7 +1,7 @@
 /*
  --------------------------------------------------------------------------- #
  Center for Environmental Genomics
- Copyright (C) 2009-2012 University of Washington.
+ Copyright (C) 2009-2013 University of Washington.
  
  Authors:
  Vaughn Iverson
@@ -29,6 +29,14 @@
                subprojects 
  =============================================================================
 */
+
+/*
+   NDEBUG is required to avoid linker errors in XCode related to a known
+   interaction between OpenMP and the __builtin_expect hint used by assert.h
+   This may be safely disabled for debugging purposes when using GCC on any
+   platform.
+*/
+#define NDEBUG 1
 
 #ifndef _STDIO_H_
 #include <stdio.h>
@@ -64,7 +72,9 @@
 #define SS_BUILD_VERSION "No version information available. Executable built on: " __DATE__ ", " __TIME__ 
 #endif
 
+/////////////////////////
 // Common macros
+/////////////////////////
 
 #define ss_trunc_utstring(s, n)                          \
 do {                                                     \
@@ -79,13 +89,7 @@ do {                                                     \
 } while(0)
 
 #define ss_strcat_utstring(s,b)                          \
-do {                                                     \
-size_t ss_ut_len = strlen(b);                            \
-utstring_reserve(s,ss_ut_len);                           \
-strcat(&(s)->d[(s)->i], b);                              \
-(s)->i += ss_ut_len;                                     \
-(s)->d[(s)->i]='\0';                                     \
-} while(0)
+utstring_bincpy(s,b,strlen(b))
 
 #define ss_rev_utstring(s)                               \
 do {                                                     \
@@ -96,7 +100,48 @@ ss_ut_c = (s)->d[i];                                     \
 (s)->d[(s)->i - i - 1]= ss_ut_c;                         \
 }                                                        \
 } while(0)
-        
+
+/////////////////////////
+// JSON stdout macros 
+/////////////////////////
+
+#define JSON_BEG_OBJ printf("{");
+#define JSON_STR_PROP(key,value) printf("\"%s\":\"%s\"",key,value);
+#define JSON_FLT_PROP(key,value) printf("\"%s\":%f",key,value); 
+#define JSON_FLT15_PROP(key,value) printf("\"%s\":%.15f",key,value); 
+#define JSON_INT_PROP(key,value) printf("\"%s\":%d",key,value); 
+#define JSON_LIT_PROP(key,value) printf("\"%s\":%s",key,value);
+#define JSON_SUB_PROP(key) printf("\"%s\" : ",key); 
+#define JSON_END_OBJ printf("}");
+#define JSON_BEG_ARR printf("[");
+#define JSON_STR_ELEM(value) printf("\"%s\"",value);
+#define JSON_FLT_ELEM(value) printf("%f",value);
+#define JSON_FLT1_ELEM(value) printf("%.1f",value);
+#define JSON_INT_ELEM(value) printf("%d",value); 
+#define JSON_LIT_ELEM(value) printf("%s",value);
+#define JSON_END_ARR printf("]");
+#define JSON_COMMA printf(","); 
+    
+#define JSON_N_STR_ARRAY_OBJ(key,vals,cont) if (vals->count) {  \
+        JSON_SUB_PROP(key); \ 
+        JSON_BEG_ARR; \
+        JSON_STR_ELEM(vals->cont[0]); \
+        for (int i=1; i<vals->count; i++) { \
+            JSON_COMMA; \
+            JSON_STR_ELEM(vals->cont[i]); \
+        } \
+        JSON_END_ARR; JSON_COMMA;  }
+    
+#define JSON_N_FLT_ARRAY_OBJ(key,array,num) if (array) {  \
+            JSON_SUB_PROP(key); \ 
+            JSON_BEG_ARR; \
+            JSON_FLT1_ELEM(array[1]); \
+            for (int i=2; i<=num; i++) { \
+                JSON_COMMA; \
+                JSON_FLT1_ELEM(array[i]); \
+            } \
+            JSON_END_ARR; JSON_COMMA;  }            
+
 /////////////////////////
 // Typedefs 
 /////////////////////////
@@ -126,3 +171,8 @@ long unsigned int ss_stream_writer(UT_string *fn, int pipe_fd, int zipped);
 
 long unsigned int ss_stream_reader(UT_string *fn, int pipe_fd);
 
+int ss_is_colorspace_fastq(char* fn);
+
+int ss_is_fastq(char* fn);
+
+gzFile ss_get_gzFile(char *fn, char *mode);

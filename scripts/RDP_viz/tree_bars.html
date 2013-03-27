@@ -1,0 +1,44 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html lang="en">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+    <title>RDP comparitive metagenomic bar charts</title>
+    <script src="./raphael-2.1.0.js" type="text/javascript" charset="utf-8"></script> 
+    <script src="./RDP_merged.js" type="text/javascript" charset="utf-8"></script> 
+    <script src="./tree_bars.js" type="text/javascript" charset="utf-8"></script>
+    
+    <style type="text/css" media="screen">
+      #holder {
+        position: relative;
+        width: 100%;
+        height: 100%;
+      }
+      #code {
+        background-color: black;
+        color: green;
+      }
+    </style>
+  </head>
+  <body>
+    <div>
+      <a href="" id="download_link" >"Right click, save/download" to download SVG file</a><br />
+      <input type="checkbox" id="percent" checked>Show percentages
+      <form name="levels" id="level_form">
+        <input type="checkbox" id="domain" checked>Show domains
+        <input type="checkbox" id="phylum" checked>Show phyla
+        <input type="checkbox" id="class" checked>Show classes
+        <input type="checkbox" id="order" checked>Show orders
+        <input type="checkbox" id="family" checked>Show families
+        <input type="checkbox" id="genus" checked>Show genera
+      </form>
+      <form name="samples" id="sample_form">
+        <input type="checkbox" id="A" checked>Sample 1
+        <input type="checkbox" id="B" checked>Sample 2
+        <input type="checkbox" id="C" checked>Sample 3
+        <input type="checkbox" id="D" checked>Sample 4
+      </form>
+    </div>
+  <br><br><br>
+  <div id="holder"></div>
+  </body>
+</html>

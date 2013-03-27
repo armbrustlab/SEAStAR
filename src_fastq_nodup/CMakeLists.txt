@@ -23,7 +23,7 @@
 # -------------------------------------------------------------------------- #
 
 # CMake file for fastq_nodup
-cmake_minimum_required (VERSION 2.6)
+cmake_minimum_required (VERSION 2.8)
 
 project (fastq_nodup C)
 
@@ -33,14 +33,23 @@ add_executable(fastq_nodup fastq_nodup.c)
 
 target_link_libraries(fastq_nodup ${COMMON_LIBS})
 
+if(CMAKE_GENERATOR STREQUAL "Xcode")
+    add_custom_command(
+        TARGET fastq_nodup
+        POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E remove -f ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/fastq_nodup
+        COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:fastq_nodup> ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/fastq_nodup
+)
+endif(CMAKE_GENERATOR STREQUAL "Xcode")
+
 enable_testing()
 
 add_test(NAME fastq_nodup_runs COMMAND fastq_nodup --version)
 
-set_tests_properties(fastq_nodup_runs PROPERTIES PASS_REGULAR_EXPRESSION "version: ${GIT_VERSION}" TIMEOUT 1)
+set_tests_properties(fastq_nodup_runs PROPERTIES PASS_REGULAR_EXPRESSION "version: ${GIT_VERSION}" TIMEOUT 3)
 
-add_test(NAME fastq_nodup_test_data COMMAND fastq_nodup -z --prefix=lambda_tst.d -l 13 -d 2 -e 3 ${CMAKE_BINARY_DIR}/output_test_data/lambda_reads ${CMAKE_BINARY_DIR}/output_test_data/lambda_reads_d)
+add_test(NAME fastq_nodup_test_data COMMAND bash -c "$<TARGET_FILE:fastq_nodup> -z --prefix=lambda_tst.d -l 13 -d 2 -e 3 ${CMAKE_BINARY_DIR}/output_test_data/lambda_reads ${CMAKE_BINARY_DIR}/output_test_data/lambda_reads_d; gunzip -c ${CMAKE_BINARY_DIR}/output_test_data/lambda_reads_d.{read1,read2}.fastq.gz | openssl md5 ")
 
-set_tests_properties(fastq_nodup_test_data PROPERTIES PASS_REGULAR_EXPRESSION "Matepairs: 80374  Rejected: 1104.*Singlets: 0 0  Rejected: 0 0" TIMEOUT 15)
+set_tests_properties(fastq_nodup_test_data PROPERTIES PASS_REGULAR_EXPRESSION "c4c8331dd1ffbe372ffe326617854ade" TIMEOUT 30)
 
 

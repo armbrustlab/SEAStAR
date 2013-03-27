@@ -1,6 +1,6 @@
 # -------------------------------------------------------------------------- #
 # Center for Environmental Genomics
-# Copyright (C) 2009-2012 University of Washington.
+# Copyright (C) 2009-2013 University of Washington.
 #
 # Authors:
 # Vaughn Iverson
@@ -25,7 +25,18 @@
 # CMake file for full SEASTAR build 
 cmake_minimum_required (VERSION 2.8)
 
-SET(CMAKE_BUILD_TYPE Release CACHE STRING "default to release build" FORCE)
+# Debug option
+option(DEBUG "debug" OFF)
+
+IF(DEBUG)
+  SET(CMAKE_BUILD_TYPE Debug CACHE STRING "debug build" FORCE)
+ENDIF(DEBUG)
+
+IF(NOT DEBUG)
+  SET(CMAKE_BUILD_TYPE Release CACHE STRING "default to release build" FORCE)
+ENDIF(NOT DEBUG)
+
+MESSAGE("Cmake build type set to ${CMAKE_BUILD_TYPE}")
 
 project (SEASTAR C)
 
@@ -33,6 +44,7 @@ set (BUILD_SHARED_LIBS OFF)
 
 set(CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/CMake_modules)
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 
 link_directories(${CMAKE_ARCHIVE_OUTPUT_DIRECTORY})
@@ -55,7 +67,7 @@ if(NOT CMAKE_GENERATOR STREQUAL "Xcode")
 		set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${OpenMP_C_FLAGS}")
 
 		message(STATUS "System is ${CMAKE_SYSTEM}.")
-		if(${CMAKE_SYSTEM_NAME} STREQUAL "Darwin")
+		if((${CMAKE_SYSTEM_NAME} STREQUAL "Darwin") AND NOT DARWIN_OPENMP_VERIFIED)
 			message(STATUS "Testing OpenMP support in compiler for known bugs. This may take a few seconds...")
 			try_run(OPENMP_TEST_RESULT OPENMP_TEST_COMPILE_RESULT ${CMAKE_CURRENT_BINARY_DIR}/openmp_test ${CMAKE_SOURCE_DIR}/openmp_test/test.c RUN_OUTPUT_VARIABLE OPENMP_TEST_OUTPUT)
 			if (NOT ${OPENMP_TEST_COMPILE_RESULT})
@@ -67,8 +79,10 @@ if(NOT CMAKE_GENERATOR STREQUAL "Xcode")
 				if(OPENMP_TEST_ABORT)
 					message(FATAL_ERROR "The default Apple provided compiler on your system has OpenMP bugs.\n You need to install gcc (version 4.4 or later) from MacPorts. See README file for more details.")
 				endif(OPENMP_TEST_ABORT)
+			else(OPENMP_TEST_RESULT)
+				SET(DARWIN_OPENMP_VERIFIED TRUE CACHE BOOL "Darwin OpenMP passed?")
 			endif(OPENMP_TEST_RESULT)
-		endif(${CMAKE_SYSTEM_NAME} STREQUAL "Darwin")
+		endif((${CMAKE_SYSTEM_NAME} STREQUAL "Darwin") AND NOT DARWIN_OPENMP_VERIFIED)
 	else(OPENMP_FOUND)
 		message (FATAL_ERROR "OpenMP support is required")
 	endif(OPENMP_FOUND)
@@ -80,24 +94,33 @@ else(NOT CMAKE_GENERATOR STREQUAL "Xcode")
 	set(CMAKE_XCODE_ATTRIBUTE_ENABLE_OPENMP_SUPPORT YES)
 endif(NOT CMAKE_GENERATOR STREQUAL "Xcode")
 
-execute_process(COMMAND bash -c "cd ${CMAKE_SOURCE_DIR}; git describe --match 'v*'" OUTPUT_STRIP_TRAILING_WHITESPACE OUTPUT_VARIABLE GIT_VERSION)
-add_definitions("-D SS_BUILD_VERSION='\"${GIT_VERSION}\"'")
+execute_process(COMMAND bash -c "cd ${CMAKE_SOURCE_DIR}; git describe --match 'v*'" OUTPUT_STRIP_TRAILING_WHITESPACE OUTPUT_VARIABLE GIT_VERSION RESULT_VARIABLE GIT_RESULT)
+
+# Test if the git command above failed, if so, set a default version string
+if (GIT_VERSION)
+	add_definitions("-D SS_BUILD_VERSION='\"${GIT_VERSION}\"'")
+else (GIT_VERSION)
+	message(WARNING "SEAStAR version not detected from git. ${GIT_VERSION}") 
+	set(GIT_VERSION "v0.4.0")
+	add_definitions("-D SS_BUILD_VERSION='\"${GIT_VERSION}\"'")
+endif (GIT_VERSION)
+
+enable_testing()
 
 set(Argtable_DIR "argtable2-13")
-include_directories(${Argtable_DIR}/src)
+include_directories(${CMAKE_SOURCE_DIR}/${Argtable_DIR}/src)
 add_subdirectory(${Argtable_DIR})
 
-set(Zlib_DIR "zlib-1.2.5")
-include_directories(${Zlib_DIR})
+set(Zlib_DIR "zlib-1.2.7")
+include_directories(${CMAKE_SOURCE_DIR}/${Zlib_DIR})
+include_directories(${CMAKE_CURRENT_BINARY_DIR}/${Zlib_DIR})
 add_subdirectory(${Zlib_DIR})
 
 add_subdirectory(src_seastar_shared)
 
-set(COMMON_LIBS "m" "seastar_shared" "argtable2" "zlib")
+set(COMMON_LIBS "m" "seastar_shared" "argtable2" "z")
 
 file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/output_test_data)
-
-enable_testing()
 
 # Note, it's important to keep these in this order for CTest because 
 # the outputs of some tool's tests are used as the inputs of others.
@@ -105,4 +128,7 @@ add_subdirectory(src_solid2fastq)
 add_subdirectory(src_fastq_nodup)
 add_subdirectory(src_trimfastq)
 add_subdirectory(src_samplefastq)
+add_subdirectory(src_ref_select)
+add_subdirectory(src_tetracalc)
+add_subdirectory(scripts)
 

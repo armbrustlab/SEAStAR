@@ -23,7 +23,7 @@
 # -------------------------------------------------------------------------- #
 
 # CMake file for trimfastq
-cmake_minimum_required (VERSION 2.6)
+cmake_minimum_required (VERSION 2.8)
 
 project (trimfastq C)
 
@@ -33,12 +33,31 @@ add_executable(trimfastq trimfastq.c)
 
 target_link_libraries(trimfastq ${COMMON_LIBS})
 
+if(CMAKE_GENERATOR STREQUAL "Xcode")
+    add_custom_command(
+        TARGET trimfastq
+        POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E remove -f ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/trimfastq
+        COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:trimfastq> ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/trimfastq
+)
+endif(CMAKE_GENERATOR STREQUAL "Xcode")
+
 enable_testing()
+
+find_program(GAWK_EXEC "gawk")
 
 add_test(NAME trimfastq_runs COMMAND trimfastq --version)
 
-set_tests_properties(trimfastq_runs PROPERTIES PASS_REGULAR_EXPRESSION "version: ${GIT_VERSION}" TIMEOUT 1)
+set_tests_properties(trimfastq_runs PROPERTIES PASS_REGULAR_EXPRESSION "version: ${GIT_VERSION}" TIMEOUT 3)
 
-add_test(NAME trimfastq_test_data COMMAND trimfastq -z --prefix=lambda_tst.d50 -p 0.5 -l 34 -m 34 -e 3.0 --add_len ${CMAKE_BINARY_DIR}/output_test_data/lambda_reads_d ${CMAKE_BINARY_DIR}/output_test_data/lambda_reads_d50)
+add_test(NAME trimfastq_test_data COMMAND bash -c "$<TARGET_FILE:trimfastq> -z --prefix=lambda_tst.d50 -p 0.5 -l 34 -m 34 -e 3.0 --add_len --mates_file ${CMAKE_BINARY_DIR}/output_test_data/lambda_reads_d ${CMAKE_BINARY_DIR}/output_test_data/lambda_reads_d50; gunzip -c ${CMAKE_BINARY_DIR}/output_test_data/lambda_reads_d50.{mates,read1,read2,single}.fastq.gz | openssl md5")
 
-set_tests_properties(trimfastq_test_data PROPERTIES PASS_REGULAR_EXPRESSION "Low complexity reads discarded: Read1: 157, Read2: 241, Singlets: 0 0.*Matepairs: Before: 79270, After: 61966.*Singlets: Before: 0 0 After: 17304 0.*Read1 singlets: 7569, Read2 singlets: 9735, Original singlets: 0 0.*Total Reads Processed: 158540, Reads retained: 141236" TIMEOUT 15)
+set_tests_properties(trimfastq_test_data PROPERTIES PASS_REGULAR_EXPRESSION "b7e1b0349ec2b00aa3b83de3ff7e4d4c" TIMEOUT 30)
+
+add_test(NAME trimfastq_2singlets_test_data COMMAND bash -c "$<TARGET_FILE:trimfastq> -z --prefix=lambda_tst.d50s2 -p 0.5 -s -l 34 -m 34 -e 3.0 --add_len ${CMAKE_BINARY_DIR}/output_test_data/lambda_reads_d ${CMAKE_BINARY_DIR}/output_test_data/lambda_reads_d50s2; gunzip -c ${CMAKE_BINARY_DIR}/output_test_data/lambda_reads_d50s2.{read1,read2,single1,single2}.fastq.gz | openssl md5")
+
+set_tests_properties(trimfastq_2singlets_test_data PROPERTIES PASS_REGULAR_EXPRESSION "487481a8b4156040d98295080d5064fa" TIMEOUT 30)
+
+add_test(NAME trimfastq_singlet_input_test_data COMMAND bash -c "$<TARGET_FILE:trimfastq> -z --prefix=lambda_tst.d70 -p 0.7 -l 34 -m 34 -e 3.0 --add_len ${CMAKE_BINARY_DIR}/output_test_data/lambda_reads_d50s2 ${CMAKE_BINARY_DIR}/output_test_data/lambda_reads_d70; (gunzip -c ${CMAKE_BINARY_DIR}/output_test_data/lambda_reads_d70.{read1,read2}.fastq.gz; for f in ${CMAKE_BINARY_DIR}/output_test_data/lambda_reads_d70.{single1,single2}.fastq.gz; do gunzip -c $f | ${GAWK_EXEC} 'NR %4 == 1 {cur=$0; next} {cur = cur $0} NR % 4 == 0 {x[i++] = cur} END {n = asort(x); for (j=1; j<=n; j++) {print x[j]}}'; done) | openssl md5")
+
+set_tests_properties(trimfastq_singlet_input_test_data PROPERTIES PASS_REGULAR_EXPRESSION "df84824a396d016689ca7a0e35085a15" TIMEOUT 30)

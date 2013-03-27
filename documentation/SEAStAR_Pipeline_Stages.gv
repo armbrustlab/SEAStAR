@@ -1,0 +1,132 @@
+# This document contains a graphical description of the SEAStAR analysis pipeline in the graphviz "dot" format.
+# To visualize this document, you must obtain the graphviz tools using your favorite package manager, or by visiting:
+# http://www.graphviz.org/
+# 
+# One you have installed graphviz, you may render this document to a viewable format (e.g. PDF) by running:
+# 	dot -Tpdf -O SEAStAR_Pipeline_Stages.gv
+#
+# Please refer to the graphviz documentation for more information.
+#
+
+digraph "" {
+	graph [labelloc = t, layout=dot, label="SEAStAR Analysis Pipeline", bb="0 0 1227 2702", labeljust=c, fontsize=32, clusterrank=local];
+
+		"2399E4BA-EA73-4290-9D4B-4C7BD94B9A52" [label="raw SOLiD reads", shape=diamond];
+		"nt_reads" [label="raw Illumina reads", shape=diamond];
+		"B89A48B7-1DD7-4850-A4CD-EC03902ECA17" [label=solid2fastq, shape=rectangle, style=filled, fillcolor=yellow];
+		"8F734B0B-4F75-4848-92D9-0BC4DBF29D4F" [label="raw reads", shape=ellipse];
+		"7E7BAC74-D576-46D7-A042-CF7B676C21C8" [label="reference sequence\ndatabases (e.g. RDP 16S)", shape=diamond];
+		"B88217DA-4C4C-4FF4-BC13-C52E9958C2A4" [label=fastq_dedup, shape=rectangle, style=filled, fillcolor=yellow];
+		"0F7F374E-E856-412D-904A-D6ED5229750A" [label=trimfastq, shape=rectangle, style=filled, fillcolor=yellow];
+		"087EAF03-68D2-4775-A8EF-3895C7CBED8F" [label="deduplicated reads", shape=ellipse];
+		"5BE03F77-A7C9-462C-B53E-64542E0044C9" [label="trimmed reads", shape=ellipse];
+		"BB4BF441-5254-4273-A3AA-ABF21DC8331D" [label=sample_fastq, shape=rectangle, style=filled, fillcolor=yellow];
+		"A35FC64A-3E13-4BC9-91EE-A2B044FF2C13" [label="read subset", shape=ellipse];
+		"4236EC27-F3E6-4408-A5BD-87AA28F99833" [label=BWA, shape=triangle, style=filled, fillcolor=cyan];
+		"4CE5D47A-1B92-4DFC-98B0-8EF802F21698" [label="trim stats / parms", shape=ellipse];
+		"CDCCB170-D929-4326-B064-E04712F958E1" [label=trimfastq, shape=rectangle, style=filled, fillcolor=yellow];
+		"8133EB2C-5DCA-4C35-9151-A3B8837CB4A7" [label="trimmed sample reads", shape=ellipse];
+		"E607B693-45E3-407B-83EE-1BFA9BDF5E57" [label="reference sequence\nfrom added standard\nor known organism", shape=diamond];
+		"3EE55509-601A-48A8-8B86-73C86BA4B481" [label="SAET (SOLiD)", shape=triangle, style=filled, fillcolor=cyan];
+		"FF6BFA6E-B07A-4FB4-9901-E2CB89A7022D" [label=BWA, shape=triangle, style=filled, fillcolor=cyan];
+		"B6DD79C3-6280-45E2-B2AD-9D95FB34CC04" [label="corrected reads", shape=ellipse];
+		"4051AF66-6946-41D7-88B0-E4BA7F8E9B7D" [label=Velvet, shape=triangle, style=filled, fillcolor=cyan];
+		"3B61E3F6-6522-4135-9C59-33BF00B7D43A" [label="assembled contigs", shape=ellipse];
+		"499BA67E-DE3C-47B4-B7F4-156B6161FC77" [label=BWA, shape=triangle, style=filled, fillcolor=cyan];
+		"A7B9AC30-B1AF-4387-9A97-3DDFCFB11FCF" [label="assembly alignments", shape=ellipse];
+		"D29064EE-946D-4A1E-B520-96C15D09D17B" [label="reference alignments", shape=ellipse];
+
+		"A78D2EA7-A69C-4C5D-8122-918E2D6E88BC" [label=ref_select, shape=rectangle, style=filled, fillcolor=yellow];
+		"396273AB-0B65-4316-A57A-5470C4184E29" [label="selected reference\nsequences & stats", shape=ellipse];
+		"2DDAF5FA-B8C2-4A72-89DC-FFDDBACD83B2" [label="RDP classifier", shape=triangle, style=filled, fillcolor=cyan];
+		"E08D248F-6888-438A-9A73-5598D4FCDFCA" [label="taxonomy abundance\nvisualization", shape=rectangle, style=filled, fillcolor=yellow];
+		"B48EAF56-3E99-46C6-BDA7-7E44144BDEB9" [label="custom training set", shape=diamond];
+		"9BE106CC-07FD-44CE-98CE-59643721AFD1" [label="nucleotide contigs", shape=ellipse];
+		"96C2D13F-92DF-40DC-BED4-3C6C05D059C7" [label="sequence graph (JSON)", shape=ellipse];
+		"22A83979-1B78-480F-AF62-C5F54F63B7F4" [label=GraphViz, shape=triangle, style=filled, fillcolor=cyan];
+		"EB958BAB-42FE-49A4-9236-E456F73474A0" [label="processed graphs with annotations", shape=ellipse];
+		"ADE79C80-747B-467B-AF23-343E1B52E327" [label="relative abundance\nstats & figures", shape=diamond];
+		"7489B14B-6F5A-42DD-981E-4AD23D069B96" [label="matepair assembly\ngraphics", shape=diamond];
+
+		"31E360AB-0EFE-435B-88A8-3583B539A963" [label="graph_ops", shape=rectangle, style=filled, fillcolor=yellow];
+		"6A2CA95C-2DB0-4CC8-9F8B-A561C73D6062" [label="linear connection graphs", shape=ellipse];
+		"0A2FE181-9FE4-4182-8EFB-5F360EFDAE14" [label=tetracalc, shape=rectangle, style=filled, fillcolor=yellow];
+		"773B5506-BF60-4D5D-9337-3A2D2CDE927D" [label="binned candidate genome\nscaffold graphs", shape=ellipse];
+		"CC8C692D-CEC8-4291-9EF8-4670449233DF" [label="seq_scaffold", shape=rectangle, style=filled, fillcolor=yellow];
+		"BD77E935-71F7-439D-8FE0-8065041B8075" [label="sequence scaffolds", shape=ellipse];
+		"30BA3351-5349-4A89-A824-40390275CA68" [label="candidate\ngenome scaffolds for\nrefinement or annotation", shape=diamond];
+		"filtered_reads" [label="filtered reads", shape=ellipse];
+
+	subgraph cluster_3  {
+		fontsize=24;
+		label = "Legend";
+		style = "filled,rounded"
+		color = lightgrey;
+		labeljust=c;
+		"C98D6102-D73D-4780-AE7B-2F7934D768E1" [label="External output", shape=diamond, style=filled, fillcolor=white];
+		"7A90A880-EC53-446F-A971-E18E72179B48" [label="External input", shape=diamond, style=filled, fillcolor=white];
+		"52907D85-7F8A-4C35-972D-C8A881026C4D" [label="External tool", shape=triangle, style=filled, fillcolor=cyan];
+		"7A109B80-BA27-4000-85C3-6EA878C4C040" [label="SEAStAR tool", style=filled, fillcolor=yellow, shape=rectangle];
+		"30148021-B7F8-4C14-BEFA-A573DF4CA1DC" [label="Intermediate data", shape=ellipse, style=filled, fillcolor=white];
+	}
+
+    "5BE03F77-A7C9-462C-B53E-64542E0044C9" -> "4051AF66-6946-41D7-88B0-E4BA7F8E9B7D"
+    "A78D2EA7-A69C-4C5D-8122-918E2D6E88BC" -> "filtered_reads"
+    "filtered_reads" -> "4051AF66-6946-41D7-88B0-E4BA7F8E9B7D"
+    "nt_reads" -> "8F734B0B-4F75-4848-92D9-0BC4DBF29D4F" 
+	"C98D6102-D73D-4780-AE7B-2F7934D768E1" -> "7A109B80-BA27-4000-85C3-6EA878C4C040" [style=dashed, label="iterative\nrefinement", constraint=false];
+	"2399E4BA-EA73-4290-9D4B-4C7BD94B9A52" -> "B89A48B7-1DD7-4850-A4CD-EC03902ECA17";
+	"B89A48B7-1DD7-4850-A4CD-EC03902ECA17" -> "8F734B0B-4F75-4848-92D9-0BC4DBF29D4F";
+	"8F734B0B-4F75-4848-92D9-0BC4DBF29D4F" -> "B88217DA-4C4C-4FF4-BC13-C52E9958C2A4";
+	"8F734B0B-4F75-4848-92D9-0BC4DBF29D4F" -> "0F7F374E-E856-412D-904A-D6ED5229750A";
+	"B88217DA-4C4C-4FF4-BC13-C52E9958C2A4" -> "087EAF03-68D2-4775-A8EF-3895C7CBED8F";
+	"087EAF03-68D2-4775-A8EF-3895C7CBED8F" -> "0F7F374E-E856-412D-904A-D6ED5229750A";
+	"0F7F374E-E856-412D-904A-D6ED5229750A" -> "5BE03F77-A7C9-462C-B53E-64542E0044C9";
+	"8F734B0B-4F75-4848-92D9-0BC4DBF29D4F" -> "BB4BF441-5254-4273-A3AA-ABF21DC8331D";
+	"087EAF03-68D2-4775-A8EF-3895C7CBED8F" -> "BB4BF441-5254-4273-A3AA-ABF21DC8331D";
+	"BB4BF441-5254-4273-A3AA-ABF21DC8331D" -> "A35FC64A-3E13-4BC9-91EE-A2B044FF2C13";
+	"4236EC27-F3E6-4408-A5BD-87AA28F99833" -> "4CE5D47A-1B92-4DFC-98B0-8EF802F21698";
+	"4CE5D47A-1B92-4DFC-98B0-8EF802F21698" -> "0F7F374E-E856-412D-904A-D6ED5229750A";
+	"A35FC64A-3E13-4BC9-91EE-A2B044FF2C13" -> "CDCCB170-D929-4326-B064-E04712F958E1";
+	"CDCCB170-D929-4326-B064-E04712F958E1" -> "8133EB2C-5DCA-4C35-9151-A3B8837CB4A7";
+	"8133EB2C-5DCA-4C35-9151-A3B8837CB4A7" -> "4236EC27-F3E6-4408-A5BD-87AA28F99833";
+	"E607B693-45E3-407B-83EE-1BFA9BDF5E57" -> "4236EC27-F3E6-4408-A5BD-87AA28F99833";
+	"5BE03F77-A7C9-462C-B53E-64542E0044C9" -> "FF6BFA6E-B07A-4FB4-9901-E2CB89A7022D";
+	"7E7BAC74-D576-46D7-A042-CF7B676C21C8" -> "FF6BFA6E-B07A-4FB4-9901-E2CB89A7022D";
+	"FF6BFA6E-B07A-4FB4-9901-E2CB89A7022D" -> "D29064EE-946D-4A1E-B520-96C15D09D17B";
+	"5BE03F77-A7C9-462C-B53E-64542E0044C9" -> "3EE55509-601A-48A8-8B86-73C86BA4B481";
+	"3EE55509-601A-48A8-8B86-73C86BA4B481" -> "B6DD79C3-6280-45E2-B2AD-9D95FB34CC04";
+	"B6DD79C3-6280-45E2-B2AD-9D95FB34CC04" -> "4051AF66-6946-41D7-88B0-E4BA7F8E9B7D";
+	"4051AF66-6946-41D7-88B0-E4BA7F8E9B7D" -> "3B61E3F6-6522-4135-9C59-33BF00B7D43A";
+	"3B61E3F6-6522-4135-9C59-33BF00B7D43A" -> "499BA67E-DE3C-47B4-B7F4-156B6161FC77";
+	"5BE03F77-A7C9-462C-B53E-64542E0044C9" -> "499BA67E-DE3C-47B4-B7F4-156B6161FC77";
+	"499BA67E-DE3C-47B4-B7F4-156B6161FC77" -> "A7B9AC30-B1AF-4387-9A97-3DDFCFB11FCF";
+	"A7B9AC30-B1AF-4387-9A97-3DDFCFB11FCF" -> "A78D2EA7-A69C-4C5D-8122-918E2D6E88BC";
+	"D29064EE-946D-4A1E-B520-96C15D09D17B" -> "A78D2EA7-A69C-4C5D-8122-918E2D6E88BC";
+	"5BE03F77-A7C9-462C-B53E-64542E0044C9" -> "A78D2EA7-A69C-4C5D-8122-918E2D6E88BC";
+	"31E360AB-0EFE-435B-88A8-3583B539A963" -> "9BE106CC-07FD-44CE-98CE-59643721AFD1";
+	"31E360AB-0EFE-435B-88A8-3583B539A963" -> "396273AB-0B65-4316-A57A-5470C4184E29";   
+	"A78D2EA7-A69C-4C5D-8122-918E2D6E88BC" -> "96C2D13F-92DF-40DC-BED4-3C6C05D059C7";
+	"396273AB-0B65-4316-A57A-5470C4184E29" -> "2DDAF5FA-B8C2-4A72-89DC-FFDDBACD83B2";
+	"2DDAF5FA-B8C2-4A72-89DC-FFDDBACD83B2" -> "E08D248F-6888-438A-9A73-5598D4FCDFCA";
+	"E08D248F-6888-438A-9A73-5598D4FCDFCA" -> "ADE79C80-747B-467B-AF23-343E1B52E327";
+	"96C2D13F-92DF-40DC-BED4-3C6C05D059C7" -> "31E360AB-0EFE-435B-88A8-3583B539A963";
+	"31E360AB-0EFE-435B-88A8-3583B539A963" -> "EB958BAB-42FE-49A4-9236-E456F73474A0";
+	"EB958BAB-42FE-49A4-9236-E456F73474A0" -> "22A83979-1B78-480F-AF62-C5F54F63B7F4";
+	"22A83979-1B78-480F-AF62-C5F54F63B7F4" -> "7489B14B-6F5A-42DD-981E-4AD23D069B96";
+	"31E360AB-0EFE-435B-88A8-3583B539A963" -> "6A2CA95C-2DB0-4CC8-9F8B-A561C73D6062";
+	"6A2CA95C-2DB0-4CC8-9F8B-A561C73D6062" -> "CC8C692D-CEC8-4291-9EF8-4670449233DF";
+ 	"BD77E935-71F7-439D-8FE0-8065041B8075" -> "0A2FE181-9FE4-4182-8EFB-5F360EFDAE14";
+ 	"0A2FE181-9FE4-4182-8EFB-5F360EFDAE14" -> "773B5506-BF60-4D5D-9337-3A2D2CDE927D";
+	"773B5506-BF60-4D5D-9337-3A2D2CDE927D" -> "30BA3351-5349-4A89-A824-40390275CA68";
+	"9BE106CC-07FD-44CE-98CE-59643721AFD1" -> "CC8C692D-CEC8-4291-9EF8-4670449233DF";
+	"CC8C692D-CEC8-4291-9EF8-4670449233DF" -> "BD77E935-71F7-439D-8FE0-8065041B8075";
+#	"6A2CA95C-2DB0-4CC8-9F8B-A561C73D6062" -> "22A83979-1B78-480F-AF62-C5F54F63B7F4";
+#	"773B5506-BF60-4D5D-9337-3A2D2CDE927D" -> "22A83979-1B78-480F-AF62-C5F54F63B7F4";
+	"4CE5D47A-1B92-4DFC-98B0-8EF802F21698" -> "CDCCB170-D929-4326-B064-E04712F958E1"  [style=dashed, constraint=false];
+	"52907D85-7F8A-4C35-972D-C8A881026C4D" -> "C98D6102-D73D-4780-AE7B-2F7934D768E1";
+	"7A90A880-EC53-446F-A971-E18E72179B48" -> "7A109B80-BA27-4000-85C3-6EA878C4C040";
+	"30148021-B7F8-4C14-BEFA-A573DF4CA1DC" -> "52907D85-7F8A-4C35-972D-C8A881026C4D";
+	"7A109B80-BA27-4000-85C3-6EA878C4C040" -> "30148021-B7F8-4C14-BEFA-A573DF4CA1DC";	
+	"B48EAF56-3E99-46C6-BDA7-7E44144BDEB9" -> "2DDAF5FA-B8C2-4A72-89DC-FFDDBACD83B2";
+}

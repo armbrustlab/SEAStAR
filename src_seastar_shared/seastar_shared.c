@@ -1,7 +1,7 @@
 /*
  --------------------------------------------------------------------------- #
  Center for Environmental Genomics
- Copyright (C) 2009-2012 University of Washington.
+ Copyright (C) 2009-2013 University of Washington.
  
  Authors:
  Vaughn Iverson
@@ -36,6 +36,8 @@
 /////////////////////////
 
 #include <seastar_shared.h>
+
+#define UTSTRING_DEFAULT_LEN 10
 
 // Helper Macros
 
@@ -314,4 +316,108 @@ double ss_rand(ss_rand_inst *r_ptr) {
     return((double) y / (unsigned int) 0xffffffff);
 }
 
-//////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////
+// 
+// ss_is_colorspace_fastq
+//
+// This function checks if a file is in colorspace fastq format.
+// It checks for the file name as given and a gzipped form with 
+// ".gz" suffix.
+//
+
+int ss_is_colorspace_fastq(char *fn) {
+    int colorspace = 0;
+    gzFile fq_hnd = NULL;
+    UT_string *str;
+    UT_string *file_name;
+    utstring_new(str);
+    utstring_new(file_name);
+    
+    utstring_printf(file_name, fn);
+    
+    if (ss_is_fastq(utstring_body(file_name))) {
+        if (fq_hnd = ss_get_gzFile(utstring_body(file_name), "r")) {
+            ss_gzget_utstring(fq_hnd, str);
+            
+            // Detect colorspace read alignments by the naming convention that preserves the
+            // primer base and first color in the header line between '@' and '+'.
+            // e.g.  >TA+49|lambda:1231_1682_1381
+            //        ^^
+            // This checks syntax and protects against buffer overflow below.
+            if (strspn(utstring_body(str), "@+ACGTNacgtn") >= 3) {
+                if (utstring_body(str)[3] == '+') {
+                    colorspace = 1;
+                }
+            }
+            
+            // Close file
+            gzclose(fq_hnd);
+        }
+    }
+    
+    utstring_free(str);
+    utstring_free(file_name);
+    
+    return colorspace;
+}
+
+/////////////////////////////////////////////////////////////////
+// 
+// ss_is_fastq
+//
+// This function checks if a file is in valid fastq format.
+// It checks for the file name as given and a gzipped form with 
+// ".gz" suffix.
+//
+
+int ss_is_fastq(char *fn) {
+    int fastq = 0;
+    gzFile fq_hnd = NULL;
+    UT_string *str;
+    UT_string *file_name;
+    utstring_new(str);
+    utstring_new(file_name);
+    
+    utstring_printf(file_name, fn);
+    
+    if (fq_hnd = ss_get_gzFile(utstring_body(file_name), "r")) {
+        ss_gzget_utstring(fq_hnd, str);
+        
+        if (utstring_body(str)[0] == '@') {
+            ss_gzget_utstring(fq_hnd, str);
+            ss_gzget_utstring(fq_hnd, str);
+            if (utstring_body(str)[0] == '+') {
+                fastq = 1;
+            }
+        }
+        // Close file
+        gzclose(fq_hnd);
+    }
+    
+    utstring_free(str);
+    utstring_free(file_name);
+    
+    return fastq;
+}
+
+/////////////////////////////////////////////////////////////////
+//
+// ss_get_gzFile
+//
+// This function tries to open the file with name as given and failing that
+// tries to open the file with ".gz" extension.  It uses gzopen and returns a 
+// gzFile.  If file opening fails a NULL pointer is returned.
+//
+
+gzFile ss_get_gzFile(char *fn, char *mode) {
+    gzFile fq_hnd = NULL;
+    UT_string *file_name;
+    utstring_new(file_name);
+    
+    utstring_printf(file_name, fn);
+    if (!(fq_hnd = gzopen(utstring_body(file_name), mode))) {
+        utstring_printf(file_name, ".gz");
+        fq_hnd = gzopen(utstring_body(file_name), mode);
+    }
+    return fq_hnd;
+}

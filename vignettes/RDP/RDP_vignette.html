@@ -1,0 +1,215 @@
+<link href="../../documentation/style.css" media="screen" rel="stylesheet" type="text/css" />
+
+<h1>Using SEAStAR and RDP to estimate relative abundance of 16S sequences in a metagenomic data set</h1>
+<p>One of SEAStAR&#39;s core use cases is to select seqeunces from a reference database which are present in a short-read metagenomic data set and to estimate their relative abundances in the sample. For example, one may wish to estimate bacterial and archaeal 16S abundances using the <a href="http://http://rdp.cme.msu.edu/">RDP</a> database. The workflow for this process is captured in two Bash scripts, <a href="#RDP_prep"><code>RDP_prep</code></a> and <a href="#RDP_go"><code>RDP_go</code></a>.</p>
+<h2>An example using simulated data</h2>
+<h3>Requirements</h3>
+<ul>
+<li>OS X or Linux</li>
+<li>SEAStAR, successfully built with <code>bin</code> directory placed in your path</li>
+<li><a href="http://sourceforge.net/projects/bio-bwa/files/">BWA</a>.  For colorspace data BWA version &lt;= 0.5.10 is required. For nucleotide data the most recent version at the time of this documentation (0.7.3) will work. This tutorial uses nucleotide read data, so any version of BWA should work.</li>
+</ul>
+<h3>Walk-through</h3>
+<p>An example data set has been provided in <code>vignettes/RDP/sim</code>.  Two <a href="../../SEAStAR_User_Guide.html#FASTQ">FASTQ</a> files of <a href="http://www.niehs.nih.gov/research/resources/software/biostatistics/art/">ART</a> simulated 50 bp Illumina reads were created based on a reference set of eight 16S sequences from RDP.  Reads in the two samples were simulated at different fold coverages for the same reference sequences to illustrate the use of the RDP pipeline to compare multiple metagenomic samples.</p>
+<p><code>sample1.single.fastq</code></p>
+<p><code>sample2.single.fastq</code></p>
+<p>Below is a table of the sequences used and their simulated fold coverages.</p>
+<table>
+<thead>
+<tr>
+<th>RDP ID</th>
+<th>Sample 1 cov, %</th>
+<th>Sample 2 cov, %</th>
+<th>lineage</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>S000000075</td>
+<td>100x, 37.0</td>
+<td>5x, 1.9</td>
+<td>Root; Bacteria; Deinococcus-Thermus; Deinococci; Thermales; Thermaceae; Thermus</td>
+</tr>
+<tr>
+<td>S000005187</td>
+<td>50x, 18.5</td>
+<td>10x, 3.7</td>
+<td>Root; Bacteria; Nitrospira; Nitrospira; Nitrospirales; Nitrospiraceae; Leptospirillum</td>
+</tr>
+<tr>
+<td>S000498962</td>
+<td>40x, 14.8</td>
+<td>15x, 5.6</td>
+<td>Root; Bacteria; Proteobacteria; Gammaproteobacteria; Oceanospirillales; SAR86; SAR86 clade II</td>
+</tr>
+<tr>
+<td>S000020432</td>
+<td>25x, 9.3</td>
+<td>25x, 9.3</td>
+<td>Root; Bacteria; Fusobacteria; Fusobacteria; Fusobacteriales; Fusobacteriaceae; Cetobacterium</td>
+</tr>
+<tr>
+<td>S000134123</td>
+<td>25x, 9.3</td>
+<td>25x, 9.3</td>
+<td>Root; Bacteria; Deinococcus-Thermus; Deinococci; Thermales; Thermaceae; Oceanithermus</td>
+</tr>
+<tr>
+<td>S000431293</td>
+<td>15x, 5.6</td>
+<td>40x, 14.8</td>
+<td>Root; Bacteria; Deinococcus-Thermus; Deinococci; Deinococcales; Deinococcaceae; Deinobacterium</td>
+</tr>
+<tr>
+<td>S000367885</td>
+<td>10x, 3.7</td>
+<td>50x, 18.5</td>
+<td>Root; Bacteria; Actinobacteria; Actinobacteria; Acidimicrobidae; Acidimicrobiales; Acidimicrobineae; Acidimicrobiaceae; Acidimicrobium</td>
+</tr>
+<tr>
+<td>S000390161</td>
+<td>5x, 1.9</td>
+<td>100x, 37.0</td>
+<td>Root; Archaea; Korarchaeota; Candidatus Korarchaeum</td>
+</tr>
+</tbody>
+</table>
+<p>In order to keep the runtime of this example reasonable we&#39;ll create our own RDP database file to align against composed of just these sequences plus seven more 16S sequences.  These sequences can be found in <code>RDP_slim.fasta</code>.</p>
+<table>
+<thead>
+<tr>
+<th>RDP ID</th>
+<th>lineage</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>S000458920</td>
+<td>Root; Bacteria; Deinococcus-Thermus; Deinococci; Thermales; Thermaceae; Vulcanithermus</td>
+</tr>
+<tr>
+<td>S000011652</td>
+<td>Root; Bacteria; Nitrospira; Nitrospira; Nitrospirales; Nitrospiraceae; Thermodesulfovibrio</td>
+</tr>
+<tr>
+<td>S000901535</td>
+<td>Root; Bacteria; Proteobacteria; Gammaproteobacteria; Oceanospirillales; Oceanospirillaceae; Amphritea</td>
+</tr>
+<tr>
+<td>S000379106</td>
+<td>Root; Bacteria; Fusobacteria; Fusobacteria; Fusobacteriales; Fusobacteriaceae; Psychrilyobacter</td>
+</tr>
+<tr>
+<td>S000443854</td>
+<td>Root; Bacteria; Actinobacteria; Actinobacteria; Acidimicrobidae; Acidimicrobiales; Acidimicrobineae; Acidimicrobiaceae; Ferrimicrobium</td>
+</tr>
+<tr>
+<td>S000357634</td>
+<td>Root; Archaea; Euryarchaeota; Halobacteria; Halobacteriales; Halobacteriaceae; Haladaptatus</td>
+</tr>
+<tr>
+<td>S000004750</td>
+<td>Root; Bacteria; Firmicutes; Bacilli; Lactobacillales; Aerococcaceae; Facklamia</td>
+</tr>
+</tbody>
+</table>
+<p>First we&#39;ll move to the simulated data directory <code>sim</code>.</p>
+<pre><code>cd sim</code></pre>
+<p>Next we need to download the RDP Classifier <a href="http://sourceforge.net/projects/rdp-classifier/files/rdp-classifier/">software</a> and training set <a href="http://sourceforge.net/projects/rdp-classifier/files/RDP_Classifier_TrainingData/">data</a> to this directory.  For this example I used classifier software version 2.5 and training set version 9.  Some browsers will automatically unzip these downloaded zip files.  If that&#39;s the case then skip the next step.  Otherwise, unzip the RDP software and training set archives.</p>
+<pre><code>unzip RDPClassifier_16S_trainsetNo9_rawtrainingdata.zip  # skip if browser automatically unzips
+unzip rdp_classifier_2.5.zip  # skip if browser automatically unzips</code></pre>
+<p>Now move the training set files to a convenient location and add a newline to the end of the file the hierarchical taxonomy file.  The last step is a workaround for the fact that the trainset9_db_taxid.txt file does not end in a newline, which makes appending  lines tricky.</p>
+<pre><code>mv RDPClassifier_16S_trainsetNo9_rawtrainingdata/* .   # move files to more convenient location
+echo &quot;&quot; &gt;&gt; trainset9_db_taxid.txt   # add missing final newline</code></pre>
+<p>The next step is to expand the RDP Classifier training set to cover an unrepresented bacterial clade common in marine environmental samples, SAR86.  RDP sequence <code>S000498962</code> has a taxonomic lineage of: </p>
+<blockquote>
+<p>Root; Bacteria; &quot;Proteobacteria&quot;; Gammaproteobacteria</p>
+</blockquote>
+<p>but we in fact know that this sequence is a representative of SAR86 clade II.  To add this clade to the training set we will append a custom FASTA entry to the training set sequence file, <code>trainset9_032012.fa</code>.  This custom entry has been updated to define the correct lineage for this sequence.</p>
+<blockquote>
+<p>>AF279106|S000498962 Root;Bacteria;&quot;Proteobacteria&quot;;Gammaproteobacteria;Oceanospirillales;SAR86; SAR86 clade II&quot;<br>agagtttgatcatg...</p>
+</blockquote>
+<p>In addition, the training set&#39;s taxonomic hierarchy file must be updated to reflect the new entries in the taxonomic lineage and connect them to the existing tree.  The following lines should be appended to <code>trainset9_db_taxid.txt</code>.</p>
+<blockquote>
+<p>4000*SAR86*1694*5*family<br>4001*&quot;SAR86 clade II&quot;*4000*6*genus</p>
+</blockquote>
+<p>This can be achieved using our example data set with these commands:</p>
+<pre><code>cat SAR86_custom_sequence.fasta &gt;&gt; trainset9_032012.fa
+cat SAR86_custom_db_taxid.txt &gt;&gt; trainset9_db_taxid.txt</code></pre>
+<p>Next we&#39;ll run <a href="#RDP_prep"><code>RDP_prep</code></a> to train the classifier with our custom training set, index our slimmed down RDP database, and specify where to find the RDP classifier software.</p>
+<pre><code>RDP_prep -s rdp_classifier_2.5 -f trainset9_032012.fa -t trainset9_db_taxid.txt -d RDP_slim.fasta -o RDP_db</code></pre>
+<p>Finally we&#39;ll run <a href="#RDP_go"><code>RDP_go</code></a> to estimate abundance of reference sequences and classify selected sequences with the RDP Classifier.</p>
+<pre><code>RDP_go -r RDP_db -o RDP_results sample1 sample2</code></pre>
+<p>The output of the pipeline can be viewed as per sample tables in files named <code>RDP_results/&lt;sample_prefix&gt;_final_class.txt</code>.  The relative percent abundance is appended to the RDP sequence identifier in column 1 of each line, and the RDP Classifier determined taxonomic lineage with confidence is shown in the remaining columns.</p>
+<p>The output of the pipeline can also be viewed as an aggregated bar plot for all samples by opening the file <code>RDP_results/html/tree_bars.html</code> in a web browser.</p>
+<p><img src="16S_abundance.png" alt="16S abundance plot" title="16S abundance"></p>
+<h2>Command Reference</h2>
+<h2><a name="RDP_prep"><code>RDP_prep</code></a></h2>
+<p>RDP_prep creates a new directory which contains</p>
+<ul>
+<li>copy of the RDP reference fasta file and associated aligner-specific index files</li>
+<li>copy of the RDP Classifier software directory</li>
+<li>processed RDP Classifier training data files in the subfolder <code>trained</code></li>
+<li>JSON file <code>RDP_expand.json</code> representing the training set taxonomic hierarchy</li>
+</ul>
+<p>It depends on <a href="#RDP_index"><code>RDP_index</code></a>.</p>
+<h4>Usage:   <code>RDP_prep [-c] -d &lt;ref&gt; -s &lt;classifier&gt; -f &lt;training_seq&gt; -t &lt;training_tax&gt; -o &lt;out_dir&gt;</code></h4>
+<p><strong><code>-h</code> / <code>--help</code></strong></p>
+<p>Request help.</p>
+<p><strong><code>-c</code></strong></p>
+<p>Colorspace data [FALSE]</p>
+<p><strong><code>-d &lt;ref&gt;</code></strong></p>
+<p>RDP sequence fasta file.  Can be gzipped with .gz extension. (required)</p>
+<p><strong><code>-s &lt;classifier&gt;</code></strong></p>
+<p>RDP classifier software directory or zip file. (required)</p>
+<p><strong><code>-f &lt;training_seq&gt;</code></strong></p>
+<p>RDP classifier training set fasta file.  Can be gzipped with .gz extension. (required)</p>
+<p><strong><code>-t &lt;training_tax&gt;</code></strong></p>
+<p>RDP classifier training set taxonomy file.  Can be gzipped with .gz extension. (required)</p>
+<p><strong><code>-o &lt;out_dir&gt;</code></strong></p>
+<p>Output directory. (required)</p>
+<h2><a name="RDP_go"><code>RDP_go</code></a></h2>
+<p>RDP_go encapsulates a series of step which</p>
+<ul>
+<li>align reads against the RDP database</li>
+<li>select reference sequences present in the sample based on initial alignments and create a new, reduced reference database with just these selected sequences</li>
+<li>re-align reads against reduced database</li>
+<li>produce final abundance estimates and selected sequences based on alignments to reduced database</li>
+<li>taxonomically classify selected RDP sequences with the RDP Classifier</li>
+</ul>
+<p>It depends on <a href="#RDP_align"><code>RDP_align</code></a>.</p>
+<h4>Usage:   <code>RDP_go [options] &lt;prefix&gt;</code></h4>
+<p><strong><code>-h</code> / <code>--help</code></strong></p>
+<p>Request help.</p>
+<p><strong><code>-r &lt;prep_dir&gt;</code></strong></p>
+<p>RDP database directory created by RDP_prep (required)</p>
+<p><strong><code>-l &lt;int&gt;</code></strong></p>
+<p>Maximum number of reference mappings before a read is rejected from consideration [5000]</p>
+<p><strong><code>-t &lt;float&gt;</code></strong></p>
+<p>Minimum bitscore value for a ref sequence to be selected by ref_select during initial RPD selection step [75.0]</p>
+<p><strong><code>-f &lt;float&gt;</code></strong></p>
+<p>Minimum bitscore value for a ref sequence to be selected by ref_select, as a fraction of the top scoring sequence.  Used by ref_select during initial RDP selection step [0.00125]</p>
+<p><strong><code>-o &lt;out_dir&gt;</code></strong></p>
+<p>Output directory (required)</p>
+<p><strong><code>-c</code></strong></p>
+<p>Colorspace data [FALSE]</p>
+<p><strong><code>-d</code></strong></p>
+<p>Debug.  Do not remove intermediate files [FALSE]</p>
+<p>It may be beneficial to customize the alignment module of this pipeline.  As provided, alignment is performed locally using up to two threads with BWA.  While this is fine for processing an example data set, most real world uses can benefit from distributing the alignment across multiple computers and/or using a different alignment program.  To aid this kind of customization, aligner specific reference indexing and read alignment have been abstracted to two scripts called <a href="#RDP_index"><code>RDP_index</code></a> and <a href="#RDP_align"><code>RDP_align</code></a>.  The only requirements when amending these scripts are that:</p>
+<ul>
+<li>the aligner returns all equally good alignments for each read (equivalent to a very high value for bwa samse -n)</li>
+<li>they keep the same behavior and command-line (CLI) interface as the original scripts.</li>
+</ul>
+<h2><a name="RDP_index"><code>RDP_index</code></a></h2>
+<h4>Usage:   <code>RDP_index [options] &lt;reference_fasta&gt;</code></h4>
+<p><code>&lt;reference_fasta&gt;</code> is the fasta file to index.  The output index files will be writte to the same directory as <code>&lt;reference_fasta&gt;</code>.  The set of index files will be referred to by the filename of <code>&lt;reference_fasta&gt;</code> in downstream RDP pipeline tools.</p>
+<p><strong><code>-c</code></strong></p>
+<p>Colorspace data (not necessary to implement if colorspace reads are never used) [FALSE]</p>
+<h2><a name="RDP_align"><code>RDP_align</code></a></h2>
+<h4>Usage:   <code>RDP_align [options] &lt;index&gt; &lt;fastq_prefix&gt; &lt;out_dir&gt;</code></h4>
+<p><code>&lt;index&gt;</code> is the same as <code>&lt;reference_fasta&gt;</code> above.</p>
+<p><code>&lt;fastq_prefix&gt;</code> refers to a set of FASTQ files.</p>
+<p><code>&lt;out dir&gt;</code> is a new directory to be created which will contain one gzipped SAM file for each FASTQ file.  Gzipped SAM files will be named as fastq_prefix.<read_type>.sam.gz where <code>&lt;read_type&gt;</code> is e.g. <code>read1</code>.</p>
+<p><strong><code>-c</code></strong></p>
+<p>Colorspace data (not necessary to implement if colorspace reads are never used) [FALSE]</p>
+

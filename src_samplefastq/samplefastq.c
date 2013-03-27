@@ -106,7 +106,7 @@ int main(int argc, char *argv[]) {
     
 	if (version->count) {
 		fprintf(stderr, "%s version: %s\n", argv[0], SS_BUILD_VERSION);
-		exit(EXIT_FAILURE);
+		exit(EXIT_SUCCESS);
     }
 	
     if (h->count) {
@@ -290,9 +290,9 @@ int main(int argc, char *argv[]) {
         mp_cnt = R1_cnt;
         mp_org = R1_org;
         
-        fprintf(stderr, "\nMatepairs: Before: %lu, After: %lu\n", mp_org, mp_cnt);
-        fprintf(stderr, "Singlets: Before: %lu %lu After: %lu %lu\n", singlet1_org, singlet2_org, singlet1_cnt, singlet2_cnt);
-        fprintf(stderr, "Total Reads Processed: %lu, Reads retained: %lu\n", (2*mp_org)+singlet1_org+singlet2_org, (2*mp_cnt)+singlet1_cnt+singlet2_cnt);
+        printf("\nMatepairs: Before: %lu, After: %lu\n", mp_org, mp_cnt);
+        printf("Singlets: Before: %lu %lu After: %lu %lu\n", singlet1_org, singlet2_org, singlet1_cnt, singlet2_cnt);
+        printf("Total Reads Processed: %lu, Reads retained: %lu\n", (2*mp_org)+singlet1_org+singlet2_org, (2*mp_cnt)+singlet1_cnt+singlet2_cnt);
     
         exit(EXIT_SUCCESS);
     }

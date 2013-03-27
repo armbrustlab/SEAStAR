@@ -23,7 +23,7 @@
 # -------------------------------------------------------------------------- #
 
 # CMake file for solid2fastq
-cmake_minimum_required (VERSION 2.6)
+cmake_minimum_required (VERSION 2.8)
 
 project (solid2fastq C)
 
@@ -33,13 +33,34 @@ add_executable(solid2fastq solid2fastq.c)
 
 target_link_libraries(solid2fastq ${COMMON_LIBS})
 
+if(CMAKE_GENERATOR STREQUAL "Xcode")
+    add_custom_command(
+        TARGET solid2fastq
+        POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E remove -f ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/solid2fastq
+        COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:solid2fastq> ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/solid2fastq
+)
+endif(CMAKE_GENERATOR STREQUAL "Xcode")
+
 enable_testing()
+
+find_program(GAWK_EXEC "gawk")
 
 add_test(NAME solid2fastq_runs COMMAND solid2fastq --version)
 
-set_tests_properties(solid2fastq_runs PROPERTIES PASS_REGULAR_EXPRESSION "version: ${GIT_VERSION}" TIMEOUT 1)
+set_tests_properties(solid2fastq_runs PROPERTIES PASS_REGULAR_EXPRESSION "version: ${GIT_VERSION}" TIMEOUT 3)
 
-add_test(NAME solid2fastq_test_data COMMAND solid2fastq -z --prefix=lambda_tst ${CMAKE_SOURCE_DIR}/test_data/lambda_reads ${CMAKE_BINARY_DIR}/output_test_data/lambda_reads)
+add_test(NAME solid2fastq_test_data COMMAND bash -c "$<TARGET_FILE:solid2fastq> -z --prefix=lambda_tst ${CMAKE_SOURCE_DIR}/test_data/lambda_reads ${CMAKE_BINARY_DIR}/output_test_data/lambda_reads; gunzip -c ${CMAKE_BINARY_DIR}/output_test_data/lambda_reads.{read1,read2}.fastq.gz | openssl md5")
 
-set_tests_properties(solid2fastq_test_data PROPERTIES PASS_REGULAR_EXPRESSION "Matepairs: 80374, Matepaired Reads: 160748.*Total singlets: 0.*Total Reads Processed: 160748" TIMEOUT 15)
+set_tests_properties(solid2fastq_test_data PROPERTIES PASS_REGULAR_EXPRESSION "97925a0daa5e9d31a4b9c746cd0c1ba7" TIMEOUT 30)
 
+# Test suppression of /1 and /2 read ID suffixes
+add_test(NAME solid2fastq_test_no_suffix COMMAND bash -c "$<TARGET_FILE:solid2fastq> -z --prefix=lambda_tst --no_suffix ${CMAKE_SOURCE_DIR}/test_data/lambda_reads ${CMAKE_BINARY_DIR}/output_test_data/lambda_reads_no_suffix; gunzip -c ${CMAKE_BINARY_DIR}/output_test_data/lambda_reads_no_suffix.{read1,read2}.fastq.gz | openssl md5")
+
+set_tests_properties(solid2fastq_test_no_suffix PROPERTIES PASS_REGULAR_EXPRESSION "791734e70eb0c93f6db4fa21daf2a263" TIMEOUT 30)
+
+# Create unsynced input fastq to test solid2fastq sorting.  These reads are 
+# colorspace, but it's ok to treat them as nucleotide for testing.
+add_test(NAME solid2fastq_nt_input_test_data COMMAND bash -c "gzip -dc ${CMAKE_BINARY_DIR}/output_test_data/lambda_reads.read1.fastq.gz | ${GAWK_EXEC} -v EVERY=4 -v HEADSTART=@ -v F3=_F3 -v R3=_R3 'line == 4 {x=0; line=0} NR % 4 == 1 {cnt++;sub(/^[^:]+:/, HEADSTART);sub(/\\/2$/, F3);sub(/\\/1$/, R3)} cnt % EVERY == 0 {x=1} x == 1 {line++; next} {print}' | gzip >${CMAKE_BINARY_DIR}/output_test_data/lambda_reads_unsync_default_R3.fastq.gz; gzip -dc ${CMAKE_BINARY_DIR}/output_test_data/lambda_reads.read2.fastq.gz | ${GAWK_EXEC} -v EVERY=3 -v HEADSTART=@ -v F3=_F3 -v R3=_R3 'line == 4 {x=0; line=0} NR % 4 == 1 {cnt++;sub(/^[^:]+:/, HEADSTART);sub(/\\/1$/, R3);sub(/\\/2$/, F3)} cnt % EVERY == 0 {x=1} x == 1 {line++; next} {print}' | gzip >${CMAKE_BINARY_DIR}/output_test_data/lambda_reads_unsync_default_F3.fastq.gz; $<TARGET_FILE:solid2fastq> -b default -z --prefix=lambda_tst ${CMAKE_BINARY_DIR}/output_test_data/lambda_reads_unsync ${CMAKE_BINARY_DIR}/output_test_data/lambda_reads_sync; gunzip -c ${CMAKE_BINARY_DIR}/output_test_data/lambda_reads_sync.{read1,read2,single}.fastq.gz | openssl md5")
+
+set_tests_properties(solid2fastq_nt_input_test_data PROPERTIES PASS_REGULAR_EXPRESSION "5c85d2f526c9cc9fb28068e6d33b9283" TIMEOUT 30)

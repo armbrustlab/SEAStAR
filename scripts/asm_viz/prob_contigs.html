@@ -1,0 +1,62 @@
+
+<html>
+
+<head>
+<script tpe="text/javascript" src="http://d3js.org/d3.v2.js"></script>
+
+<style type="text/css">
+.xAxis path,
+.xAxis line {
+  fill: none;
+  stroke: black;
+  shape-rendering: crispEdges;
+}
+
+.xAxis text {
+  font-family: sans-serif;
+  font-size: 11px;
+}
+.yAxis path,
+.yAxis line {
+  fill: none;
+  stroke: black;
+  shape-rendering: crispEdges;
+}
+
+.yAxis text {
+  font-family: sans-serif;
+  font-size: 11px;
+}
+
+.buttons text {
+  font-family: sans-serif;
+  font-size: 14px;
+  text-anchor: middle;
+  dominant-baseline: central;
+}
+
+
+</style>
+
+</head>
+
+<body>
+
+<div id="viz"></div>
+<div id="control"></div>
+<div id="info"</div>
+
+<!--
+Set JSON file name here.  Should be run through json_graph_ops.js through
+maximum spanning tree creation and edge direction.
+e.g. node json_graph_ops.js data.json MST DIRECT >input.json
+-->
+<script type="text/javascript">json_file = "MST_DIRECT.json";</script>
+
+<!-- Load visualization code -->
+<script type="text/javascript" src="prob_contigs.js"></script>
+
+
+</body>
+
+</html>

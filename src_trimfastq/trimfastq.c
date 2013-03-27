@@ -56,13 +56,13 @@ double entropy_cutoff = -1.0;
 // Strict entropy
 int strict_ent = 0;
 
-// Trimming Method parameter [0=>cs, 1=>nt]
-int method_flag = 0;
-
 // Minimum output read length
 int min_len = 0;
 int min_mate_len = 0;
 int fix_len = 0;
+
+// Colorspace fastq flag
+int colorspace_flag = 0;
 
 /////////////////////////
 // Function prototypes
@@ -73,6 +73,10 @@ int trimmer(char *qualdata);
 double entropy_calc(char *seqdata, int len);
 
 unsigned long int fq_stream_trimmer(UT_string *fq_fn, int pipe_fd, UT_string *out_prefix, int no_pre, int len_pre, unsigned long int *comp_cnt, unsigned long int *org, char split);
+
+void output_read(UT_string *fwd, UT_string *rev, UT_string *tmp, FILE *input, FILE *output, FILE *mates_output);
+
+int keep_read(UT_string *header);
 
 /////////////////////////////////////////////////////////////////
 // Entry point
@@ -124,24 +128,23 @@ int main(int argc, char *argv[]) {
     struct arg_lit *inv_singles = arg_lit0("v", "invert_singles", "Causes singles output to be the inverse of the input. 2->1 or 1->2 [NULL]");
     struct arg_lit *num_singles = arg_lit0("s", "singles", "Write two singlet files, one for each mate-paired input file. [NULL]");
     struct arg_rem *sing_rem = arg_rem(NULL, "Note! -v is only valid when there are input singlet reads. -s is only valid when there are NO input singlet reads.");    
-    struct arg_lit *colorspace = arg_lit0("c", "color_space", "Use color-space errors to trim and reject reads [default: use nucleotide space errors]");
     struct arg_str *pre_read_id = arg_str0(NULL, "prefix", "<string>", "Prefix to add to read identifiers. [out_prefix]");
     struct arg_lit *no_pre = arg_lit0(NULL, "no_prefix", "Do not change the read names in any way. [NULL]");
     struct arg_lit *pre_read_len = arg_lit0(NULL, "add_len", "Add the final trimmed length value to the read id prefix. [length not added]");
-    struct arg_dbl *prob = arg_dbl0("p","correct_prob","<d>","Probability that output reads are correct in nucleotide space (or colorspace with -c) [0.5]");
+    struct arg_dbl *prob = arg_dbl0("p","correct_prob","<d>","Probability that output reads are correct [0.5]");
     struct arg_int *fixed_len = arg_int0("f","fixed_len","<u>","Trim all reads to a fixed length, still filtering on quality [no fixed length]");
     struct arg_int *len = arg_int0("l","min_read_len","<u>","Minimum length of a singlet or longest-mate in nucleotides [24]");
     struct arg_int *mate_len = arg_int0("m","min_mate_len","<u>","Minimum length of the shortest mate in nucleotides [min_read_len]");
     struct arg_dbl *entropy = arg_dbl0("e","entropy_filter","<d>","Remove reads with per position information below given value (in bits per dinucleotide) [No filter]");
     struct arg_lit *entropy_strict = arg_lit0(NULL, "entropy_strict", "Reject reads for low entropy overall, not just the retained part after trimming [NULL]");
-    struct arg_lit *mates = arg_lit0(NULL, "mates_file", "Produce a Velvet compatible mate-paired output file (e.g. <out_prefix>_mates.fastq) with read2 mates reversed. [none]");
+    struct arg_lit *mates = arg_lit0(NULL, "mates_file", "Produce a Velvet compatible mate-paired output file (e.g. <out_prefix>_mates.fastq) with read1 mates reversed. [none]");
     struct arg_file *input = arg_file1(NULL, NULL, "<in_prefix>", "Input file prefix: (e.g. <in_prefix>_single.fastq [<in_prefix>_read1.fastq <in_prefix>_read2.fastq]) ");
     struct arg_file *output = arg_file1(NULL, NULL, "<out_prefix>", "Output file prefix: (e.g. <out_prefix>_single.fastq [<out_prefix>_read1.fastq <out_prefix>_read2.fastq]) ");
     struct arg_lit *version = arg_lit0(NULL,"version","Print the build version and exit."); 
     struct arg_lit *h = arg_lit0("h", "help", "Request help.");
     struct arg_end *end = arg_end(20);
     
-    void *argtable[] = {h,version,colorspace,gzip,inv_singles,num_singles,sing_rem,prob,len,mate_len,fixed_len,pre_read_id,pre_read_len,no_pre,entropy,entropy_strict,mates,input,output,end};
+    void *argtable[] = {h,version,gzip,inv_singles,num_singles,sing_rem,prob,len,mate_len,fixed_len,pre_read_id,pre_read_len,no_pre,entropy,entropy_strict,mates,input,output,end};
     int arg_errors = 0;
         
     ////////////////////////////////////////////////////////////////////////
@@ -152,7 +155,7 @@ int main(int argc, char *argv[]) {
 
 	if (version->count) {
 		fprintf(stderr, "%s version: %s\n", argv[0], SS_BUILD_VERSION);
-		exit(EXIT_FAILURE);
+		exit(EXIT_SUCCESS);
     }    
 	
     if (h->count) {
@@ -162,7 +165,7 @@ int main(int argc, char *argv[]) {
         fprintf(stderr, "_single.fastq [_read1.fastq _read2.fastq]  A singlets (single) file\n");
         fprintf(stderr, "is required.  Mate-paired read files are automatically used if present.\n");
         fprintf(stderr, "Three fastq output files only produced for mate-paired inputs.\n");
-        // fprintf(stderr, "\nNote! Input and output fastq files may be gzipped.\n");
+        fprintf(stderr, "\nNote! Input and output fastq files may be gzipped.\n");
         
         exit(EXIT_FAILURE);
     }    
@@ -173,13 +176,6 @@ int main(int argc, char *argv[]) {
         exit(EXIT_FAILURE);
     }
     
-    // Validate method
-    if (colorspace->count) {
-        method_flag = 0;    // cs space
-    } else {
-        method_flag = 1;    // nt space
-    }    
-
     // Validate entropy
     if (entropy->count) {
         entropy_cutoff = entropy->dval[0];
@@ -294,41 +290,34 @@ int main(int argc, char *argv[]) {
     
     utstring_printf(in_single1_fq_fn, "%s.single.fastq", input->filename[0]);
     
-    FILE *in_single1_file = NULL;
+    FILE *in_read_file = NULL;
     
     num_input_singles_files = 1;
     
     // Try to open a singlet fastq file
-    if (!(in_single1_file = gzopen(utstring_body(in_single1_fq_fn), "r"))) {
-        utstring_printf(in_single1_fq_fn, ".gz");
+    // Check singlet output options -s and -v
+    // Set input singlet names to
+    //   - *.single.fastq or
+    //   - *.single1.fastq and *.single2.fastq
+    if (!(in_read_file = ss_get_gzFile(utstring_body(in_single1_fq_fn), "r"))) {
+        utstring_clear(in_single1_fq_fn);
+        utstring_printf(in_single1_fq_fn, "%s.single1.fastq", input->filename[0]);
+        utstring_printf(in_single2_fq_fn, "%s.single2.fastq", input->filename[0]);
+        num_input_singles_files = 2;
         
-        if (!(in_single1_file = gzopen(utstring_body(in_single1_fq_fn), "r"))) {
-            utstring_clear(in_single1_fq_fn);
-            utstring_printf(in_single1_fq_fn, "%s.single1.fastq", input->filename[0]);
-            utstring_printf(in_single2_fq_fn, "%s.single2.fastq", input->filename[0]);
-            num_input_singles_files = 2;
-            
-            if ((in_single1_file = gzopen(utstring_body(in_single1_fq_fn), "r")) || (in_single1_file = gzopen(utstring_body(in_single2_fq_fn), "r"))) {
-                singles_flag = 1;   // Two singlet outputs
-            } else {
-                utstring_printf(in_single1_fq_fn, ".gz");
-                utstring_printf(in_single2_fq_fn, ".gz");
-                
-                if ((in_single1_file = gzopen(utstring_body(in_single1_fq_fn), "r")) || (in_single1_file = gzopen(utstring_body(in_single2_fq_fn), "r"))) {
-                    singles_flag = 1;   // Two singlet outputs
-                } else {
-                    singles_flag = num_singles->count;  // Number of singlet outputs set by -s parm
-                    if (inv_singles->count) {
-                        fprintf(stderr, "Error: Invalid option -v, No input singlet file(s) found. Use -s to select multiple output singlet files.\n");
-                        exit(EXIT_FAILURE);
-                    }
-                }
+        if ((in_read_file = ss_get_gzFile(utstring_body(in_single1_fq_fn), "r")) || (in_read_file = ss_get_gzFile(utstring_body(in_single2_fq_fn), "r"))) {
+            singles_flag = 1;   // Two singlet outputs
+        } else {
+            singles_flag = num_singles->count;  // Number of singlet outputs set by -s parm
+            if (inv_singles->count) {
+                fprintf(stderr, "Error: Invalid option -v, No input singlet file(s) found. Use -s to select multiple output singlet files.\n");
+                exit(EXIT_FAILURE);
             }
-        } 
+        }
     }
     
-    if (in_single1_file) {
-        gzclose(in_single1_file);
+    if (in_read_file) {
+        gzclose(in_read_file);
         if (num_singles->count) {
             fprintf(stderr, "Error: Invalid option -s, Input singlet file(s) found, use -v to change the number of output singlet files.\n");
             exit(EXIT_FAILURE);
@@ -337,6 +326,25 @@ int main(int argc, char *argv[]) {
 
     // singles->count inverts the current singles file input scheme
     singles_flag = (singles_flag ^ inv_singles->count);
+    
+    // Check if input fastq is colorspace
+    // If some files are colorspace and some are basespace, throw an error
+    int fcount = 0;
+    int cscount = 0;
+    fcount += ss_is_fastq(utstring_body(in_read1_fq_fn));
+    fcount += ss_is_fastq(utstring_body(in_read2_fq_fn));
+    fcount += ss_is_fastq(utstring_body(in_single1_fq_fn));
+    fcount += ss_is_fastq(utstring_body(in_single2_fq_fn));
+    cscount += (ss_is_fastq(utstring_body(in_read1_fq_fn)) && ss_is_colorspace_fastq(utstring_body(in_read1_fq_fn)));
+    cscount += (ss_is_fastq(utstring_body(in_read2_fq_fn)) && ss_is_colorspace_fastq(utstring_body(in_read2_fq_fn)));
+    cscount += (ss_is_fastq(utstring_body(in_single1_fq_fn)) && ss_is_colorspace_fastq(utstring_body(in_single1_fq_fn)));
+    cscount += (ss_is_fastq(utstring_body(in_single2_fq_fn)) && ss_is_colorspace_fastq(utstring_body(in_single2_fq_fn)));
+    
+    if (cscount && (cscount != fcount)) {        
+        printf("Error: Mixed colorspace and basespace FASTQ files detected\n");
+        exit(EXIT_FAILURE);
+    }
+    colorspace_flag = cscount ? 1 : 0;
     
     // Output filenames
     
@@ -460,39 +468,12 @@ int main(int argc, char *argv[]) {
             UT_string *s2_data;
             utstring_new(s2_data);
             
-            UT_string *mate_data;
-            utstring_new(mate_data);
-
+            UT_string *rev_tmp;
+            utstring_new(rev_tmp);
+            
             UT_string *rev_data;
             utstring_new(rev_data);
-
-            // Read header scanf pattern string:
-            // Parses out the three bead coordinates from the first FASTQ "header" line for a read
-            // e.g.  @TA+lambda:1231_1682_1381/1
-            //                  xxxx yyyy zzzz    where xxxx, yyyy and zzzz are the bead coordinates
             
-            const char *head_scanner = "@%*[^:]:%hu_%hu_%hu"; 
-            
-            // Encoded header 64-bit values 
-            // Each solid read coordiante is xxxx_yyyy_zzzz, the code below packs these three
-            // (< 16-bit) unsigned values into a 64-bit unsigned integer as:
-            // 0000xxxxyyyyzzzz in hex notation
-            long unsigned int single1_head_int = 0, single2_head_int = 0, read1_head_int = 0, read2_head_int = 0, last_head_int = 0;
-            
-            // Pointers to short int parts of the above 64-bit ints (used by sscanf below)
-            short unsigned int *single1_1 = (short unsigned int *)(&single1_head_int)+2;
-            short unsigned int *single1_2 = (short unsigned int *)(&single1_head_int)+1;
-            short unsigned int *single1_3 = (short unsigned int *)(&single1_head_int);
-            short unsigned int *single2_1 = (short unsigned int *)(&single2_head_int)+2;
-            short unsigned int *single2_2 = (short unsigned int *)(&single2_head_int)+1;
-            short unsigned int *single2_3 = (short unsigned int *)(&single2_head_int);
-            short unsigned int *read1_1 = (short unsigned int *)(&read1_head_int)+2;
-            short unsigned int *read1_2 = (short unsigned int *)(&read1_head_int)+1;
-            short unsigned int *read1_3 = (short unsigned int *)(&read1_head_int);
-            short unsigned int *read2_1 = (short unsigned int *)(&read2_head_int)+2;
-            short unsigned int *read2_2 = (short unsigned int *)(&read2_head_int)+1;
-            short unsigned int *read2_3 = (short unsigned int *)(&read2_head_int);
-
             // Pipes
             FILE *r1_in = fdopen(r1_pipe[0],"r"); 
             FILE *r2_in = fdopen(r2_pipe[0],"r");                 
@@ -513,249 +494,122 @@ int main(int argc, char *argv[]) {
                 s2_out = s1_out;
             }
             
-            // Prime flags for loop below
-            int single1_hungry = 0;
-            int single2_hungry = 0;
-            int read1_hungry = 0;
-            int read2_hungry = 0;
-           
-            // Prime buffers
-            if (ss_get_utstring(r1_in, r1_data)) {
-                sscanf(utstring_body(r1_data), head_scanner, read1_1, read1_2, read1_3);
-                if ((mates->count) && (read1_head_int >= read2_head_int)) {
-                    utstring_clear(mate_data);
-                    utstring_concat(mate_data, r1_data);    // head
-                    ss_get_utstring(r1_in, rev_data);       // seq
-                    utstring_concat(r1_data, rev_data);
-                    ss_trunc_utstring(rev_data, 1);  // remove newline
-                    ss_rev_utstring(rev_data);
-                    ss_strcat_utstring(rev_data, "\n"); // add newline back
-                    utstring_concat(mate_data, rev_data);
-                    ss_get_utstring(r1_in, rev_data);       // extra
-                    utstring_concat(r1_data, rev_data);
-                    utstring_concat(mate_data, rev_data);
-                    ss_get_utstring(r1_in, rev_data);       // qual
-                    utstring_concat(r1_data, rev_data);
-                    ss_trunc_utstring(rev_data, 1);  // remove newline
-                    ss_rev_utstring(rev_data);
-                    ss_strcat_utstring(rev_data, "\n"); // add newline back
-                    utstring_concat(mate_data, rev_data);
-                } else {
-                    ss_get_cat_utstring(r1_in, r1_data);
-                    ss_get_cat_utstring(r1_in, r1_data);
-                    ss_get_cat_utstring(r1_in, r1_data);
+            // Flags for data left in single files
+            int single1_hungry = 1;
+            int single2_hungry = 1;
+            
+            // Handle read1 and read2 files
+            while (ss_get_utstring(r1_in, r1_data)) {
+                if (!ss_get_utstring(r2_in, r2_data)) {
+                    fprintf(stderr, "Error: Input read1 and read2 files are not synced\n");
+                    exit(EXIT_FAILURE);
                 }
-            } else {
-                read1_head_int = 0xffffffffffffffff;
-            }
-            
-            if (ss_get_utstring(r2_in, r2_data)) {
-                sscanf(utstring_body(r2_data), head_scanner, read2_1, read2_2, read2_3);
-                    ss_get_cat_utstring(r2_in, r2_data);
-                    ss_get_cat_utstring(r2_in, r2_data);
-                    ss_get_cat_utstring(r2_in, r2_data);
-            } else {
-                read2_head_int = 0xffffffffffffffff;
-            }
-
-            if (ss_get_utstring(s1_in, s1_data)) {
-                sscanf(utstring_body(s1_data), head_scanner, single1_1, single1_2, single1_3);
-                ss_get_cat_utstring(s1_in, s1_data);
-                ss_get_cat_utstring(s1_in, s1_data);
-                ss_get_cat_utstring(s1_in, s1_data);
-            } else {
-                single1_head_int = 0xffffffffffffffff;
-            }
-            
-            if (ss_get_utstring(s2_in, s2_data)) {
-                sscanf(utstring_body(s2_data), head_scanner, single2_1, single2_2, single2_3);
-                ss_get_cat_utstring(s2_in, s2_data);
-                ss_get_cat_utstring(s2_in, s2_data);
-                ss_get_cat_utstring(s2_in, s2_data);
-            } else {
-                single2_head_int = 0xffffffffffffffff;
-            }            
-
-            while ((read1_head_int & read2_head_int & single1_head_int & single2_head_int) != 0xffffffffffffffff) {
-                                
-                if ((read1_head_int <= read2_head_int) && (read1_head_int < single1_head_int) && (read1_head_int < single2_head_int)) {
-                    
-                    last_head_int = read1_head_int;
-                    
-                    if (read1_head_int == read2_head_int) {  // Write a trimmed mate-pair
-                        
-                        fputs(utstring_body(r1_data), r1_out);
-                        fputs(utstring_body(r2_data), r2_out);
-                        
+                if (keep_read(r1_data)) {
+                    if (keep_read(r2_data)) {
+                        // Output both read1 and read2
                         if (mates->count) {
-                            fputs(utstring_body(r2_data), mates_out);
-                            fputs(utstring_body(mate_data), mates_out);
-                        }
-
-                        read1_hungry = read2_hungry = 1;
-
-                    } else {    // write read1 singlet
-                    
-                        read1_singlet_cnt++;
-                        fputs(utstring_body(r1_data), s1_out);
-                        read1_hungry = 1;
-                    
-                    }
-                    
-                } else if ((read2_head_int < single1_head_int) && (read2_head_int < single2_head_int)) {
-                    
-                    last_head_int = read2_head_int;
-                    read2_singlet_cnt++;
-                    fputs(utstring_body(r2_data), s2_out);
-                    read2_hungry = 1;
-                    
-                } else if (single1_head_int < single2_head_int) {
-
-                    last_head_int = single1_head_int;
-                    fputs(utstring_body(s1_data), s1_out);
-                    single1_hungry = 1;
-                    
-                } else { // single2 must be the smallest
-                    
-                    last_head_int = single2_head_int;
-                    fputs(utstring_body(s2_data), s2_out);
-                    single2_hungry = 1;
-                    
-                }
-            
-                // Deal with hungry input buffers
-                
-                if (read1_hungry) {
-                    if (ss_get_utstring(r1_in, r1_data)) {
-                        sscanf(utstring_body(r1_data), head_scanner, read1_1, read1_2, read1_3);
-                        
-                        if (read1_head_int <= last_head_int) {
-                            fprintf(stderr, "Error: Out of order read detected! %s\n", utstring_body(r1_data));
-                            exit(EXIT_FAILURE);
-                        }
-                        if ((mates->count) && (read1_head_int >= read2_head_int)) {
-                            utstring_clear(mate_data);
-                            utstring_concat(mate_data, r1_data);    // head
-                            ss_get_utstring(r1_in, rev_data);       // seq
-                            utstring_concat(r1_data, rev_data);
-                            ss_trunc_utstring(rev_data, 1);  // remove newline
-                            ss_rev_utstring(rev_data);
-                            ss_strcat_utstring(rev_data, "\n"); // add newline back
-                            utstring_concat(mate_data, rev_data);
-                            ss_get_utstring(r1_in, rev_data);       // extra
-                            utstring_concat(r1_data, rev_data);
-                            utstring_concat(mate_data, rev_data);
-                            ss_get_utstring(r1_in, rev_data);       // qual
-                            utstring_concat(r1_data, rev_data);
-                            ss_trunc_utstring(rev_data, 1);  // remove newline
-                            ss_rev_utstring(rev_data);
-                            ss_strcat_utstring(rev_data, "\n"); // add newline back
-                            utstring_concat(mate_data, rev_data);
+                            // Interleaved velvet output and normal read file output
+                            output_read(r2_data, NULL, NULL, r2_in, r2_out, mates_out);
+                            output_read(r1_data, rev_data, rev_tmp, r1_in, r1_out, mates_out);
                         } else {
-                            ss_get_cat_utstring(r1_in, r1_data);
-                            ss_get_cat_utstring(r1_in, r1_data);
-                            ss_get_cat_utstring(r1_in, r1_data);
+                            // No interleaved velvet output
+                            output_read(r1_data, NULL, NULL, r1_in, r1_out, NULL);
+                            output_read(r2_data, NULL, NULL, r2_in, r2_out, NULL);
                         }
                     } else {
-                        read1_head_int = 0xffffffffffffffff;
-                    }                
-                    read1_hungry = 0;
-                }
-
-                if (read2_hungry) {
-                    if (ss_get_utstring(r2_in, r2_data)) {
-                        sscanf(utstring_body(r2_data), head_scanner, read2_1, read2_2, read2_3);
-                        
-                        if (read2_head_int <= last_head_int) {
-                            fprintf(stderr, "Error: Out of order read detected! %s\n", utstring_body(r2_data));
-                            exit(EXIT_FAILURE);
-                        }
-                        ss_get_cat_utstring(r2_in, r2_data);
-                        ss_get_cat_utstring(r2_in, r2_data);
-                        ss_get_cat_utstring(r2_in, r2_data);
-                    } else {
-                        read2_head_int = 0xffffffffffffffff;
+                        // Discard read2, output read1 as singlet
+                        output_read(r1_data, NULL, NULL, r1_in, s1_out, NULL);
+                        read1_singlet_cnt++;
                     }
-                    read2_hungry = 0;
+                } else {
+                    if (keep_read(r2_data)) {
+                        // Discard read1, output read2 as singlet
+                        output_read(r2_data, NULL, NULL, r2_in, s2_out, NULL);
+                        read2_singlet_cnt++;
+                    }
                 }
-
+                
+                // Process reads from singles here to take advantage of
+                // parallelism
+                if (single1_hungry || single2_hungry) {
+                    if (single1_hungry) {
+                        if (ss_get_utstring(s1_in, s1_data)) {
+                            if (keep_read(s1_data)) {
+                                output_read(s1_data, NULL, NULL, s1_in, s1_out, NULL);
+                            }
+                        } else {
+                            single1_hungry = 0;
+                        }
+                    }
+                    if (single2_hungry) {
+                        if (ss_get_utstring(s2_in, s2_data)) {
+                            if (keep_read(s2_data)) {
+                                output_read(s2_data, NULL, NULL, s2_in, s2_out, NULL);
+                            }
+                        } else {
+                            single2_hungry = 0;
+                        }
+                    }
+                }
+            }
+            
+            while (single1_hungry || single2_hungry) {
                 if (single1_hungry) {
                     if (ss_get_utstring(s1_in, s1_data)) {
-                        sscanf(utstring_body(s1_data), head_scanner, single1_1, single1_2, single1_3);
-                        
-                        if (single1_head_int <= last_head_int) {
-                            fprintf(stderr, "Error: Out of order read detected! %s\n", utstring_body(s1_data));
-                            exit(EXIT_FAILURE);
+                        if (keep_read(s1_data)) {
+                            output_read(s1_data, NULL, NULL, s1_in, s1_out, NULL);
                         }
-                        
-                        ss_get_cat_utstring(s1_in, s1_data);
-                        ss_get_cat_utstring(s1_in, s1_data);
-                        ss_get_cat_utstring(s1_in, s1_data);
                     } else {
-                        single1_head_int = 0xffffffffffffffff;
+                        single1_hungry = 0;
                     }
-                    single1_hungry = 0;
                 }
-                
                 if (single2_hungry) {
                     if (ss_get_utstring(s2_in, s2_data)) {
-                        sscanf(utstring_body(s2_data), head_scanner, single2_1, single2_2, single2_3);
-                        
-                        if (single2_head_int <= last_head_int) {
-                            fprintf(stderr, "Error: Out of order read detected! %s\n", utstring_body(s2_data));
-                            exit(EXIT_FAILURE);
+                        if (keep_read(s2_data)) {
+                            output_read(s2_data, NULL, NULL, s2_in, s2_out, NULL);
                         }
-                        
-                        ss_get_cat_utstring(s2_in, s2_data);
-                        ss_get_cat_utstring(s2_in, s2_data);
-                        ss_get_cat_utstring(s2_in, s2_data);
                     } else {
-                        single2_head_int = 0xffffffffffffffff;
+                        single2_hungry = 0;
                     }
-                    single2_hungry = 0;
                 }
             }
-                        
-            fclose(r1_in); 
-            fclose(r2_in);                 
+            
+            fclose(r1_in);
+            fclose(r2_in);
             
             fclose(s1_in);
-            fclose(s2_in);             
+            fclose(s2_in);
             
-            fclose(mates_out); 
+            fclose(mates_out);
             
-            fclose(r1_out); 
-            fclose(r2_out);                 
+            fclose(r1_out);
+            fclose(r2_out);
             
             fclose(s1_out);
             
             if (singles_flag) {
                 fclose(s2_out);
             }
-           
+            
             // Free buffers
             utstring_free(r1_data);
             utstring_free(r2_data);
             utstring_free(s1_data);
             utstring_free(s2_data);
-            utstring_free(mate_data);
+            utstring_free(rev_tmp);
             utstring_free(rev_data);
-
-        }        
-    } 
-
-    if (R1_org != R2_org) {
-        
-        fprintf(stderr, "\nERROR! read1 and read2 fastq files did not contain an equal number of reads. %lu %lu\n", R1_org, R2_org);
-        exit(EXIT_FAILURE);
-        
-    } 
+        }
+    }
 
     if (!(R1_org+singlet1_org+singlet2_org)) {
     
         fprintf(stderr, "ERROR! No reads found in input files, or input(s) not found.\n");
         exit(EXIT_FAILURE);
     
+    }
+    
+    if (R1_org != R2_org) {
+        fprintf(stderr, "\nWarning! read1 and read2 fastq files did not contain an equal number of reads. %lu %lu\n", R1_org, R2_org);
     }
     
     if ((R1_org + R2_org) && !(singlet1_cnt + singlet2_cnt)) {
@@ -769,10 +623,10 @@ int main(int argc, char *argv[]) {
     mp_org = R1_org;
     mp_cnt = R1_cnt;
     
-    fprintf(stderr, "\nMatepairs: Before: %lu, After: %lu\n", mp_org, mp_cnt);
-    fprintf(stderr, "Singlets: Before: %lu %lu After: %lu %lu\n", singlet1_org, singlet2_org, s1_cnt, s2_cnt);
-    fprintf(stderr, "Read1 singlets: %lu, Read2 singlets: %lu, Original singlets: %lu %lu\n", read1_singlet_cnt, read2_singlet_cnt, singlet1_cnt, singlet2_cnt);
-    fprintf(stderr, "Total Reads Processed: %lu, Reads retained: %lu\n", 2*mp_org+singlet1_org+singlet2_org, 2*mp_cnt+s1_cnt+s2_cnt);
+    printf("\nMatepairs: Before: %lu, After: %lu\n", mp_org, mp_cnt);
+    printf("Singlets: Before: %lu %lu After: %lu %lu\n", singlet1_org, singlet2_org, s1_cnt, s2_cnt);
+    printf("Read1 singlets: %lu, Read2 singlets: %lu, Original singlets: %lu %lu\n", read1_singlet_cnt, read2_singlet_cnt, singlet1_cnt, singlet2_cnt);
+    printf("Total Reads Processed: %lu, Reads retained: %lu\n", 2*mp_org+singlet1_org+singlet2_org, 2*mp_cnt+s1_cnt+s2_cnt);
     
     utstring_free(in_read1_fq_fn);
     utstring_free(in_read2_fq_fn);
@@ -793,7 +647,7 @@ int main(int argc, char *argv[]) {
 // Function trimmer
 // Parm: qualdata -- pointer to buffer of fastq encoded Phred quality scores
 // Returns: int -- Position to trim to
-// Uses global parm values: method_flag, err_prob 
+// Uses global parm values: colorspace_flag, err_prob 
 
 int trimmer(char *qualdata) {
     
@@ -802,7 +656,7 @@ int trimmer(char *qualdata) {
     double psave = 0.0, p2 = 0.0;
     int diff = 0;
     
-    if (method_flag) {  // nt space => joint cs space error probability
+    if (colorspace_flag) {  // joint cs space error probability
         psave = pow(10.0, (((double)-(*q - 33))/10.0));
         q++;
         do {
@@ -812,7 +666,7 @@ int trimmer(char *qualdata) {
             q++;
         } while ((prob >= err_prob) && *q);
         
-    } else {  // cs space cumulative error prob
+    } else {  // cumulative error prob
         do {
             prob *= (1.0 - pow(10.0, (((double)-(*q - 33))/10.0)));
             q++;
@@ -924,12 +778,12 @@ unsigned long int fq_stream_trimmer(UT_string *fq_fn, int pipe_fd, UT_string *ou
         return(0);
     }
     
-    // Try to open the read1 fastq file
+    // Try to open the fastq file
     if (!(fq_file = gzopen(utstring_body(fq_fn), "r"))) {
         utstring_printf(fq_fn, ".gz");
         if (!(fq_file = gzopen(utstring_body(fq_fn), "r"))) {
             fclose(pipe_in);
-            return(0);    
+            return(0);
         }
     } 
     
@@ -948,7 +802,7 @@ unsigned long int fq_stream_trimmer(UT_string *fq_fn, int pipe_fd, UT_string *ou
             if ((x = trimmer(utstring_body(qual_data))) >= min_len) {  // Keep at least some of read
                 
                 // Reject read if complexity is too low
-                if ((entropy_cutoff < 0.0) || (entropy_calc(utstring_body(seq_data), x) >= entropy_cutoff)) {                    
+                if ((entropy_cutoff < 0.0) || (entropy_calc(utstring_body(seq_data), x) >= entropy_cutoff)) {
                     
                     // Truncate sequence
                     
@@ -966,7 +820,11 @@ unsigned long int fq_stream_trimmer(UT_string *fq_fn, int pipe_fd, UT_string *ou
                         if ((start = strchr(utstring_body(head_data), '|'))) {
                             start++;
                         } else {
-                            start = utstring_body(head_data) + 4;
+                            if (colorspace_flag) {
+                                start = utstring_body(head_data) + 4;
+                            } else {
+                                start = utstring_body(head_data) + 1;
+                            }
                         }
                         *end = '\0';
                     } else {
@@ -975,10 +833,18 @@ unsigned long int fq_stream_trimmer(UT_string *fq_fn, int pipe_fd, UT_string *ou
                     
                     end++;
                     
-                    if (len_pre) {
-                        utstring_printf(new_head_data, "@%.2s+%u|%s:%s",utstring_body(head_data)+1,x,start,end);
+                    if (colorspace_flag) {
+                        if (len_pre) {
+                            utstring_printf(new_head_data, "@%.2s+%u|%s:%s",utstring_body(head_data)+1,x,start,end);
+                        } else {
+                            utstring_printf(new_head_data, "@%.2s+%s:%s",utstring_body(head_data)+1,start,end);
+                        }
                     } else {
-                        utstring_printf(new_head_data, "@%.2s+%s:%s",utstring_body(head_data)+1,start,end);
+                        if (len_pre) {
+                            utstring_printf(new_head_data, "@%u|%s:%s",x,start,end);
+                        } else {
+                            utstring_printf(new_head_data, "@%s:%s",start,end);
+                        }
                     }
                     
                     fputs(utstring_body(new_head_data), pipe_in);
@@ -988,8 +854,17 @@ unsigned long int fq_stream_trimmer(UT_string *fq_fn, int pipe_fd, UT_string *ou
                     cnt++;
                     
                 } else {
+                    // rejected by entropy filter
+                    // Send along placeholder read to be discarded, keeping read1 and read2 in sync
+                    // Empty fastq header is a read to be rejected by consumer threads
                     (*comp_cnt)++;
+                    fputs("\n", pipe_in);
                 }
+            } else {
+                // rejected by minimum length cutoff
+                // Send along placeholder read to be discarded, keeping read1 and read2 in sync
+                // Empty fastq header is a read to be rejected by consumer threads
+                fputs("\n", pipe_in);
             }
         }
     }
@@ -1005,4 +880,68 @@ unsigned long int fq_stream_trimmer(UT_string *fq_fn, int pipe_fd, UT_string *ou
     utstring_free(qual_data);
 
     return(cnt);
+}
+
+////////////////////////////////////////////////////////////////
+//
+// output_read
+//
+// This function reads a fastq record from one file and writes
+// it to another.  It assumes the header in the first line of
+// record has already been stored in fwd.  The last 3 lines of
+// the record are read from input and the record is written
+// unaltered to output.  A read will also be written to 
+// mates_output if mates_output is not null.  If rev is not null
+// this read will be written to mates_output with reversed
+// sequence and quality.
+//
+void output_read(UT_string *fwd, UT_string *rev, UT_string *tmp, FILE *input, FILE *output, FILE *mates_output) {
+    if (mates_output) {
+        if (rev) {
+            utstring_clear(rev);
+            utstring_concat(rev, fwd);    // head
+            ss_get_utstring(input, tmp);   // seq
+            utstring_concat(fwd, tmp);
+            ss_trunc_utstring(tmp, 1);     // remove newline
+            ss_rev_utstring(tmp);
+            ss_strcat_utstring(tmp, "\n"); // add newline back
+            utstring_concat(rev, tmp);
+            ss_get_utstring(input, tmp);   // extra
+            utstring_concat(fwd, tmp);
+            utstring_concat(rev, tmp);
+            ss_get_utstring(input, tmp);   // qual
+            utstring_concat(fwd, tmp);
+            ss_trunc_utstring(tmp, 1);     // remove newline
+            ss_rev_utstring(tmp);
+            ss_strcat_utstring(tmp, "\n"); // add newline back
+            utstring_concat(rev, tmp);
+            
+            fputs(utstring_body(rev), mates_output);
+            fputs(utstring_body(fwd), output);
+        } else {
+            ss_get_cat_utstring(input, fwd);
+            ss_get_cat_utstring(input, fwd);
+            ss_get_cat_utstring(input, fwd);
+            
+            fputs(utstring_body(fwd), mates_output);
+            fputs(utstring_body(fwd), output);
+        }   
+    } else {
+        ss_get_cat_utstring(input, fwd);
+        ss_get_cat_utstring(input, fwd);
+        ss_get_cat_utstring(input, fwd);
+        
+        fputs(utstring_body(fwd), output);
+    }
+}
+
+////////////////////////////////////////////////////////////////
+//
+// keep_read
+//
+// This function checks for zero-length string in header to determine whether
+// the read should be kept or rejected.
+//
+int keep_read(UT_string *header) {
+    return(strlen(utstring_body(header)) > 1);
 }

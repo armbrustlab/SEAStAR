@@ -23,7 +23,7 @@
 # -------------------------------------------------------------------------- #
 
 # CMake file for seastar_shared 
-cmake_minimum_required (VERSION 2.6)
+cmake_minimum_required (VERSION 2.8)
 
 project (seastar_shared C)
 
@@ -31,5 +31,5 @@ set(CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/CMake_modules/)
 
 add_library(seastar_shared seastar_shared.c)
 
-target_link_libraries(seastar_shared zlib)
+target_link_libraries(seastar_shared)
 

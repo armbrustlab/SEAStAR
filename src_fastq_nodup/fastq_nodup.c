@@ -70,7 +70,7 @@ typedef struct read_list_st {
     unsigned int prefix; 
     unsigned int quality;
     unsigned long int best;
-    int rejected;
+    unsigned int rejected;
     struct read_list_st *next;    // Note, this must be called "next", for utlist.h
 } read_list_entry;
 
@@ -95,13 +95,13 @@ unsigned long int reject_handler(int reject_pipe_fd, reject_list_entry **rejects
 
 unsigned long int fq_stream_prefixer(UT_string *fq_fn, int pipe_fd, int pipe2_fd);
 
-unsigned long int match_rejecter(int r1_pipe, int r2_pipe, int reject_pipe, read_list_entry **r_list, int read_len, int mate_len, int slop, unsigned int *eLUT, unsigned int verbose);
+unsigned long int match_rejecter(int r1_pipe, int r2_pipe, int reject_pipe, read_list_entry **r_list, int read_len, int slop, unsigned int *eLUT, unsigned int verbose);
 
 unsigned long int fq_stream_rejecter(UT_string *fq_fn, int pipe_fd, UT_string *out_prefix, int no_pre, reject_list_entry *rejects, unsigned long int *rej_cnt);
 
 unsigned long int fq_stream_singlet_rejecter(UT_string *fq_fn, int pipe_fd, UT_string *out_prefix, int no_pre, int read_len, read_list_entry **r_list1, read_list_entry **r_list2, int seed, unsigned long int *rej_cnt);
 
-unsigned long int mismatch_rejecter(int reject_pipe_fd, read_list_entry **r_list, unsigned int r_start,unsigned int r_stop, int read_len, int mate_len, int slop, int r_slop, unsigned int *eLUT, unsigned int verbose);
+unsigned long int mismatch_rejecter(int reject_pipe_fd, read_list_entry **r_list, unsigned long int r_start,unsigned long int r_stop, int read_len, int slop, int r_slop, unsigned int *eLUT, unsigned int verbose);
 
 /////////////////////////////////////////////////////////////////
 // Entry point
@@ -135,7 +135,7 @@ int main(int argc, char *argv[]) {
     utstring_new(out_read_prefix);
     
     // Parameters
-    int read_len = 0, mate_len = 0, r_slop = 0, slop = 0; 
+    int read_len = 0, r_slop = 0, slop = 0; 
 
     // Flags
     // Read counters
@@ -145,6 +145,7 @@ int main(int argc, char *argv[]) {
     // Hash table struct vars
     read_list_entry **r_list1 = NULL;
     read_list_entry **r_list2 = NULL;
+    long unsigned int read_list_length = 0;
     
     // Seed for the random number generator
     int rnd_seed = 12345;
@@ -160,8 +161,7 @@ int main(int argc, char *argv[]) {
     ///////////////////////////////////
     
     struct arg_lit *gzip = arg_lit0("z", "gzip", "Output converted files in gzip compressed format. [NULL]");
-    struct arg_int *len = arg_int0("l","index_len","<u>","Match length of indexed mate [14]");
-    struct arg_int *m_len = arg_int0("m","match_len","<u>","Match length of unindexed mate [read_len]");
+    struct arg_int *len = arg_int0("l","index_len","<u>","Match length of both mates [14]");
     struct arg_int *mismatch = arg_int0("d","index_err","<u>","Mismatches within indexed mate [1]");
     struct arg_int *m_mismatch = arg_int0("e","match_err","<u>","Mismatches within unindexed mate [3]");
     struct arg_int *seed = arg_int0(NULL,"seed","<n>","Seed used by random number generator [12345]");
@@ -174,7 +174,7 @@ int main(int argc, char *argv[]) {
     struct arg_lit *h = arg_lit0("h", "help", "Request help.");
     struct arg_end *end = arg_end(20);
     
-    void *argtable[] = {h,version,v,gzip,pre_read_id,no_pre,len,m_len,mismatch,m_mismatch,seed,input,output,end};
+    void *argtable[] = {h,version,v,gzip,pre_read_id,no_pre,len,mismatch,m_mismatch,seed,input,output,end};
 
     int arg_errors = 0;
     
@@ -186,7 +186,7 @@ int main(int argc, char *argv[]) {
     
 	if (version->count) {
 		fprintf(stderr, "%s version: %s\n", argv[0], SS_BUILD_VERSION);
-		exit(EXIT_FAILURE);
+		exit(EXIT_SUCCESS);
     }
 	
     if (h->count) {
@@ -206,27 +206,21 @@ int main(int argc, char *argv[]) {
     }
     
     // Validate read len
+    // len should not be set greater than 16 because code in this program
+    // assumes that the 2 bit encoded read prefixes can be represented with a 
+    // 32 bit unsigned int.  If this size limit is relaxed then care must be
+    // taken to change affected 32 unsigned ints to 62 bit unsigned ints.
     if (len->count) {
         read_len = 2*len->ival[0];
         if ((read_len <= 0) || (read_len > 32)) {
-            fprintf(stderr, "index_len must be between 1 and 32, inclusive.\n");
+            fprintf(stderr, "index_len must be between 1 and 16, inclusive.\n");
             exit(EXIT_FAILURE);
         }        
     } else {
         read_len = 14*2;
     }
+    read_list_length = (long unsigned int)1<<read_len;
     
-    // Validate mate len
-    if (m_len->count) {
-        mate_len = 2*m_len->ival[0];
-        if (mate_len <= 0) {
-            fprintf(stderr, "match_len must be > 0\n");
-            exit(EXIT_FAILURE);
-        }        
-    } else {
-        mate_len = read_len;
-    }
-
     // Validate read err
     if (mismatch->count) {
         r_slop = mismatch->ival[0];
@@ -256,28 +250,24 @@ int main(int argc, char *argv[]) {
     }    
     
     // Allocate read index table
-    if (!(r_list1 = calloc((1<<read_len), sizeof(read_list_entry *)))) {
+    if (!(r_list1 = calloc(read_list_length, sizeof(read_list_entry *)))) {
         fprintf(stderr, "Calloc failed! r_hash allocation\n");
         exit(EXIT_FAILURE);
     } 
 
-    if (!(r_list2 = calloc((1<<read_len), sizeof(read_list_entry *)))) {
+    if (!(r_list2 = calloc(read_list_length, sizeof(read_list_entry *)))) {
         fprintf(stderr, "Calloc failed! r_hash allocation\n");
         exit(EXIT_FAILURE);
     } 
 
-    // Initialize the read1 subsequence pointer array
-    
-    for (int x = 0; x < 1<<read_len; x++) {
-            r_list1[x] = NULL;
-            r_list2[x] = NULL;
-    }
-    
     // Construct input filenames
-    utstring_printf(in_read1_fq_fn, "%s.read1.fastq", input->filename[0]);
-    utstring_printf(in_read2_fq_fn, "%s.read2.fastq", input->filename[0]);
-    
-    utstring_printf(in_single1_fq_fn, "%s.single.fastq", input->filename[0]);
+    if (input->count) {
+        utstring_printf(in_read1_fq_fn, "%s.read1.fastq", input->filename[0]);
+        utstring_printf(in_read2_fq_fn, "%s.read2.fastq", input->filename[0]);
+        utstring_printf(in_single1_fq_fn, "%s.single.fastq", input->filename[0]);
+    } else {
+        fprintf(stderr, "in_prefix not specified\n");
+    }
     
     FILE *in_single1_file = NULL;
     
@@ -318,7 +308,7 @@ int main(int argc, char *argv[]) {
             printf("Input files: %s %s %s\n", utstring_body(in_read1_fq_fn), utstring_body(in_read2_fq_fn), utstring_body(in_single1_fq_fn));
             printf("Output files: %s %s %s\n", utstring_body(out_read1_fq_fn), utstring_body(out_read2_fq_fn), utstring_body(out_single1_fq_fn));
         }
-        printf("Read len: %d  Mate len: %d \n", read_len/2, mate_len/2);
+        printf("Read len: %d\n", read_len/2);
         printf("Index mismatches: %d  Mate mismatches: %d \n", r_slop, slop);
     }
     
@@ -347,7 +337,7 @@ int main(int argc, char *argv[]) {
         if (!no_pre->count) {
             if (strchr(output->filename[0], ':') || strchr(output->filename[0], '|') || strchr(output->filename[0], '+') || strchr(output->filename[0], '/')) {
                 fprintf(stderr, "Read ID prefix '%s' (from output prefix) may not contain the characters ':', '|', '+' or '/'.\n", output->filename[0]);
-                fprintf(stderr, "Hint: Use the --prefix parameter if the output file prefix contains path information.\n");
+                fprintf(stderr, "Hint: Use the --prefix or --no_prefix parameter if the output file prefix contains path information.\n");
                 exit(EXIT_FAILURE);
             }        
             
@@ -409,12 +399,12 @@ int main(int argc, char *argv[]) {
 
 #pragma omp section 
         {   // Read1 processor
-            match_rejecter(r1_pipe[0], r2_pipe[0], reject_pipe[1], r_list1, read_len, mate_len, slop, ErrLUT, v->count);
+            match_rejecter(r1_pipe[0], r2_pipe[0], reject_pipe[1], r_list1, read_len, slop, ErrLUT, v->count);
         }
         
 #pragma omp section 
         {   // Read2 processor
-            match_rejecter(r2_pipe2[0], r1_pipe2[0], rej_dup, r_list2, read_len, mate_len, slop, ErrLUT, v->count);
+            match_rejecter(r2_pipe2[0], r1_pipe2[0], rej_dup, r_list2, read_len, slop, ErrLUT, v->count);
         } 
         
 #pragma omp section 
@@ -443,42 +433,42 @@ int main(int argc, char *argv[]) {
             
 #pragma omp section 
             {   // Read1 reader
-                mismatch_rejecter(rej_p[0], r_list1, (0*(1<<(read_len-2))), (1*(1<<(read_len-2)))-1, read_len, mate_len, slop, r_slop, ErrLUT, v->count);
+                mismatch_rejecter(rej_p[0], r_list1, (0*(1L<<(read_len-2))), (1*(1L<<(read_len-2)))-1, read_len, slop, r_slop, ErrLUT, v->count);
             }
             
 #pragma omp section 
             {   // Read1 reader
-                mismatch_rejecter(rej_p[1], r_list1, (1*(1<<(read_len-2))), (2*(1<<(read_len-2)))-1, read_len, mate_len, slop, r_slop, ErrLUT, v->count);
+                mismatch_rejecter(rej_p[1], r_list1, (1*(1L<<(read_len-2))), (2*(1L<<(read_len-2)))-1, read_len, slop, r_slop, ErrLUT, v->count);
             }
             
 #pragma omp section 
             {   // Read1 reader
-                mismatch_rejecter(rej_p[2], r_list1, (2*(1<<(read_len-2))), (3*(1<<(read_len-2)))-1, read_len, mate_len, slop, r_slop, ErrLUT, v->count);
+                mismatch_rejecter(rej_p[2], r_list1, (2*(1L<<(read_len-2))), (3*(1L<<(read_len-2)))-1, read_len, slop, r_slop, ErrLUT, v->count);
             }
             
 #pragma omp section 
             {   // Read1 reader
-                mismatch_rejecter(rej_p[3], r_list1, (3*(1<<(read_len-2))), (4*(1<<(read_len-2)))-1, read_len, mate_len, slop, r_slop, ErrLUT, v->count);
+                mismatch_rejecter(rej_p[3], r_list1, (3*(1L<<(read_len-2))), (4*(1L<<(read_len-2)))-1, read_len, slop, r_slop, ErrLUT, v->count);
             }
             
 #pragma omp section 
             {   // Read1 reader
-                mismatch_rejecter(rej_p[4], r_list2, (0*(1<<(read_len-2))), (1*(1<<(read_len-2)))-1, read_len, mate_len, slop, r_slop, ErrLUT, v->count);
+                mismatch_rejecter(rej_p[4], r_list2, (0*(1L<<(read_len-2))), (1*(1L<<(read_len-2)))-1, read_len, slop, r_slop, ErrLUT, v->count);
             }
             
 #pragma omp section 
             {   // Read1 reader
-                mismatch_rejecter(rej_p[5], r_list2, (1*(1<<(read_len-2))), (2*(1<<(read_len-2)))-1, read_len, mate_len, slop, r_slop, ErrLUT, v->count);
+                mismatch_rejecter(rej_p[5], r_list2, (1*(1L<<(read_len-2))), (2*(1L<<(read_len-2)))-1, read_len, slop, r_slop, ErrLUT, v->count);
             }
             
 #pragma omp section 
             {   // Read1 reader
-                mismatch_rejecter(rej_p[6], r_list2, (2*(1<<(read_len-2))), (3*(1<<(read_len-2)))-1, read_len, mate_len, slop, r_slop, ErrLUT, v->count);
+                mismatch_rejecter(rej_p[6], r_list2, (2*(1L<<(read_len-2))), (3*(1L<<(read_len-2)))-1, read_len, slop, r_slop, ErrLUT, v->count);
             }
             
 #pragma omp section 
             {   // Read1 reader
-                mismatch_rejecter(rej_p[7], r_list2, (3*(1<<(read_len-2))), (4*(1<<(read_len-2)))-1, read_len, mate_len, slop, r_slop, ErrLUT, v->count);
+                mismatch_rejecter(rej_p[7], r_list2, (3*(1L<<(read_len-2))), (4*(1L<<(read_len-2)))-1, read_len, slop, r_slop, ErrLUT, v->count);
             }
             
 #pragma omp section 
@@ -569,7 +559,7 @@ int main(int argc, char *argv[]) {
     // Free up all of the data structures.
 
 #pragma omp parallel for default(shared)       
-    for (int x = 0; x < 1<<read_len; x++) {
+    for (int x = 0; x < read_list_length; x++) {
         read_list_entry *entry = NULL;
         
         while (r_list1[x]) {
@@ -676,7 +666,7 @@ unsigned long int fq_stream_prefixer(UT_string *fq_fn, int pipe_fd, int pipe2_fd
 // This function takes streams of bitpacked prefixes and quality sums for the reads,
 // and generates a reject list for perfect matches of the index read (with slop for the mate).
 
-unsigned long int match_rejecter(int r1_pipe_fd, int r2_pipe_fd, int reject_pipe_fd, read_list_entry **r_list, int read_len, int mate_len, int slop, unsigned int *eLUT, unsigned int verbose) {
+unsigned long int match_rejecter(int r1_pipe_fd, int r2_pipe_fd, int reject_pipe_fd, read_list_entry **r_list, int read_len, int slop, unsigned int *eLUT, unsigned int verbose) {
     
     FILE *r1_in = fdopen(r1_pipe_fd, "rb");
     FILE *r2_in = fdopen(r2_pipe_fd, "rb");
@@ -689,8 +679,9 @@ unsigned long int match_rejecter(int r1_pipe_fd, int r2_pipe_fd, int reject_pipe
     unsigned int qual = 0, read1_prefix = 0, read2_prefix = 0;
     
     unsigned long int mp_cnt = 0;
-    
-    unsigned int read_mask = (1<<read_len) - 1;
+    // may be too large for unsigned int so used unsigned long first
+    unsigned long int read_mask_tmp = ((long unsigned int)1<<read_len) - 1;
+    unsigned int read_mask = read_mask_tmp;
     
     while (fread(pq_r1, sizeof(unsigned int), 2, r1_in)) {
         fread(pq_r2, sizeof(unsigned int), 2, r2_in);
@@ -785,13 +776,13 @@ unsigned long int match_rejecter(int r1_pipe_fd, int r2_pipe_fd, int reject_pipe
 // and looks for up to two mismatch duplicates to remove.
 //
 
-unsigned long int mismatch_rejecter(int reject_pipe_fd, read_list_entry **r_list, unsigned int r_start, unsigned int r_stop, int read_len, int mate_len, int slop, int r_slop, unsigned int *eLUT, unsigned int verbose) {
+unsigned long int mismatch_rejecter(int reject_pipe_fd, read_list_entry **r_list, unsigned long int r_start, unsigned long int r_stop, int read_len, int slop, int r_slop, unsigned int *eLUT, unsigned int verbose) {
     
     FILE *rej_out = fdopen(reject_pipe_fd, "wb");
     
     read_list_entry **entry1 = NULL, *entry2 = NULL, *r2p = NULL, **read1 = NULL, *read2 = NULL;
     
-    unsigned int r1p = 0, read1_prefix = 0;
+    unsigned long int r1p = 0, read1_prefix = 0;
     
     unsigned long int mp_cnt = 0;
     
@@ -817,7 +808,7 @@ unsigned long int mismatch_rejecter(int reject_pipe_fd, read_list_entry **r_list
             for (int i = 0; i < read_len; i+=2) {
                 unsigned int rptmp = (read1_prefix & ~(3 << i));
                 
-                int same_a = (read1_prefix >> i) & 3;
+                unsigned int same_a = (read1_prefix >> i) & 3;
                 for (int a = 0; a < 4; a++) {
                     if (a != same_a) {    // Don't repeat the exact match!
                         r1p = rptmp | (a << i);
@@ -846,12 +837,12 @@ unsigned long int mismatch_rejecter(int reject_pipe_fd, read_list_entry **r_list
                 for (int i = 0; i < read_len-2; i+=2) {
                     for (int j = i+2; j < read_len; j+=2) {
                         unsigned int rptmp = (read1_prefix & ~((3 << i) | (3 << j)));
-                        int same_a = (read1_prefix >> i) & 3;
-                        int same_b = (read1_prefix >> j) & 3;
+                        unsigned int same_a = (read1_prefix >> i) & 3;
+                        unsigned int same_b = (read1_prefix >> j) & 3;
                         
                         for (int x = 0; x < 16; x++) {
-                            int a = x&3;
-                            int b = x>>2;
+                            unsigned int a = x&3;
+                            unsigned int b = x>>2;
                             if ((a != same_a) && (b != same_b)) {
                                 r1p = rptmp | (a << i) | (b << j);
                                 entry1 = &r_list[r1p];
@@ -1044,8 +1035,9 @@ unsigned long int fq_stream_singlet_rejecter(UT_string *fq_fn, int pipe_fd, UT_s
     utstring_new(qual_data);
     
     unsigned long int cnt = 0;
-    
-    unsigned int read_mask = (1<<read_len) - 1;
+    // may be too large for unsigned int so used unsigned long first
+    unsigned long int read_mask_tmp = ((long unsigned int)1<<read_len) - 1;
+    unsigned int read_mask = read_mask_tmp;
     
     unsigned int read_prefix = 0; 
 
@@ -1098,18 +1090,17 @@ unsigned long int fq_stream_singlet_rejecter(UT_string *fq_fn, int pipe_fd, UT_s
             unsigned int rejc = 0, cnt = 0;
             LL_FOREACH(*entry1,entry2) {
                 cnt += entry2->rejected + 1;
-                rejc += entry2->rejected + (entry2->rejected != 0);
+                rejc += entry2->rejected;
             }
             
             // Choose retain or reject randomly, biased by mate reject rate
-            rej = (ss_rand(rnd_state) >= ((double)rejc/(double)cnt));
+            rej = (ss_rand(rnd_state) <= (double)rejc/(double)cnt);
             
             *rej_cnt += rej;
         } 
-         
+        
         if (!rej) {    // If not rejected, then write 'em out!
             
-            // Fixup the read name
             // Fixup the read name
             utstring_clear(new_head_data);
             

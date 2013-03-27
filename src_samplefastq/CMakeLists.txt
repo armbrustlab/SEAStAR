@@ -23,7 +23,7 @@
 # -------------------------------------------------------------------------- #
 
 # CMake file for samplefastq
-cmake_minimum_required (VERSION 2.6)
+cmake_minimum_required (VERSION 2.8)
 
 project (samplefastq C)
 
@@ -33,13 +33,22 @@ add_executable(samplefastq samplefastq.c)
 
 target_link_libraries(samplefastq ${COMMON_LIBS})
 
+if(CMAKE_GENERATOR STREQUAL "Xcode")
+    add_custom_command(
+        TARGET samplefastq
+        POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E remove -f ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/samplefastq
+        COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:samplefastq> ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/samplefastq
+)
+endif(CMAKE_GENERATOR STREQUAL "Xcode")
+
 enable_testing()
 
 add_test(NAME samplefastq_runs COMMAND samplefastq --version)
 
-set_tests_properties(samplefastq_runs PROPERTIES PASS_REGULAR_EXPRESSION "version: ${GIT_VERSION}" TIMEOUT 1)
+set_tests_properties(samplefastq_runs PROPERTIES PASS_REGULAR_EXPRESSION "version: ${GIT_VERSION}" TIMEOUT 3)
 
-add_test(NAME samplefastq_test_data COMMAND samplefastq -f 0.1 -z ${CMAKE_BINARY_DIR}/output_test_data/lambda_reads_d50 ${CMAKE_BINARY_DIR}/output_test_data/lambda_reads_samp)
+add_test(NAME samplefastq_test_data COMMAND bash -c "$<TARGET_FILE:samplefastq> -f 0.1 -z ${CMAKE_BINARY_DIR}/output_test_data/lambda_reads_d50 ${CMAKE_BINARY_DIR}/output_test_data/lambda_reads_samp; gunzip -c ${CMAKE_BINARY_DIR}/output_test_data/lambda_reads_samp.{read1,read2,single}.fastq.gz | openssl md5")
 
-set_tests_properties(samplefastq_test_data PROPERTIES PASS_REGULAR_EXPRESSION "Matepairs: Before: 61966, After: 6196.*Singlets: Before: 17304 0 After: 1741 0.*Total Reads Processed: 141236, Reads retained: 14133" TIMEOUT 15)
+set_tests_properties(samplefastq_test_data PROPERTIES PASS_REGULAR_EXPRESSION "64364db829fdb2189fcb622596e3f46f" TIMEOUT 30)
 

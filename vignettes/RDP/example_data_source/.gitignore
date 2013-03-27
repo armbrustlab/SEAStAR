@@ -1,0 +1,4 @@
+# Ignore RDP software project zip files
+# These should be downloaded by the user from http://sourceforge.net/projects/rdp-classifier/
+*rawtrainingdata.zip
+rdp_classifier*.zip
