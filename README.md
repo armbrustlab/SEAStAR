@@ -55,11 +55,11 @@ Once you have the above packages: To build SEAStAR using Unix style command line
 
 Where [dir] is the path to the root of the SEASTAR source tree (where this README file is found). 
 
-If the path "." is used for [dir] above (run from the "source tree"), then the binary and source tree will be the same (an "in-source build"). After a successful make, executables will be found the directory [dir]/bin. 
+If the path "." is used for [dir] above (run from the "source tree"), then the binary and source tree will be the same (an "in-source build"). After a successful make, executables will be found in the bin/ subdirectory. 
 
-This directory should be added to your PATH environment variable, so that newly built tools can be found from your data analysis directories:
+This directory (the bin subdirectory of the destination tree) should be added to your PATH environment variable, so that newly built tools can be found from your data analysis directories:
 
-    export PATH=$PATH:[dir]/bin   # Where [dir] is the fully qualified path to your destination tree directory 
+    export PATH=$PATH:[dest_dir]/bin   # Where [dest_dir] is the fully qualified path to your destination tree directory 
 
 To test the newly built components:
 
@@ -104,7 +104,7 @@ You may need to define an environment variable to explicitly tell cmake which co
 For Developers
 ------------------------------
 
-Some of the included JavaScript (.js) files are automatically generated from [CoffeeScript](http://coffeescript.org) source files (CoffeeScript is a [transcompiled](http://en.wikipedia.org/wiki/Source-to-source_compiler) dialect of JavaScript with Python-like syntax.) If you wish to modify these components, please edit the .coffee files in the scripts/ subdirectory of the source tree. The make system with automatically regenerate the .js files in the bin/ subdirectory in the destination tree. To successfully transcompile these files, you will need the to install the CoffeeScript package for node.js:
+Some of the included JavaScript (.js) files are automatically generated from [CoffeeScript](http://coffeescript.org) source files (CoffeeScript is a [transcompiled](http://en.wikipedia.org/wiki/Source-to-source_compiler) dialect of JavaScript with Python-like syntax.) If you wish to modify these components, please edit the .coffee files in the scripts/ subdirectory of the source tree. The make system will automatically regenerate the .js files in the bin/ subdirectory of the destination tree. To successfully transcompile these files, you will need the to install the CoffeeScript package for node.js:
 
     sudo npm install -g coffee-script
 

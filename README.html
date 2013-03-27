@@ -40,9 +40,9 @@
 <pre><code>cmake [dir] 
 make</code></pre>
 <p>Where [dir] is the path to the root of the SEASTAR source tree (where this README file is found). </p>
-<p>If the path &quot;.&quot; is used for [dir] above (run from the &quot;source tree&quot;), then the binary and source tree will be the same (an &quot;in-source build&quot;). After a successful make, executables will be found the directory [dir]/bin. </p>
-<p>This directory should be added to your PATH environment variable, so that newly built tools can be found from your data analysis directories:</p>
-<pre><code>export PATH=$PATH:[dir]/bin   # Where [dir] is the fully qualified path to your destination tree directory </code></pre>
+<p>If the path &quot;.&quot; is used for [dir] above (run from the &quot;source tree&quot;), then the binary and source tree will be the same (an &quot;in-source build&quot;). After a successful make, executables will be found in the bin/ subdirectory. </p>
+<p>This directory (the bin subdirectory of the destination tree) should be added to your PATH environment variable, so that newly built tools can be found from your data analysis directories:</p>
+<pre><code>export PATH=$PATH:[dest_dir]/bin   # Where [dest_dir] is the fully qualified path to your destination tree directory </code></pre>
 <p>To test the newly built components:</p>
 <pre><code>make test</code></pre>
 <p>If any tests fail, do not use the executables!</p>
@@ -68,7 +68,7 @@ sudo port install gcc44</code></pre>
 <p>You may need to define an environment variable to explicitly tell cmake which compiler to use.  Note that this must be done each time you start a command line session where you wish to run cmake again (or add it to your shell startup file, e.g. .bashrc in your home directory)</p>
 <pre><code>export CC=/opt/local/bin/gcc-mp-4.4  # change this if you are using a different version!</code></pre>
 <h2>For Developers</h2>
-<p>Some of the included JavaScript (.js) files are automatically generated from <a href="http://coffeescript.org">CoffeeScript</a> source files (CoffeeScript is a <a href="http://en.wikipedia.org/wiki/Source-to-source_compiler">transcompiled</a> dialect of JavaScript with Python-like syntax.) If you wish to modify these components, please edit the .coffee files in the scripts/ subdirectory of the source tree. The make system with automatically regenerate the .js files in the bin/ subdirectory in the destination tree. To successfully transcompile these files, you will need the to install the CoffeeScript package for node.js:</p>
+<p>Some of the included JavaScript (.js) files are automatically generated from <a href="http://coffeescript.org">CoffeeScript</a> source files (CoffeeScript is a <a href="http://en.wikipedia.org/wiki/Source-to-source_compiler">transcompiled</a> dialect of JavaScript with Python-like syntax.) If you wish to modify these components, please edit the .coffee files in the scripts/ subdirectory of the source tree. The make system will automatically regenerate the .js files in the bin/ subdirectory of the destination tree. To successfully transcompile these files, you will need the to install the CoffeeScript package for node.js:</p>
 <pre><code>sudo npm install -g coffee-script</code></pre>
 <p>It is sometimes useful to build with GCC debug flags turned on.  To achieve this follow the normal cmake build procedure with one additional user defined cmake cache entry:</p>
 <pre><code>cmake -D DEBUG=ON [dir]</code></pre>

@@ -1,0 +1,26 @@
+### 0.4.1 ###
+- Fixed typos and broken links in the documentation.
+
+- Added this change log.
+
+### 0.4.0 ###
+- solid2fastq: Reversed the meaning of "read1" and "read2" file names for 
+mate-pairs.  "read1" is the first read in a pair and "read2" is the second 
+read, 5' to 3'.
+
+- solid2fastq: Added support for new native SOLiD file read type "F5-RNA" and 
+variations on "QV" placement in quality files.
+
+- solid2fastq: Added -x parameter to turn of read ID suffix of "/1" and "/2".
+
+- trimfastq:  Removed -c parameter.  This parameter toggled dinucleotide error 
+probability calculation.  Now trimfastq automatically detects if a read set is 
+colorspace or nucleotide and chooses the appropriate error probability 
+calculation method.
+
+- fastq_nodup: Fixed bug where index lengths of 32 would cause a segfault.
+
+- fastq_nodup: Fixed bug where too many singlets were removed.
+
+- Added new programs ref_select, tetracalc, graph_ops, and many other utility
+scripts.  

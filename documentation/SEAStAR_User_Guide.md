@@ -1,6 +1,6 @@
 <link href="style.css" media="screen" rel="stylesheet" type="text/css" />
 
-SEAStAR User Guide, version 0.4.0
+SEAStAR User Guide, version 0.4.1
 ==============================
 ####Vaughn Iverson and Chris Berthiaume
 
@@ -63,13 +63,13 @@ And make sure that your `PATH` environment variable points to your SEAStAR binar
 
 **NOTE:** to work your way through all of the examples in this tutorial, you will also need the following external tools, in addition to those that were required to build SEAStAR:
 
-+ [Velvet](http://www.ebi.ac.uk/~zerbino/velvet/)
++ [Velvet](http://www.ebi.ac.uk/~zerbino/velvet/) -- You need the **colorspace** build, see Velvet for instructions
 + [BWA](http://sourceforge.net/projects/bio-bwa/files/) -- **Version 0.5.10**. *Important!! Because newer versions do not support the SOLiD colorspace reads used by this tutorial*
 + [GraphViz](http://www.graphviz.org/Download.php)
 
 ###Read preparation
 
-Convert SOLiD `.csfasta` and `.qual` files to gzipped `.fastq` files. Users with no colorspace data will omit this step in their analysis pipeline, although the FASTQ file naming conventions still need to be followed for nucleotide (e.g. Illumina) reads; see the [FASTQ][FASTQ] appendix for details.
+Convert SOLiD `.csfasta` and `.qual` files to gzipped `.fastq` files. For real projects, users with no colorspace data will omit this step in their analysis pipeline, although the FASTQ file naming conventions still need to be followed for nucleotide (e.g. Illumina) reads; see the [FASTQ][FASTQ] appendix for details.
 
     solid2fastq -z lambda_reads lambda_conv
 
@@ -87,7 +87,7 @@ Randomly sample reads from `.fastq` files, retaining approximately 10% of the or
 
 ###*De novo* contig assembly
 
-If the colorspace aware build of the *de novo* assembly tool [Velvet](http://www.ebi.ac.uk/~zerbino/velvet/) is installed it can be used to assemble lambda colorspace contigs.  First re-trim reads at a stricter quality cutoff and output a Velvet style `.fastq` file of interleaved mate-pairs, then assemble with Velvet.
+If you have installed the colorspace aware build of the *de novo* assembly tool [Velvet](http://www.ebi.ac.uk/~zerbino/velvet/), it can be used to assemble lambda-phage colorspace contigs:
 
     velveth_de lambda_asm/ 15 -fastq.gz -shortPaired lambda_trim.mates.fastq.gz -short lambda_trim.single.fastq.gz > lambda_asm.velveth_de.log 2>&1
     velvetg_de lambda_asm/ -scaffolding no -read_trkg no -ins_length auto -ins_length_sd auto -exp_cov 50 -cov_cutoff 5 -min_contig_lgth 50 > lambda_asm.velvetg_de.log 2>&1
@@ -96,7 +96,7 @@ There will now be a subdirectory called `lambda_asm` with a file called `contigs
 
 ###Aligning reads to a reference
 
-For this example, you need If the short read aligner [BWA](http://sourceforge.net/projects/bio-bwa/files/) (version <= 0.5.10) is installed it can be used to align de-duplicated and trimmed lambda FASTQ reads against the lambda reference genome. IMPORTANT: This quickstart example will not work with versions of BWA version 0.6.0 or newer because colorspace support was removed from BWA at that point. For your own work, if you are using nucleotide reads, you are free to use any alignment software you wish that produces standard SAM files. 
+For this example, you need the short read aligner [BWA](http://sourceforge.net/projects/bio-bwa/files/) (version <= 0.5.10). It can be used to align the de-duplicated and trimmed lambda FASTQ reads against the lambda-phage colorspace contigs. IMPORTANT: This quickstart example will not work with versions of BWA version 0.6.0 or newer because colorspace support was removed from BWA at that point. For your own work, if you are using nucleotide reads, you are free to use any alignment software you wish that produces standard SAM files. 
 
     # Because these are colorspace contigs and BWA expects nucleotide reference sequences, 
     # we need to convert the colorspace contigs to nucleotides using a single starting 
@@ -175,7 +175,7 @@ You should now be able to load the PDF files with your favorite PDF viewer in or
 
 ###Estimating 16S sequence abundance
 
-The tools in SEAStAR can be used to create a pipeline for estimating sequence abundance in a short-read data set.  This is particularly useful for assessing community composition in a metagenomic sample through alignments to a 16S database.  See [RDP vignette](vignettes/RDP/RDP_vignette.html) for a walk-through of an implementation of this pipeline using the [RDP](http://rdp.cme.msu.edu/) 16S database.
+The tools in SEAStAR can be used to create a pipeline for estimating sequence abundance in a short-read data set.  This is particularly useful for assessing community composition in a metagenomic sample through alignments to a 16S database.  See vignettes/RDP/RDP_vignette.html for a walk-through of an implementation of this pipeline using the [RDP](http://rdp.cme.msu.edu/) 16S database.
 
 ******************
 

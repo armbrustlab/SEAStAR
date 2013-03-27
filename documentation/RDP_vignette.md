@@ -15,7 +15,7 @@ One of SEAStAR's core use cases is to select seqeunces from a reference database
 
 ### Walk-through
 
-An example data set has been provided in `vignettes/RDP/sim`.  Two [FASTQ][] files of [ART][] simulated 50 bp Illumina reads were created based on a reference set of eight 16S sequences from RDP.  Reads in the two samples were simulated at different fold coverages for the same reference sequences to illustrate the use of the RDP pipeline to compare multiple metagenomic samples.
+An example data set has been provided in `vignettes/RDP/sim`.  Two FASTQ files of [ART][] simulated 50 bp Illumina reads were created based on a reference set of eight 16S sequences from RDP.  Reads in the two samples were simulated at different fold coverages for the same reference sequences to illustrate the use of the RDP pipeline to compare multiple metagenomic samples.
 
 `sample1.single.fastq`
 
@@ -222,6 +222,5 @@ Colorspace data (not necessary to implement if colorspace reads are never used) 
 [RDP]: http://http://rdp.cme.msu.edu/
 [BWA]: http://sourceforge.net/projects/bio-bwa/files/
 [ART]: http://www.niehs.nih.gov/research/resources/software/biostatistics/art/
-[FASTQ]: ../../SEAStAR_User_Guide.html#FASTQ
 [RDP_Classifier_Download]: http://sourceforge.net/projects/rdp-classifier/files/rdp-classifier/
 [Training_Set_Download]: http://sourceforge.net/projects/rdp-classifier/files/RDP_Classifier_TrainingData/
