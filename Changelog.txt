@@ -1,3 +1,14 @@
+### 0.4.2 ###
+- Documentation improvements; fixed typos and formatting problems when read on Github.
+
+- Added the new "free" parameter to the graph_ops UNSTASH command.
+
+- Fixed a segfault in ref_select when input SAM files contain no aligned reads.
+
+- Fixed build problems in XCode projects.
+
+- solid2fastq automatically checks for barcode strings of "default" or "Default".
+
 ### 0.4.1 ###
 - Fixed typos and broken links in the documentation.
 

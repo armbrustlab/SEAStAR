@@ -22,6 +22,8 @@
 # You should have received a copy of the GNU General Public License
 # along with SEAStAR.  If not, see <http:#www.gnu.org/licenses/>.
 # -------------------------------------------------------------------------- #
+###
+
 #
 # This script reads a nucleotide FASTA files with properly oriented contig 
 # sequences in scaffold order (as produced by the json_graph_ops "FASTA" 
@@ -41,7 +43,6 @@
 # 
 # Command line: [options] infile.fna [heal_file.fna] 
 #
-###
 
 verbose = false
 

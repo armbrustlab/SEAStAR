@@ -7,8 +7,10 @@ marked RDP_vignette.md > RDP_vignette.html
 
 # Make updated pdf user guide document
 # This is run twice to get the table of contents and back reference correct.
-cp SEAStAR_User_Guide.html .. 
+cp SEAStAR_User_Guide.html ..
+cp SEAStAR_User_Guide.md ..
 cp style.css ..
 cp SEAStAR_Pipeline_Stages.png ..
 cp RDP_vignette.html ../vignettes/RDP
 cp 16S_abundance.png ../vignettes/RDP
+

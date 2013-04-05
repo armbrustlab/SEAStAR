@@ -1,6 +1,7 @@
+###
 # -------------------------------------------------------------------------- #
 # Center for Environmental Genomics
-# Copyright (C) 2009-2012 University of Washington.
+# Copyright (C) 2009-2013 University of Washington.
 #
 # Authors:
 # Vaughn Iverson
@@ -21,6 +22,7 @@
 # You should have received a copy of the GNU General Public License
 # along with SEAStAR.  If not, see <http:#www.gnu.org/licenses/>.
 # -------------------------------------------------------------------------- #
+###
 
 # This script reads in an RDP classifier taxonomic heirarchy file and converts
 # it to a JSON tree formatted output file.

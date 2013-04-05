@@ -1,7 +1,7 @@
 ###
 # -------------------------------------------------------------------------- #
 # Center for Environmental Genomics
-# Copyright (C) 2009-2012 University of Washington.
+# Copyright (C) 2009-2013 University of Washington.
 #
 # Authors:
 # Vaughn Iverson
@@ -22,6 +22,8 @@
 # You should have received a copy of the GNU General Public License
 # along with SEAStAR.  If not, see <http:#www.gnu.org/licenses/>.
 # -------------------------------------------------------------------------- #
+###
+
 #
 # This script reads a JSON formatted heirarchy file and converts it to NEXUS
 # tree format
@@ -32,7 +34,7 @@
 #
 # Method for branch objects that calculates summary stats for conf, cnt and cum
 # And prunes branches from the tree with no representative sequences.
-###
+#
 
 norm = 1.0;		# This variable is used to normalize all releative populations to 100% total
 

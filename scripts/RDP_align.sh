@@ -61,10 +61,10 @@ function aln_part {
 }
 
 # Options and Environment --------------------------------------------------- #
-if ! which bwa >/dev/null; then
+if ! which bwa >/dev/null 2>&1; then
     echo "Error: bwa not found in path" >&2
     echo >&2
-    echo usage
+    usage
     exit 1
 fi
 

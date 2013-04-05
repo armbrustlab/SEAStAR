@@ -121,14 +121,14 @@ To make XCode project files (for Mac OS X only):
 
     cmake -G Xcode [dir] 
 
-Where [dir] is the path to the root of the destination binary tree.  If the path '.' is used, then the binary and source tree will be the same (i.e. an in-source build).
-
-WARNING!!! Once the XCode project is imported, the binary tree will not be backed-up by Time Machine on OS X.  For in-source builds, the binary and source trees are the same, so there will be no source code backups if you develop and build within the source tree.
-
-Then load the project file into XCode to build, etc.
+Where [dir] is the path to the root of the destination binary tree. If the path '.' is used, then the binary and source tree will be the same (i.e. an in-source build). You may then load the SEAStAR project file into XCode to build, debug, etc.
 
 Alternatively, an xcode project may be built on the command line as (choosing Debug or Release as appropriate):
 
     xcodebuild -alltargets -configuration [Debug|Release] 
+
+A word of Warning: once the project is imported into XCode, the destination tree will not be backed-up by Time Machine on OS X. For in-source builds, the binary and source trees are the same directory, so Time Machine will not back up your source code changes if you develop and build within the source tree. For this reason, it is highly advisable to do out-of-source builds when developing in XCode, unless you back up your local git repository via a mechanism other than Time Machine.
+
+
 
 

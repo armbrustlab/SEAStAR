@@ -66,6 +66,8 @@ endforeach()
 
 # Optionally Transcompile coffeescript to javascript in the scripts directory
 find_program(COFFEE_EXEC "coffee")
+find_program(NODE_EXEC "node")
+
 file(GLOB COFFEE_SOURCES_INPUT RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} *.coffee)
 set(COFFEE_SOURCES_OUTPUT)
 if (COFFEE_EXEC)
@@ -76,7 +78,7 @@ if (COFFEE_EXEC)
         add_custom_command(
             OUTPUT ${OUT_FILE}
             COMMAND ${CMAKE_COMMAND} -E remove -f ${OUT_FILE}
-            COMMAND ${COFFEE_EXEC} -c ${CMAKE_CURRENT_SOURCE_DIR}/${IN_FILE}
+            COMMAND ${NODE_EXEC} ${COFFEE_EXEC} -c ${CMAKE_CURRENT_SOURCE_DIR}/${IN_FILE}
             COMMAND chmod 444 ${OUT_FILE}
             DEPENDS ${IN_FILE}
         )
@@ -119,7 +121,6 @@ add_custom_target(scripts ALL DEPENDS ${JS_SOURCES_OUTPUT} ${COFFEE_SOURCES_OUTP
 enable_testing()
 
 find_program(GAWK_EXEC "gawk")
-find_program(NODE_EXEC "node")
 
 add_test(NAME fastq2csfasta_test_data COMMAND bash -c "gunzip -c ${CMAKE_BINARY_DIR}/output_test_data/lambda_reads_d50.read2.fastq.gz | ${GAWK_EXEC} -f ${SCRIPT_RUNTIME_OUTPUT_DIRECTORY}/fastq2csfasta.awk > ${CMAKE_BINARY_DIR}/output_test_data/lambda_reads_d50.read2.csfasta; gunzip -c ${CMAKE_BINARY_DIR}/output_test_data/lambda_reads_d50.read1.fastq.gz | ${GAWK_EXEC} -f ${SCRIPT_RUNTIME_OUTPUT_DIRECTORY}/fastq2csfasta.awk | tee ${CMAKE_BINARY_DIR}/output_test_data/lambda_reads_d50.read1.csfasta | openssl md5")
 set_tests_properties(fastq2csfasta_test_data PROPERTIES PASS_REGULAR_EXPRESSION "92e15d3e11aca4afdee50148b655894a" TIMEOUT 30)

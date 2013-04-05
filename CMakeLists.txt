@@ -101,7 +101,7 @@ if (GIT_VERSION)
 	add_definitions("-D SS_BUILD_VERSION='\"${GIT_VERSION}\"'")
 else (GIT_VERSION)
 	message(WARNING "SEAStAR version not detected from git. ${GIT_VERSION}") 
-	set(GIT_VERSION "v0.4.1")
+	set(GIT_VERSION "v0.4.2")
 	add_definitions("-D SS_BUILD_VERSION='\"${GIT_VERSION}\"'")
 endif (GIT_VERSION)
 
@@ -121,6 +121,7 @@ add_subdirectory(src_seastar_shared)
 set(COMMON_LIBS "m" "seastar_shared" "argtable2" "z")
 
 file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/output_test_data)
+file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/bin)
 
 # Note, it's important to keep these in this order for CTest because 
 # the outputs of some tool's tests are used as the inputs of others.

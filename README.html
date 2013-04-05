@@ -76,9 +76,8 @@ sudo port install gcc44</code></pre>
 <p>The following section covers using cmake to build XCode project files. However, we do not recommend using executables built by XCode for anything other than development and debugging purposes due to the aforementioned bugs in the XCode compilers. This may change in the future, but as of now beware of these known issues with OpenMP in XCode.</p>
 <p>To make XCode project files (for Mac OS X only):</p>
 <pre><code>cmake -G Xcode [dir] </code></pre>
-<p>Where [dir] is the path to the root of the destination binary tree.  If the path &#39;.&#39; is used, then the binary and source tree will be the same (i.e. an in-source build).</p>
-<p>WARNING!!! Once the XCode project is imported, the binary tree will not be backed-up by Time Machine on OS X.  For in-source builds, the binary and source trees are the same, so there will be no source code backups if you develop and build within the source tree.</p>
-<p>Then load the project file into XCode to build, etc.</p>
+<p>Where [dir] is the path to the root of the destination binary tree. If the path &#39;.&#39; is used, then the binary and source tree will be the same (i.e. an in-source build). You may then load the SEAStAR project file into XCode to build, debug, etc.</p>
 <p>Alternatively, an xcode project may be built on the command line as (choosing Debug or Release as appropriate):</p>
 <pre><code>xcodebuild -alltargets -configuration [Debug|Release] </code></pre>
+<p>A word of Warning: once the project is imported into XCode, the destination tree will not be backed-up by Time Machine on OS X. For in-source builds, the binary and source trees are the same directory, so Time Machine will not back up your source code changes if you develop and build within the source tree. For this reason, it is highly advisable to do out-of-source builds when developing in XCode, unless you back up your local git repository via a mechanism other than Time Machine.</p>
 

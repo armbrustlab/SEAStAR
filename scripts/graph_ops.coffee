@@ -3926,8 +3926,12 @@ Parameters:  None.\n
       return
    else
       hist = j.processing or []  # Preserve history across UNSTASH
-      j = stash_stack.pop()
-      j.processing = hist  # Restore history
+
+      if args.free
+         stash_stack.pop()  # Don't restore state
+      else 
+         j = stash_stack.pop()
+         j.processing = hist  # Restore history
       
       console.warn("#{stash_stack.length} graph#{if stash_stack.length isnt 1 then 's' else ''} remain#{if stash_stack.length is 1 then 's' else ''} in stash.")
       callback?(null, j) 

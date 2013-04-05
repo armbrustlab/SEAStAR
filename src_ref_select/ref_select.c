@@ -1474,9 +1474,13 @@ int main(const int argc, char *argv[]) {
         num_seq = (float) seq_tot;        
     }
     
-    if (num_seq <= 1.0) {
-        fprintf(stderr, "WARNING: num_seq <= 1, setting to 2\n");
+    if (num_seq == 1.0) {
+        fprintf(stderr, "WARNING: num_seq == 1, setting to 2\n");
         num_seq = 2.0;
+    } else if (num_seq == 0.0) {
+        fprintf(stderr, "ERROR: num_seq == 0 because %d reads aligned with references in the input.\n", num_reads);
+        fprintf(stderr, "Check your alignment tool and reference sequences.\n");
+        exit(EXIT_FAILURE);
     }
     
     if (v->count) {

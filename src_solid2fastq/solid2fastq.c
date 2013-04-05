@@ -99,7 +99,7 @@ int main(int argc, char *argv[]) {
     ///////////////////////////////////
     
     struct arg_str *pre_read_id = arg_str0(NULL, "prefix", "<string>", "Prefix to add to read identifiers. [out_prefix]");
-    struct arg_str *bc = arg_str0("b", "bc", "<BC>", "Barcode string in filename. Only needed for barcoded runs. [NULL]");
+    struct arg_str *bc = arg_str0("b", "bc", "<BC>", "Barcode string in filename. Only needed for barcoded runs. Not necessary for 'default' or 'Default' libraries. [NULL]");
     struct arg_lit *no_pre = arg_lit0("n", "no_prefix", "Do not change the read names in any way. [NULL]");
     struct arg_lit *no_suf = arg_lit0("x", "no_suffix", "Suppress /1 or /2 suffix additions to read IDs. [NULL]");
     struct arg_lit *gzip = arg_lit0("z", "gzip", "Output converted files in gzip compressed format. [NULL]");
@@ -443,6 +443,21 @@ long unsigned int convert_one_stream(UT_string *prefix, UT_string *suffix, int n
     FILE *out_file = NULL;
     
     open_input_files(prefix, suffix, infile_prefix, bc_flag, bc_id, &csfasta_file, &qual_file, &fastq_file);
+    // If no barcode was provided and no input files were found, try using 
+    // "default" or "Default" as barcode string.  This is the string provided
+    // for non-barcoded runs by SOLiD 5500 and higher.
+    if (! bc_flag && ! (fastq_file || csfasta_file)) {
+        // Try barcode name of "default"
+        bc_flag = 1;
+        char new_bc_id[] = "default";
+        open_input_files(prefix, suffix, infile_prefix, bc_flag, new_bc_id, &csfasta_file, &qual_file, &fastq_file);
+        if (! bc_flag && ! (fastq_file || csfasta_file)) {
+            // Try with capital "D"
+            strcpy(new_bc_id, "Default");
+            open_input_files(prefix, suffix, infile_prefix, bc_flag, new_bc_id, &csfasta_file, &qual_file, &fastq_file);
+        }
+    }
+
     out_file = fdopen(out_pipe, "w");
     
     if (no_suffix_flag) {
