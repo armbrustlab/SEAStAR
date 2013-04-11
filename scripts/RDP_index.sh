@@ -31,8 +31,8 @@
 function usage {
     echo "Usage: RDP_index [OPTIONS] reference_fasta" >&2
     echo 
-    echo "Options: -c         Colorspace data [FALSE]" >&2
-    echo "         -h         Print this help text" >&2
+    echo "Options: -h         Print this help text" >&2
+    echo "         -c         Colorspace data [FALSE]" >&2
     echo
     echo "Arguments: reference_fasta  Reference fasta file to index" >&2
 }

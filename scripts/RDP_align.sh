@@ -33,8 +33,8 @@
 function usage {
     echo "Usage: RDP_align [OPTIONS] index fastq_prefix output_directory" >&2
     echo 
-    echo "Options: -c         Colorspace data [FALSE]" >&2
-    echo "         -h         Print this help text" >&2
+    echo "Options: -h         Print this help text" >&2
+    echo "         -c         Colorspace data [FALSE]" >&2
     echo
     echo "Arguments: index            BWA reference index prefix" >&2
     echo "           fastq_prefix     Fastq file prefix.  Files can be gzipped with .gz extension" >&2

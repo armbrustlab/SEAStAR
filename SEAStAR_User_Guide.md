@@ -1,6 +1,6 @@
 <link href="style.css" media="screen" rel="stylesheet" type="text/css" />
 
-SEAStAR User Guide, version 0.4.2
+SEAStAR User Guide, version 0.4.3
 ==============================
 ####Vaughn Iverson and Chris Berthiaume
 
@@ -48,28 +48,49 @@ We are in the process of preparing several publications specific to the SEAStAR 
 <a name="quick_start">Quick Start</a>
 ------------------------------
 
-This section is a quick introduction to using SEAStAR tools for some common use cases. For installation instructions for SEAStAR itself, see the `README` file in the SEAStAR root directory. Although the SEAStAR tools can be quite memory and resource intensive, with the data used in this tutorial you should be able to comforably complete all of the steps below on a modern laptop with a dual-core processor and 4GB of RAM.
+This section is a quick introduction to using SEAStAR tools for some common use cases. The SEAStAR tools are "command-line" tools that run on UNIX-like operating systems. If you are not familiar with how to use the UNIX command-line shell, you should work your way through a tutorial before proceeding. Here are a few possibilities:
 
-The data used in these examples are actual raw SOLiD sequence reads corresponding to the [Lambda phage](http://www.ncbi.nlm.nih.gov/nuccore/NC_001416.1) genome, and can be found in the `test_data` directory of the SEAStAR source tree. Copy the following files from that directory to a new working directory.
++ [UNIX Tutorial for Beginners](http://www.ee.surrey.ac.uk/Teaching/Unix/)
++ [Learning the Linux Shell](http://linuxcommand.org/learning_the_shell.php)
++ [Introduction to the OS X Unix Command Line](http://www.matisse.net/osx/intro_unix/0_outline.html)
 
-	test_data/lambda_reads_F3.csfasta.gz
-    test_data/lambda_reads_F3_QV.qual.gz
-    test_data/lambda_reads_R3.csfasta.gz
-    test_data/lambda_reads_R3_QV.qual.gz
+This tutorial assumes that you have already installed the SEAStAR software. For instructions see the `README` file in the SEAStAR root directory. Although the SEAStAR tools can be quite memory and resource intensive, with the data used in this tutorial you should be able to comforably complete all of the steps below on a modern laptop with a dual-core processor and 2GB of RAM.
+
+The data used in these examples are actual raw SOLiD sequence reads corresponding to the [Lambda phage](http://www.ncbi.nlm.nih.gov/nuccore/NC_001416.1) genome, and can be found in the `test_data` subdirectory of the SEAStAR source directory. 
+
+If you are working from a SEAStAR Quick Start Virtual Machine image in VirtualBox, your environment is already set-up and ready to go, so you can skip to the next section: [Read Preparation][read_prep].
+
+Otherwise, create a new working directory and copy the following files from the `test_data` directory into that directory.
+
+    # Substitute the actual path to your SEAStAR "source directory" for 
+    # [SEASTAR_src] in the copy commands below:
     
-And make sure that your `PATH` environment variable points to your SEAStAR binaries directory:
+    mkdir Quick_start
+    cd Quick_start
+    cp [SEASTAR_src]/test_data/lambda_reads_F3.csfasta.gz .
+    cp [SEASTAR_src]/test_data/lambda_reads_F3_QV.qual.gz .
+    cp [SEASTAR_src]/test_data/lambda_reads_R3.csfasta.gz .
+    cp [SEASTAR_src]/test_data/lambda_reads_R3_QV.qual.gz .
+    
+And make sure that your `PATH` environment variable points to the executable files in your SEAStAR binaries directory:
 
-    export PATH=$PATH:[dir]/bin   # Where [dir] is the fully qualified path to your SEAStAR destination tree 
+    # Where [SEASTAR_dest] below is the fully qualified path to your 
+    # SEAStAR build destination directory.  
+    
+    export PATH=$PATH:[SEASTAR_dest]/bin   
 
-**NOTE:** to work your way through all of the examples in this tutorial, you will also need the following external tools, in addition to those that were required to build SEAStAR:
+If the `PATH` above is working, you should be able to run `ref_select --version` and get back something like: `ref_select version: v0.4.x`. If this doesn't work, you will need to figure out where SEAStAR is installed before proceeding so that the instructions that follow in this tutorial can find the SEAStAR tools on your computer.  
+
+**NOTE:** To work your way through all of the examples in this tutorial, you will need the following external tools (in addition to those that were required to build SEAStAR):
 
 + [Velvet](http://www.ebi.ac.uk/~zerbino/velvet/) -- You need the **colorspace** version. Build it with: `make color`, see the Velvet `README` file for instructions.
 + [BWA](http://sourceforge.net/projects/bio-bwa/files/) -- **Version 0.5.10**. *Important!! Because newer versions do not support the SOLiD colorspace reads used by this tutorial*
 + [GraphViz](http://www.graphviz.org/Download.php)
 
-Please ensure that the directories where these tools reside are in your `PATH` environment variable before proceeding. You can test this by typing `velveth_de`, `bwa`, and `dot -V` at your command line. Each of these commands should write its version string (and perhaps other help messages) in response to being run.
+Please ensure that the directories where these tools reside are also in your `PATH` environment variable before proceeding. You can test this by typing `velveth_de`, `bwa`, and `dot -V` at your command line. Each of these commands should write its version string (and perhaps other help messages) in response to being run.
 
-###Read preparation
+[read_prep]: #read_prep
+###<a name="read_prep">Read preparation</a>
 
 Convert SOLiD `.csfasta` and `.qual` files to gzipped `.fastq` files. For real projects, users with no colorspace data will omit this step in their analysis pipeline, although the FASTQ file naming conventions still need to be followed for nucleotide (e.g. Illumina) reads; see the [FASTQ][FASTQ] appendix for details.
 
@@ -91,7 +112,7 @@ Randomly sample reads from `.fastq` files, retaining approximately 10% of the or
 
 If you have installed the colorspace aware build of the *de novo* assembly tool [Velvet](http://www.ebi.ac.uk/~zerbino/velvet/), it can be used to assemble lambda-phage colorspace contigs:
 
-    velveth_de lambda_asm/ 15 -fastq.gz -shortPaired lambda_trim.mates.fastq.gz -short lambda_trim.single.fastq.gz > lambda_asm.velveth_de.log 2>&1
+    velveth_de lambda_asm/ 19 -fastq.gz -shortPaired lambda_trim.mates.fastq.gz -short lambda_trim.single.fastq.gz > lambda_asm.velveth_de.log 2>&1
     velvetg_de lambda_asm/ -scaffolding no -read_trkg no -ins_length auto -ins_length_sd auto -exp_cov 50 -cov_cutoff 5 -min_contig_lgth 50 > lambda_asm.velvetg_de.log 2>&1
 
 There will now be a subdirectory called `lambda_asm` with a file called `contigs.fa` in it. These are the colorspace contigs we will use in the next section.
@@ -104,8 +125,8 @@ For this example, you need the short read aligner [BWA](http://sourceforge.net/p
     # we need to convert the colorspace contigs to nucleotides using a single starting 
     # nucleotide (this will be wrong 3/4 of the time, but it doesn't matter because
     # BWA immediately converts the reference back to colorspace internally...)
-	# Note: replace [SEASTAR_path] below with the path to your SEASTAR "destination tree" 
-	# directory from when you built the tools.
+    # Note: replace [SEASTAR_path] below with the path to your SEASTAR build destination 
+    # directory.
 	
     gawk -f [SEASTAR_path]/bin/csfasta2ntfasta.awk lambda_asm/contigs.fa > lambda_contigs.fna
     
@@ -164,7 +185,7 @@ Now run the following command:
 
     graph_ops lambda_asm.json lambda_viz.go
 
-This will produce the same scaffolded assembly as the previous example, while writing a `DOT` format file at each step in the pipeline (with an incrementing number at the end of the filename: `lambda_asm0.dot`, `lambda_asm1.dot`, etc.) The next command will convert all of these `DOT` files to corresponding PDF figures using the `neato` layout engine in Graphviz. 	 
+This will produce the same scaffolded assembly as the previous example, but in addition, it will write a `DOT` (GraphViz) format file for each step in the scaffolding pipeline (with an incrementing number at the end of the filename: `lambda_asm0.dot`, `lambda_asm1.dot`, etc.) This next command will convert all of these DOT files to corresponding PDF figures using the `neato` layout engine in Graphviz. 	 
 
     # After this command, load the output PDF files in a viewer to see the scaffold layout
     # process, step by step. Circles are contigs with area proportional to sequence length  
@@ -173,7 +194,7 @@ This will produce the same scaffolded assembly as the previous example, while wr
     
     for i in lambda_asm?.dot; do neato -Tpdf $i > ${i##.*}.pdf; done
 
-You should now be able to load the PDF files with your favorite PDF viewer in order from `lambda_asm0.pdf` through `lambda_asm7.pdf` to see the effect of each `graph_ops` command.
+You should now be able to load the PDF files with your favorite PDF viewer in order from `lambda_asm0.pdf` through `lambda_asm6.pdf` to see the effect of each `graph_ops` command in the script above. Each graph represents the state of the assembly before/after each successive step, showing the operation of graph_ops as it run on this example dataset.  
 
 ###Estimating 16S sequence abundance
 

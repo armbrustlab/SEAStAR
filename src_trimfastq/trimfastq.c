@@ -137,7 +137,7 @@ int main(int argc, char *argv[]) {
     struct arg_int *mate_len = arg_int0("m","min_mate_len","<u>","Minimum length of the shortest mate in nucleotides [min_read_len]");
     struct arg_dbl *entropy = arg_dbl0("e","entropy_filter","<d>","Remove reads with per position information below given value (in bits per dinucleotide) [No filter]");
     struct arg_lit *entropy_strict = arg_lit0(NULL, "entropy_strict", "Reject reads for low entropy overall, not just the retained part after trimming [NULL]");
-    struct arg_lit *mates = arg_lit0(NULL, "mates_file", "Produce a Velvet compatible mate-paired output file (e.g. <out_prefix>_mates.fastq) with read1 mates reversed. [none]");
+    struct arg_lit *mates = arg_lit0(NULL, "mates_file", "Produce a Velvet compatible mate-paired output file (e.g. <out_prefix>_mates.fastq) with read2 mates reversed. [none]");
     struct arg_file *input = arg_file1(NULL, NULL, "<in_prefix>", "Input file prefix: (e.g. <in_prefix>_single.fastq [<in_prefix>_read1.fastq <in_prefix>_read2.fastq]) ");
     struct arg_file *output = arg_file1(NULL, NULL, "<out_prefix>", "Output file prefix: (e.g. <out_prefix>_single.fastq [<out_prefix>_read1.fastq <out_prefix>_read2.fastq]) ");
     struct arg_lit *version = arg_lit0(NULL,"version","Print the build version and exit."); 
@@ -509,8 +509,8 @@ int main(int argc, char *argv[]) {
                         // Output both read1 and read2
                         if (mates->count) {
                             // Interleaved velvet output and normal read file output
-                            output_read(r2_data, NULL, NULL, r2_in, r2_out, mates_out);
-                            output_read(r1_data, rev_data, rev_tmp, r1_in, r1_out, mates_out);
+                            output_read(r1_data, NULL, NULL, r1_in, r1_out, mates_out);
+                            output_read(r2_data, rev_data, rev_tmp, r2_in, r2_out, mates_out);
                         } else {
                             // No interleaved velvet output
                             output_read(r1_data, NULL, NULL, r1_in, r1_out, NULL);
@@ -617,7 +617,7 @@ int main(int argc, char *argv[]) {
     } 
     
     if (entropy->count) {
-        fprintf(stderr, "\nLow complexity reads discarded: Read1: %lu, Read2: %lu, Singlets: %lu %lu\n", comp_r1, comp_r2, comp_s1, comp_s2);
+        printf("\nLow complexity reads discarded: Read1: %lu, Read2: %lu, Singlets: %lu %lu\n", comp_r1, comp_r2, comp_s1, comp_s2);
     }
 
     mp_org = R1_org;

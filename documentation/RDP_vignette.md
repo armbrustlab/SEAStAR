@@ -24,7 +24,7 @@ An example data set has been provided in `vignettes/RDP/sim`.  Two FASTQ files o
 Below is a table of the sequences used and their simulated fold coverages.
 
 | RDP ID     | Sample 1 cov, % | Sample 2 cov, % | lineage |
-| -------------------------------------------------------- |
+| -----------|-----------------|-----------------|-------- |
 | S000000075 | 100x, 37.0 | 5x, 1.9 | Root; Bacteria; Deinococcus-Thermus; Deinococci; Thermales; Thermaceae; Thermus |
 | S000005187 | 50x, 18.5 | 10x, 3.7 | Root; Bacteria; Nitrospira; Nitrospira; Nitrospirales; Nitrospiraceae; Leptospirillum |
 | S000498962 | 40x, 14.8 | 15x, 5.6 | Root; Bacteria; Proteobacteria; Gammaproteobacteria; Oceanospirillales; SAR86; SAR86 clade II |
@@ -37,7 +37,7 @@ Below is a table of the sequences used and their simulated fold coverages.
 In order to keep the runtime of this example reasonable we'll create our own RDP database file to align against composed of just these sequences plus seven more 16S sequences.  These sequences can be found in `RDP_slim.fasta`.
 
 | RDP ID     | lineage |
-| -------------------- |
+| -----------|-------- |
 | S000458920 | Root; Bacteria; Deinococcus-Thermus; Deinococci; Thermales; Thermaceae; Vulcanithermus |
 | S000011652 | Root; Bacteria; Nitrospira; Nitrospira; Nitrospirales; Nitrospiraceae; Thermodesulfovibrio |
 | S000901535 | Root; Bacteria; Proteobacteria; Gammaproteobacteria; Oceanospirillales; Oceanospirillaceae; Amphritea |

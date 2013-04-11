@@ -52,7 +52,7 @@ set_tests_properties(trimfastq_runs PROPERTIES PASS_REGULAR_EXPRESSION "version:
 
 add_test(NAME trimfastq_test_data COMMAND bash -c "$<TARGET_FILE:trimfastq> -z --prefix=lambda_tst.d50 -p 0.5 -l 34 -m 34 -e 3.0 --add_len --mates_file ${CMAKE_BINARY_DIR}/output_test_data/lambda_reads_d ${CMAKE_BINARY_DIR}/output_test_data/lambda_reads_d50; gunzip -c ${CMAKE_BINARY_DIR}/output_test_data/lambda_reads_d50.{mates,read1,read2,single}.fastq.gz | openssl md5")
 
-set_tests_properties(trimfastq_test_data PROPERTIES PASS_REGULAR_EXPRESSION "b7e1b0349ec2b00aa3b83de3ff7e4d4c" TIMEOUT 30)
+set_tests_properties(trimfastq_test_data PROPERTIES PASS_REGULAR_EXPRESSION "b009aad561368fa3db8dd4ad718d64b3" TIMEOUT 30)
 
 add_test(NAME trimfastq_2singlets_test_data COMMAND bash -c "$<TARGET_FILE:trimfastq> -z --prefix=lambda_tst.d50s2 -p 0.5 -s -l 34 -m 34 -e 3.0 --add_len ${CMAKE_BINARY_DIR}/output_test_data/lambda_reads_d ${CMAKE_BINARY_DIR}/output_test_data/lambda_reads_d50s2; gunzip -c ${CMAKE_BINARY_DIR}/output_test_data/lambda_reads_d50s2.{read1,read2,single1,single2}.fastq.gz | openssl md5")
 

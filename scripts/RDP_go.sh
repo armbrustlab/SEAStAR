@@ -70,14 +70,14 @@ function get_ssdir {
 function usage {
     echo "Usage: RDP_go [OPTIONS] <PREFIX>..." >&2
     echo  >&2
-    echo "Options: -r DIR     RDP database directory created by RDP_prep" >&2
+    echo "Options: -h         Print this help text" >&2
+    echo "         -r DIR     RDP database directory created by RDP_prep" >&2
     echo "         -l INT     Maximum number of reference mappings before a read is rejected from consideration during initial RDP selction step [5000]" >&2
     echo "         -t FLOAT   Minimum bitscore value for a ref sequence to be selected by ref_select during initial RPD selection step [75.0]" >&2
     echo "         -f FLOAT   Minimum bitscore value, as a fraction of the top scoring sequence.  Used by ref_select during initial RDP selection step [0.00125]"  >&2
-    echo "         -o DIR     Output directory" >&2
     echo "         -c         Colorspace data [FALSE]" >&2
     echo "         -d         Debug.  Do not remove intermediate files [FALSE]" >&2
-    echo "         -h         Print this help text" >&2
+    echo "         -o DIR     Output directory" >&2
     echo >&2
     echo "Arguments: PREFIX   fastq file prefix.  Files may be gzipped with .gz extension." >&2
 }

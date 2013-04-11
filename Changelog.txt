@@ -1,3 +1,10 @@
+### 0.4.3 ###
+- General documentation improvements and fixed typos and formatting problems.
+
+- Fixed a status printing bug in trimfastq
+
+- Fixed bug in trimfastq Velvet paired interleaved output where wrong mate was reversed.
+
 ### 0.4.2 ###
 - Documentation improvements; fixed typos and formatting problems when read on Github.
 
