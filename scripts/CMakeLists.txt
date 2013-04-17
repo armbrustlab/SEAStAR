@@ -29,6 +29,7 @@ cmake_minimum_required (VERSION 2.8)
 set(SCRIPT_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_RUNTIME_OUTPUT_DIRECTORY})
 
 find_program(SED_EXEC "sed")
+find_program(GAWK_EXEC "gawk")
 
 # N.B. At some point in the future when CMake adds a command to alter file
 # permissions the chmod commands used below should be replaced to stay platform
@@ -41,9 +42,9 @@ foreach(IN_FILE ${AWK_SOURCES_INPUT})
     list(APPEND AWK_SOURCES_OUTPUT ${OUT_FILE})
     add_custom_command(
         OUTPUT ${OUT_FILE}
-        COMMAND ${CMAKE_COMMAND} -E remove -f ${OUT_FILE}
-        COMMAND bash -c '${SED_EXEC} "s/SS_BUILD_VERSION/${GIT_VERSION}/g" ${CMAKE_CURRENT_SOURCE_DIR}/${IN_FILE} > ${OUT_FILE}'
-        COMMAND chmod 444 ${OUT_FILE}
+        COMMAND bash -c 'echo \"\#!${GAWK_EXEC} -f\" > ${OUT_FILE}'
+        COMMAND bash -c '${SED_EXEC} "s/SS_BUILD_VERSION/${GIT_VERSION}/g" ${CMAKE_CURRENT_SOURCE_DIR}/${IN_FILE} >> ${OUT_FILE}'
+        COMMAND chmod 555 ${OUT_FILE}
         DEPENDS ${IN_FILE}
     )
 endforeach()
@@ -120,16 +121,14 @@ add_custom_target(scripts ALL DEPENDS ${JS_SOURCES_OUTPUT} ${COFFEE_SOURCES_OUTP
 
 enable_testing()
 
-find_program(GAWK_EXEC "gawk")
-
 add_test(NAME fastq2csfasta_test_data COMMAND bash -c "gunzip -c ${CMAKE_BINARY_DIR}/output_test_data/lambda_reads_d50.read2.fastq.gz | ${GAWK_EXEC} -f ${SCRIPT_RUNTIME_OUTPUT_DIRECTORY}/fastq2csfasta.awk > ${CMAKE_BINARY_DIR}/output_test_data/lambda_reads_d50.read2.csfasta; gunzip -c ${CMAKE_BINARY_DIR}/output_test_data/lambda_reads_d50.read1.fastq.gz | ${GAWK_EXEC} -f ${SCRIPT_RUNTIME_OUTPUT_DIRECTORY}/fastq2csfasta.awk | tee ${CMAKE_BINARY_DIR}/output_test_data/lambda_reads_d50.read1.csfasta | openssl md5")
 set_tests_properties(fastq2csfasta_test_data PROPERTIES PASS_REGULAR_EXPRESSION "92e15d3e11aca4afdee50148b655894a" TIMEOUT 30)
 
 add_test(NAME csfasta2fasta_test_data COMMAND bash -c "${GAWK_EXEC} -f ${SCRIPT_RUNTIME_OUTPUT_DIRECTORY}/csfasta2fasta.awk ${CMAKE_BINARY_DIR}/output_test_data/lambda_reads_d50.read1.csfasta | tee ${CMAKE_BINARY_DIR}/output_test_data/lambda_reads_d50.read1.fasta | openssl md5")
 set_tests_properties(csfasta2fasta_test_data PROPERTIES PASS_REGULAR_EXPRESSION "7f601062c2f14a8b9319c3da220b3451" TIMEOUT 30)
 
-add_test(NAME csfasta2fasta_paired_test_data COMMAND bash -c "${GAWK_EXEC} -f ${SCRIPT_RUNTIME_OUTPUT_DIRECTORY}/csfasta2fasta.awk ${CMAKE_BINARY_DIR}/output_test_data/lambda_reads_d50.read2.csfasta ${CMAKE_BINARY_DIR}/output_test_data/lambda_reads_d50.read1.csfasta | tee ${CMAKE_BINARY_DIR}/output_test_data/lambda_reads_d50.mates.fasta | openssl md5")
-set_tests_properties(csfasta2fasta_paired_test_data PROPERTIES PASS_REGULAR_EXPRESSION "b66355fb6a4cbefb91efa61048c61bb7" TIMEOUT 30)
+add_test(NAME csfasta2fasta_paired_test_data COMMAND bash -c "${GAWK_EXEC} -f ${SCRIPT_RUNTIME_OUTPUT_DIRECTORY}/csfasta2fasta.awk ${CMAKE_BINARY_DIR}/output_test_data/lambda_reads_d50.read1.csfasta ${CMAKE_BINARY_DIR}/output_test_data/lambda_reads_d50.read2.csfasta | tee ${CMAKE_BINARY_DIR}/output_test_data/lambda_reads_d50.mates.fasta | openssl md5")
+set_tests_properties(csfasta2fasta_paired_test_data PROPERTIES PASS_REGULAR_EXPRESSION "90b10cd600ace98d5bb9ba025437e1e8" TIMEOUT 30)
 
 add_test(NAME csfasta2ntfasta_test_data COMMAND bash -c "${NODE_EXEC} ${SCRIPT_RUNTIME_OUTPUT_DIRECTORY}/graph_ops.js ${CMAKE_BINARY_DIR}/output_test_data/lambda_asm.json FASTA | tee ${CMAKE_BINARY_DIR}/output_test_data/lambda_asm_recon.fna | ${GAWK_EXEC} -v numstarts=4 -f ${SCRIPT_RUNTIME_OUTPUT_DIRECTORY}/csfasta2ntfasta.awk | tee ${CMAKE_BINARY_DIR}/output_test_data/lambda_asm_recon_4starts.fasta | openssl md5") 
 set_tests_properties(csfasta2ntfasta_test_data PROPERTIES PASS_REGULAR_EXPRESSION "e7565baf852172a3f9f1703b2e00fd85" TIMEOUT 30)

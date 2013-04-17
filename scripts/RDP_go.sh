@@ -123,7 +123,7 @@ function align_prefix {
     
     echo "Extract final selected sequence set"
     graph_ops "$prefix"_final_taxa_seastar.json.gz FASTA '{"abundance":true}' >"$prefix"_final_taxa.fasta
-    java -Xmx1g -jar "$rdpdir"/rdp_classifier_2.?/rdp_classifier-2.?.jar -q "$prefix"_final_taxa.fasta -o /dev/stdout -f allrank -t "$rdpdir"/trained/rRNAClassifier.properties >"$prefix"_final_class.txt
+    java -Xmx500m -jar "$rdpdir"/rdp_classifier_2.?/rdp_classifier-2.?.jar -q "$prefix"_final_taxa.fasta -o /dev/stdout -f allrank -t "$rdpdir"/trained/rRNAClassifier.properties >"$prefix"_final_class.txt
     RDP_tree_dev "$rdpdir"/RDP_expand.json 0.1 <"$prefix"_final_class.txt >"$prefix"_final_class.json
     
     # Cleanup some intermediate files

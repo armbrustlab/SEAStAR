@@ -1,7 +1,7 @@
 /*
  --------------------------------------------------------------------------- #
  Center for Environmental Genomics
- Copyright (C) 2009-2012 University of Washington.
+ Copyright (C) 2009-2013 University of Washington.
  
  Authors:
  Vaughn Iverson
@@ -24,7 +24,7 @@
  --------------------------------------------------------------------------- #
  
  =============================================================================
- Name        : fastqnodup
+ Name        : fastq_nodup
  Description : Read FASTQ format file(s) and reject reads that appear to be
                PCR over-amplification duplicates 
  =============================================================================
@@ -1114,7 +1114,7 @@ unsigned long int fq_stream_singlet_rejecter(UT_string *fq_fn, int pipe_fd, UT_s
                     *start = '\0';
                     utstring_printf(new_head_data, "@%s|%s:%s",utstring_body(head_data)+1,utstring_body(out_prefix),end);
                 } else {
-                    utstring_printf(new_head_data, "@%s:%s",utstring_body(out_prefix),end);
+                    utstring_printf(new_head_data, "@%.2s+%s:%s",utstring_body(head_data)+1,utstring_body(out_prefix),end);
                 } 
             }
             

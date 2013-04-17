@@ -1,3 +1,22 @@
+### 0.4.4 ###
+
+- Added new options to trimfastq supporting the output of FASTA format files and 
+adding more flexibility to the --mates_file output functionality. Also optimized
+the case where -p = 0.0, to enable very efficient file format conversion using
+--fasta and --mate_file when no additional trimming is desired.
+
+- Fixed bug in fastq_nodup which led to corruption of the read headers in .single
+output files for colorspace reads. 
+
+- All *.awk scripts in the /bin directory now have correct shebang lines, so they
+may be located and run through the PATH. 
+
+- Added new script fastq_merge_csfasta.awk to pull modified csfasta read data back
+into the originating fastq file. This is useful when using the SAET read error 
+correction tool, which only supports csfasta format files.  
+
+- Documentation fixes and updates reflecting the above changes.
+
 ### 0.4.3 ###
 - General documentation improvements and fixed typos and formatting problems.
 

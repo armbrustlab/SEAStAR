@@ -93,13 +93,13 @@ Note, it is possible to use a newer version of gcc (such as gcc46) if you alread
 
 It may be possible to use [HomeBrew](http://mxcl.github.com/homebrew/) instead of Macports to install these packages, but we haven't tested it.
 
+You will need to define an environment variable to explicitly tell cmake which compiler to use. Note that this must be done each time you start a command line session where you wish to run cmake again (or add it to your shell startup file, e.g. .bashrc in your home directory).  For example:
+ 
+    export CC=/opt/local/bin/gcc-mp-4.4  # change this if you are using a different version!
+
 ####An important note about compilers on Mac OS X (starting with Xcode 4.2 on OS X 10.7 and later versions):
 
 There are known bugs in OpenMP (multi-core processor support) in the gcc compiler Apple supplies with Xcode on OS X Lion (or later).  This is why we specify above that you install gcc separately with MacPorts. The cmake script provided checks OS X systems to see if the OpenMP support is working correctly with the default (or specified) C compiler. If you receive an error when trying to build that says "You need to install gcc (version 4.4 or later) from MacPorts" it is because our build system is attempting to use the XCode gcc compiler, and not the one you installed from MacPorts.
-
-You may need to define an environment variable to explicitly tell cmake which compiler to use.  Note that this must be done each time you start a command line session where you wish to run cmake again (or add it to your shell startup file, e.g. .bashrc in your home directory)
- 
-    export CC=/opt/local/bin/gcc-mp-4.4  # change this if you are using a different version!
 
 For Developers
 ------------------------------

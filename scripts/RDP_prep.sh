@@ -125,7 +125,7 @@ echo "Filtering RDP database sequences"
 if [[ "${rdpseqs: -3}" == ".gz" ]]; then
     gawk -v minlen="$minlen" -v maxlen="$maxlen" -f "$ssdir/fix_fasta_line_lengths.awk" <(gzip -dc "$rdpseqs") 2>"$outdir"/RDP_rejected.txt | gzip >"$outdir"/RDP.fasta.gz
 else
-    gawk -v minlen="$minlen" -v maxlen="$maxlen" -f "$ssdir/fix_fasta_line_lengths.awk" "$rdpseqs" 2>"$outdir"/RDP_rejected.txt | gzip >"$outdir"/RDP.fasta.gz
+    gawk --re-interval -v minlen="$minlen" -v maxlen="$maxlen" -f "$ssdir/fix_fasta_line_lengths.awk" "$rdpseqs" 2>"$outdir"/RDP_rejected.txt | gzip >"$outdir"/RDP.fasta.gz
 fi
 
 echo "Training the RDP classifier"

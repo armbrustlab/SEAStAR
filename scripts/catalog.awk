@@ -1,4 +1,3 @@
-#!/usr/bin/gawk -f
 # -------------------------------------------------------------------------- #
 # Center for Environmental Genomics
 # Copyright (C) 2009-2013 University of Washington.

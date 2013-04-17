@@ -1,6 +1,6 @@
 <link href="style.css" media="screen" rel="stylesheet" type="text/css" />
 
-<h1>SEAStAR User Guide, version 0.4.3</h1>
+<h1>SEAStAR User Guide, version 0.4.4</h1>
 <h4>Vaughn Iverson and Chris Berthiaume</h4>
 <h5><a href="http://armbrustlab.ocean.washington.edu">Armbrust Lab</a>, School of Oceanography, University of Washington</h5>
 <h2>Table of Contents</h2>
@@ -80,10 +80,8 @@ velvetg_de lambda_asm/ -scaffolding no -read_trkg no -ins_length auto -ins_lengt
 # we need to convert the colorspace contigs to nucleotides using a single starting 
 # nucleotide (this will be wrong 3/4 of the time, but it doesn&#39;t matter because
 # BWA immediately converts the reference back to colorspace internally...)
-# Note: replace [SEASTAR_path] below with the path to your SEASTAR build destination 
-# directory.
 
-gawk -f [SEASTAR_path]/bin/csfasta2ntfasta.awk lambda_asm/contigs.fa &gt; lambda_contigs.fna
+csfasta2ntfasta.awk lambda_asm/contigs.fa &gt; lambda_contigs.fna
 
 bwa index -a is -c lambda_contigs.fna
 bwa aln -c -n 0.001 -l 18 lambda_contigs.fna lambda_trim.read1.fastq.gz &gt; lambda_trim.read1.sai
@@ -273,9 +271,9 @@ singlets from <code>F3</code> &rarr; <code>&lt;out_prefix&gt;.single2.fastq</cod
 <p><code>&lt;in_prefix&gt;.read1.fastq</code> &rarr; <code>&lt;out_prefix&gt;.read1.fastq</code></p>
 <p><code>&lt;in_prefix&gt;.read2.fastq</code> &rarr; <code>&lt;out_prefix&gt;.read2.fastq</code></p>
 <p><code>&lt;in_prefix&gt;.single.fastq</code> &rarr; <code>&lt;out_prefix&gt;.single.fastq</code></p>
-<p>The input files may be gzip format compressed files with the customary <code>.gz</code> suffix at the very end of the filename, which tells <code>trimfastq</code> to decompress the files as it reads them. Multiple single files (i.e. <code>.single1.fastq</code> and <code>.single2.fastq</code> suffixes) are also recognized.</p>
+<p>The input files may be gzip format compressed files with the customary <code>.gz</code> suffix at the very end of the filename, which tells <code>trimfastq</code> to decompress the files as it reads them. Multiple single files (i.e. <code>.single1.fastq</code> and <code>.single2.fastq</code> suffixes) are also recognized. It is also possible to write FASTA format files (i.e. lacking quality scores) and interleaved paired-read files (for the Velvet assembler). See the options below for more information.</p>
 <h4><code>trimfastq</code> optional parameters <code>[options]</code>:</h4>
-<p><code>[-h|--help]</code> <code>[--version]</code> <code>[-c|--color_space]</code> <code>[-z|--gzip]</code> <code>[-v|--invert_singles]</code> <code>[-s|--singles]</code> <code>[-p &lt;d&gt;|--correct_prob=&lt;d&gt;]</code> <code>[-l &lt;u&gt;|--min_read_len=&lt;u&gt;]</code> <code>[-m &lt;u&gt;|--min_mate_len=&lt;u&gt;]</code> <code>[-f &lt;u&gt;|--fixed_len=&lt;u&gt;]</code> <code>[--prefix=&lt;string&gt;]</code> <code>[--add_len]</code> <code>[--no_prefix]</code> <code>[-e &lt;d&gt;|--entropy_filter=&lt;d&gt;]</code> <code>[--entropy_strict]</code> <code>[--mates_file]</code></p>
+<p><code>[-h|--help]</code> <code>[--version]</code> <code>[-c|--color_space]</code> <code>[-z|--gzip]</code> <code>[-v|--invert_singles]</code> <code>[-s|--singles]</code> <code>[-p &lt;d&gt;|--correct_prob=&lt;d&gt;]</code> <code>[-l &lt;u&gt;|--min_read_len=&lt;u&gt;]</code> <code>[-m &lt;u&gt;|--min_mate_len=&lt;u&gt;]</code> <code>[-f &lt;u&gt;|--fixed_len=&lt;u&gt;]</code> <code>[--prefix=&lt;string&gt;]</code> <code>[--add_len]</code> <code>[--no_prefix]</code> <code>[-e &lt;d&gt;|--entropy_filter=&lt;d&gt;]</code> <code>[--entropy_strict]</code> <code>[--mates_file]</code> <code>[--no_rev]</code> <code>[--only_mates]</code> <code>[--fasta]</code></p>
 <p><b><code>-h</code> / <code>--help</code></b></p>
 <p>Print a guide to valid command line parameters and their correct usage to the terminal, and then exit.</p>
 <p><b><code>--version</code></b></p>
@@ -307,7 +305,7 @@ TGTTGTGCGCGCCATAGCGAGGGGCTCAGCACGCGTC
 <p><b><code>-s</code> / <code>--singles</code></b></p>
 <p>Write two singlet files (<code>.single1.fastq</code> and <code>.single2.fastq</code>), one for new singlets generated from each paired input file. Note that this option is only valid when there are no input singlet reads. The default behavior in this case is to write a single combined singlet file (<code>.single.fastq</code>).</p>
 <p><b><code>-p &lt;d&gt;</code> / <code>--correct_prob=&lt;d&gt;</code></b></p>
-<p>Minimum mean probability that trimmed output reads are free of uncorrectable errors (or all errors with <code>-c</code>).  Default value is <code>&lt;d&gt;</code>= 0.5.</p>
+<p>Minimum mean probability that trimmed output reads are free of uncorrectable errors (or all errors with <code>-c</code>).  Default value is <code>&lt;d&gt;</code>= 0.5  Setting <code>-p</code> to 0.0 completely disables quality trimming, which is sometimes appropriate for file format conversion and interleaving operations (e.g. see <code>--fasta</code> and <code>--mates_file</code>).</p>
 <p><b><code>-l &lt;u&gt;</code> / <code>--min_read_len=&lt;u&gt;</code></b></p>
 <p>Minimum length of a singlet or longest-mate of a pair, in nucleotides. Default value is <code>&lt;u&gt;</code>= 24 bases.</p>
 <p><b><code>-m &lt;u&gt;</code> / <code>--min_mate_len=&lt;u&gt;</code></b></p>
@@ -319,7 +317,13 @@ TGTTGTGCGCGCCATAGCGAGGGGCTCAGCACGCGTC
 <p><b><code>--entropy_strict</code></b></p>
 <p>Reject reads for low entropy overall, not just the retained part after trimming. By default this setting is off. Use of this setting requires use of <code>--entropy_filter</code>. </p>
 <p><b><code>--mates_file</code></b></p>
-<p>In addition to other outputs, produce a Velvet compatible mate-paired output file (named <code>&lt;out_prefix&gt;_mates.fastq</code>) with read2 mates reversed as required. </p>
+<p>In addition to other outputs, produce a Velvet compatible interleaved paired output file (named <code>&lt;out_prefix&gt;_mates.fastq</code>) with read2 mates reversed by default (to support SOLiD mate-paired reads.) </p>
+<p><b><code>--no_rev</code></b></p>
+<p>By default, for SOLiD colorspace read-pairs, the second read of each pair is reverse in the <code>mates</code> file produced by <code>--mates_file</code> (to put the mates on opposite strands, as Velvet expects). <code>--no_rev</code> disables this reversing, which is useful for SOLiD colorspace paired-end files.  Nucleotide inputs are never reversed in the output generated by <code>--mates_file</code>, so this option has no effect in that case.</p>
+<p><b><code>--only_mates</code></b></p>
+<p>Surpress writing <code>&lt;out_prefix&gt;.read1.fastq</code> and <code>&lt;out_prefix&gt;.read2.fastq</code> output files. <code>--only_mates</code> may only be used with the <code>--mates_file</code> option. This option is useful when reads are being trimmed exclusively for assembly, to save unnecessary processing for files that will not be used. See also the --fasta option below to save even more space.</p>
+<p><b><code>--fasta</code></b></p>
+<p>Write FASTA format files instead of FASTQ files for all outputs. FASTA files are about half the size of FASTQ, so for some purposes (e.g. assembly, alignment) that may not take quality scores into account, FASTA may be a preferable output format to save disk space. When <code>--fasta</code> is used, no <code>.fastq</code> files will be written, and the output files will instead end with <code>.fasta[.gz]</code>. </p>
 <hr>
 <h2><a name="ref_select"><code>ref_select</code></a></h2>
 <p><code>ref_select</code> is a utility for calculating a wide variety of useful information from alignments of next-generation sequence reads to large reference sequence datasets. For example, it can be used to build a meta-genomic assembly graph from paired-reads aligned back to <em>de novo</em> assembled contigs. It can also be used to precisely select (and accurately estimate the relative abundances of) sequences from an alignment with a reference library (e.g. metagenomic reads to 16S rDNA database, or mRNA transcript reads to a database of genes from one or more genomes.)</p>
@@ -1371,7 +1375,7 @@ CGAGCAAC....TTAGCGAC....</code></pre>
 <p><b><code>--verbose</code></b></p>
 <p>Output extra diagnostic information to STDERR.</p>
 <h2><a name="misc_scripts">Miscellaneous scripts</a></h2>
-<p>There are a number of utility GAWK scripts that can be found in the source <code>scripts</code> directory and get copied to the build <code>bin</code> directory.  Their names should give a reasonable summary of purpose and further descriptions can be found in header comments of the source.</p>
+<p>There are a number of utility GAWK scripts that can be found in the source <code>scripts</code> directory and get copied to the build <code>bin</code> directory. Their names should give a reasonable summary of purpose and further descriptions can be found in header comments of the source. </p>
 <hr>
 <h2><a name="file_formats">File Formats</a></h2>
 <h2><a name="FASTQ">FASTQ</a> Format Reference</h2>
@@ -1410,7 +1414,7 @@ CGAAACCGCCGGAACCAGCTTGTGCGGACGCGCCGGCCCCTGGACCGGA
 +
 9&#39;4,)9,*%4/&#39;#,32)*.1-1(5&amp;3,%,$:*&amp;#&#39;8,+2&#39;40$)05(,&amp;</code></pre>
 <p>The read prefix <code>lambda</code> is added as an identifier for this set of reads, by default, from the <code>.csfasta</code> filename prefix.  The read name suffix changes from the SOLiD specific <code>F3</code> to <code>/2</code>‚ designating it as the second mate or the only read in a fragment run. Similarly for mated reads, <code>R3</code> (or <code>F5-BC</code>/<code>F5-P2</code>) suffixes are changed to <code>/1</code>, designating them as the first mates.</p>
-<p>If the resulting <code>.fastq</code> files are then be processed by <code>trimfastq</code> with <code>--add_len</code>, read lengths will be added to the read header after the primer base and first color.  Below, the <code>49+</code> indicates the actual number of color encoded nucleotides:</p>
+<p>If the resulting <code>.fastq</code> files are then be processed by <code>trimfastq</code> with <code>--add_len</code>, read lengths will be added to the read header after the primer base and first color.  Below, the <code>49|</code> indicates the actual number of color encoded nucleotides:</p>
 <pre><code>@TA+49|lambda:1_68_381/2
 CGAAACCGCCGGAACCAGCTTGTGCGGACGCGCCGGCCCCTGGACCGGA
 +
