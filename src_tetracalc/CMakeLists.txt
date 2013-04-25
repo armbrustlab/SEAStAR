@@ -50,4 +50,4 @@ add_test(NAME tetracalc_test_data COMMAND bash -c "$<TARGET_FILE:tetracalc> --me
 
 set_tests_properties(tetracalc_runs PROPERTIES PASS_REGULAR_EXPRESSION "version: ${GIT_VERSION}" TIMEOUT 3)
 
-set_tests_properties(tetracalc_test_data PROPERTIES PASS_REGULAR_EXPRESSION "ab56ec052736ca5c2536028c63b50bf6" TIMEOUT 30)
+set_tests_properties(tetracalc_test_data PROPERTIES PASS_REGULAR_EXPRESSION "ab56ec052736ca5c2536028c63b50bf6" TIMEOUT 90)

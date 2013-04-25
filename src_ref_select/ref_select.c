@@ -2429,6 +2429,8 @@ int main(const int argc, char *argv[]) {
                         
                         if (utstring_body(name_str)[utstring_len(name_str) - 3] == '/') {
                             ss_trunc_utstring(name_str, 3);
+                        } else {
+                            ss_trunc_utstring(name_str, 1);  // Remove newline
                         }
                         
                         // Find the info for this read

@@ -1,6 +1,6 @@
 <link href="style.css" media="screen" rel="stylesheet" type="text/css" />
 
-SEAStAR User Guide, version 0.4.4
+SEAStAR User Guide, version 0.4.5
 ==============================
 ####Vaughn Iverson and Chris Berthiaume
 
@@ -58,7 +58,7 @@ This tutorial assumes that you have already installed the SEAStAR software. For 
 
 The data used in these examples are actual raw SOLiD sequence reads corresponding to the [Lambda phage](http://www.ncbi.nlm.nih.gov/nuccore/NC_001416.1) genome, and can be found in the `test_data` subdirectory of the SEAStAR source directory. 
 
-If you are working from a SEAStAR Quick Start Virtual Machine image in VirtualBox, your environment is already set-up and ready to go, so you can skip to the next section: [Read Preparation][read_prep].
+If you are working from the [SEAStAR Quick Start virtual machine appliance](http://armbrustlab.ocean.washington.edu/node/305) file in VirtualBox, your environment is already set-up and ready to go, so you can skip to the next section: [Read Preparation][read_prep].
 
 Otherwise, create a new working directory and copy the following files from the `test_data` directory into that directory.
 
@@ -364,7 +364,7 @@ Specify the prefix string to add to read identifiers. For example: `@<string>:1_
 
 Note, this will replace any existing prefix. By default this is `<out_prefix>` described above.
 
-<b>`-n` / `--no_prefix`</b>
+<b>`--no_prefix`</b>
 
 Overrides the default read prefixing behavior and instead preserves the read identifiers exactly as they are in the input fastq file(s).
 

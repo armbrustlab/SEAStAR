@@ -1,6 +1,6 @@
 <link href="style.css" media="screen" rel="stylesheet" type="text/css" />
 
-<h1>SEAStAR User Guide, version 0.4.4</h1>
+<h1>SEAStAR User Guide, version 0.4.5</h1>
 <h4>Vaughn Iverson and Chris Berthiaume</h4>
 <h5><a href="http://armbrustlab.ocean.washington.edu">Armbrust Lab</a>, School of Oceanography, University of Washington</h5>
 <h2>Table of Contents</h2>
@@ -36,7 +36,7 @@
 </ul>
 <p>This tutorial assumes that you have already installed the SEAStAR software. For instructions see the <code>README</code> file in the SEAStAR root directory. Although the SEAStAR tools can be quite memory and resource intensive, with the data used in this tutorial you should be able to comforably complete all of the steps below on a modern laptop with a dual-core processor and 2GB of RAM.</p>
 <p>The data used in these examples are actual raw SOLiD sequence reads corresponding to the <a href="http://www.ncbi.nlm.nih.gov/nuccore/NC_001416.1">Lambda phage</a> genome, and can be found in the <code>test_data</code> subdirectory of the SEAStAR source directory. </p>
-<p>If you are working from a SEAStAR Quick Start Virtual Machine image in VirtualBox, your environment is already set-up and ready to go, so you can skip to the next section: <a href="#read_prep">Read Preparation</a>.</p>
+<p>If you are working from the <a href="http://armbrustlab.ocean.washington.edu/node/305">SEAStAR Quick Start virtual machine appliance</a> file in VirtualBox, your environment is already set-up and ready to go, so you can skip to the next section: <a href="#read_prep">Read Preparation</a>.</p>
 <p>Otherwise, create a new working directory and copy the following files from the <code>test_data</code> directory into that directory.</p>
 <pre><code># Substitute the actual path to your SEAStAR &quot;source directory&quot; for 
 # [SEASTAR_src] in the copy commands below:
@@ -220,7 +220,7 @@ singlets from <code>F3</code> &rarr; <code>&lt;out_prefix&gt;.single2.fastq</cod
 <p><b><code>--prefix=&lt;string&gt;</code></b></p>
 <p>Specify the prefix string to add to read identifiers. For example: <code>@&lt;string&gt;:1_68_381</code></p>
 <p>Note, this will replace any existing prefix. By default this is <code>&lt;out_prefix&gt;</code> described above.</p>
-<p><b><code>-n</code> / <code>--no_prefix</code></b></p>
+<p><b><code>--no_prefix</code></b></p>
 <p>Overrides the default read prefixing behavior and instead preserves the read identifiers exactly as they are in the input fastq file(s).</p>
 <p><b><code>-l &lt;u&gt;</code> / <code>--index_len=&lt;u&gt;</code></b>        </p>
 <p>Controls the read sequence prefix length of the search index. This should be set long enough so that random prefix collisions are infrequent, but short enough so that a large number of sequence errors are unlikely to accumulate. This parameter also impacts the memory use of this tool, with each increment increasing the index size by a factor of 4. This parameter defaults to <code>&lt;u&gt;</code>=14 nucleotides and may not exceed 32 nucleotides.</p>

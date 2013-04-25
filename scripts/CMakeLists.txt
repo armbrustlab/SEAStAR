@@ -102,6 +102,15 @@ foreach(COFFEE_SRC_FILE ${COFFEE_SOURCES_INPUT})
     )
 endforeach()
 
+# Copy contents of node_modules subdirectory to bin/ 
+set (NODE_MODS_OUTPUT ${SCRIPT_RUNTIME_OUTPUT_DIRECTORY}/node_modules)
+set (NODE_MODS_INPUT ${CMAKE_CURRENT_SOURCE_DIR}/node_modules)
+add_custom_command(
+     OUTPUT ${NODE_MODS_OUTPUT}
+     COMMAND ${CMAKE_COMMAND} -E copy_directory ${NODE_MODS_INPUT} ${NODE_MODS_OUTPUT}
+     DEPENDS ${NODE_MODS_INPUT}
+)
+
 # Copy RDP_viz directory to the final script directory
 set(RDP_VIZ_FILES ${CMAKE_CURRENT_SOURCE_DIR}/RDP_viz/raphael-2.1.0.js ${CMAKE_CURRENT_SOURCE_DIR}/RDP_viz/tree_bars.html ${CMAKE_CURRENT_SOURCE_DIR}/RDP_viz/tree_bars.js)
 set(OUT_DIR ${SCRIPT_RUNTIME_OUTPUT_DIRECTORY}/RDP_viz)
@@ -114,10 +123,11 @@ foreach(IN_FILE ${RDP_VIZ_FILES})
         OUTPUT ${OUT_FILE}
         COMMAND ${CMAKE_COMMAND} -E copy ${IN_FILE} ${OUT_FILE}
         COMMAND chmod 444 ${OUT_FILE}
+        DEPENDS ${IN_FILE}
     )
 endforeach()
 
-add_custom_target(scripts ALL DEPENDS ${JS_SOURCES_OUTPUT} ${COFFEE_SOURCES_OUTPUT} ${AWK_SOURCES_OUTPUT} ${SH_SOURCES_OUTPUT} ${RDP_VIZ_SOURCES_OUTPUT})
+add_custom_target(scripts ALL DEPENDS ${NODE_MODS_OUTPUT} ${JS_SOURCES_OUTPUT} ${COFFEE_SOURCES_OUTPUT} ${AWK_SOURCES_OUTPUT} ${SH_SOURCES_OUTPUT} ${RDP_VIZ_SOURCES_OUTPUT})
 
 enable_testing()
 

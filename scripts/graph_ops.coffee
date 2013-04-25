@@ -34,23 +34,24 @@
 # For example:  node --max-old-space-size=4000 --max-new-space-size=4000 ...
 # (The included graph_ops (and nodewrap) scripts do this automatically) 
 #
-# Usage: [<input.json[.gz]>] <command> ['{parms}'] [<command> ['{parms}']...]\n
+# Usage: [-h|--help] [<input.json[.gz]>] [<script.go[.gz]>] [<command> ['{parms}']...]
 # 
-# Where: <input.json> is an optional datafile to initially LOAD\n
-#       <command> is one of the commands listed below\n
-#       '{params}' optionally specify parameters for a given command\n
+# Where: <input.json> is an optional datafile to initially LOAD
+#        <script.go> is an optional command SCRIPT file
+#        <command> is one of the valid commands
+#        '{params}' optionally specify parameters for a given command
+#        -h for help with running graph_ops
 #
 # Command list:  (type HELP <command> for more details about a given command):
 #
 ###
-
-# Currently, only node.js bundled libraries are required
 
 fs = require('fs')       # Node.js built-in filesystem access module
 zlib = require('zlib')   # Node.js built-in zlib (de)compression library 
 path = require('path')   # Node.js built-in filename path parsing library
 repl = require('repl')   # Node.js built-in command line eval loop library
 child_process = require('child_process')   # Node.js built-in process spawning library
+JSONStream = require('JSONStream')   # npm library for dealing with JSON streams
 
 ss_version = "SS_BUILD_VERSION"   # Note, this gets replaced in the build process
 
@@ -69,8 +70,8 @@ resolve_path = (fn) ->
 ###
 # Helper function to uniformly handle reading from a file, a gzipped file or stdin 
 ###
-read_input_stream = (fn, cb) ->  # fn = Filename, cb = callback passing full data buffer
-   if fn is '-'                  # '-' indicates STDIN input stream
+read_input_stream = (fn, parse, cb) ->  # fn = Filename, cb = callback passing object or full data buffer
+   if fn is '-'                         # '-' indicates STDIN input stream
       input = process.stdin
       input.resume()              # STDIN needs to be "resumed" in node.js (not opened)
    else 
@@ -83,16 +84,24 @@ read_input_stream = (fn, cb) ->  # fn = Filename, cb = callback passing full dat
       else
          input = fs.createReadStream(inputfn)
       
-   read_buffer = ''   # Initialize read buffer
-
-   # Handlers for events on the the input stream
-   input.on('data', (data) -> 
-           read_buffer = read_buffer.concat(data))  # Add data to the input buffer
-        .on('end', () ->
-           cb(null, read_buffer))     # End of data, invoke the callback with the buffer
-        .on('error', (err) ->
-            console.error("ERROR: read_input_stream could not open file '#{fn}' for input.")
-            cb(err, null))
+   if parse   # Return stream parsed JSON instead of string buffer
+      obj_buffer = null   
+      input.pipe(JSONStream.parse())
+           .on('root', (data) ->
+              cb(null, data))
+           .on('error', (err) ->
+               console.error("ERROR: JSON read_input_stream could not be opened or parsed '#{fn}' for input.")
+               cb(err, null))
+   else
+      read_buffer = ''   # Initialize read buffer
+      # Handlers for events on the the input stream
+      input.on('data', (data) -> 
+              read_buffer = read_buffer.concat(data))  # Add data to the input buffer
+           .on('end', () ->
+              cb(null, read_buffer))     # End of data, invoke the callback with the buffer
+           .on('error', (err) ->
+              console.error("ERROR: read_input_stream could not open file '#{fn}' for input.")
+              cb(err, null))
 
 ###
 # Helper functions to uniformly handle writing to a file, a gzipped file or stdout 
@@ -149,27 +158,56 @@ close_output_stream = (out, cb) ->  # out = output stream, cb = callback when cl
 # my_stringify writes JSON output progressively to a stream, avoiding the creation of a 
 # giant text buffer (saving memory for large objects)
 ##
-my_stringify = (j, o, l=1) -> 
-# j = object to serialize, o = output stream, l = levels to descend
-   if (l and (j instanceof Array))  # Handle traversing array objects 
-      o.write("[")
-      first = true
-      for obj in j
-         o.write(",\n") unless first
-         first = false
-         my_stringify(obj,o,l-1)  # Recursive call
-      o.write("]")
-   else if (l and (typeof(j) is 'object'))  # Handle traversing normal objects 
-      o.write("{")
-      first = true
-      for name,obj of j
-         o.write(",\n") unless first
-         first = false
-         o.write("\"#{name}\":")
-         my_stringify(obj,o,l-1)  # Recursive call
-      o.write("}")
-   else
-      o.write(JSON.stringify(j))  # Once l levels are reached, use the system JSON call
+
+my_stringify = (j, o, l=2, cb) -> 
+   trav_cnt = 0
+
+   traverse = (stack, o, l, cb, buf = '') ->
+      trav_cnt++
+      if work = stack.pop()
+         if (l and (work.obj instanceof Array))  # Handle traversing array objects
+            if work.keys?.length is 0
+               buf = buf + ']'
+               traverse(stack, o, l+1, cb, buf)
+            else
+               if work.keys?
+                  buf = buf + ',\n'
+               else 
+                  buf = buf + '['
+                  work.keys = [0...work.obj.length].reverse()
+               k = work.keys.pop()
+               stack.push({'obj':work.obj,'keys':work.keys},{'obj':work.obj[k]})
+               traverse(stack, o, l-1, cb, buf)
+         else if (l and (typeof(work.obj) is 'object'))  # Handle traversing normal objects
+            if work.keys?.length is 0
+               buf = buf + '}'
+               traverse(stack, o, l+1, cb, buf)
+            else
+               if work.keys?
+                  buf = buf + ',\n'
+               else 
+                  buf = buf + '{'
+                  work.keys = Object.keys(work.obj).reverse()
+               k = work.keys.pop()
+               stack.push({'obj':work.obj,'keys':work.keys},{'obj':work.obj[k]})
+               buf = buf + "\"#{k}\":"
+               traverse(stack, o, l-1, cb, buf)
+         else  # Handle all other cases
+            buf = buf + JSON.stringify(work.obj)    # Buffer for performance, but
+            if buf.length > 32000 or trav_cnt > 25  # guard against excess recursion 
+               o.write(buf, (err) ->
+                  if err
+                     cb(err)
+                  else
+                     traverse(stack, o, l+1, cb))
+            else  # Pass on writing for now
+               traverse(stack, o, l+1, cb, buf)
+      else  # No more work, so clean up and invoke the callback    
+         o.write(buf + '\n', cb)
+      trav_cnt--
+
+   # Invoke the traverse function with the input it expects
+   traverse([{"obj":j}], o, l, cb)
 
 ##
 # clone_object makes a deep copy of a JavaScript object (assumes JSON compliant, no cycles, etc)
@@ -786,7 +824,6 @@ bits : true -- Use raw connection bitscores and not GC% / Coverage adjusted bits
 
    # Walk though each ccomp
    for c in j.connected_comps
-   
       n = j.nodes[c[0]]
       nodes_added = {}
       nodes_added[n.id] = n
@@ -795,10 +832,6 @@ bits : true -- Use raw connection bitscores and not GC% / Coverage adjusted bits
 
       # Walk through all of the nodes 
       while n      
-         
-         if n.contig_problems?
-            console.warn("Warning: Contig #{n.id} has #{n.contig_problems.length} internal coverage problem(s) and is likely misassembled.  Problem: #{n.contig_problems[0].type} detected")
-         
          # For each link from this node
          for l in n.links  
             if (not nodes_added[l[1].id]?)
@@ -940,10 +973,6 @@ bits : true -- Use raw connection bitscores and not GC% / Coverage adjusted bits
          # if found, keep this edge and setup for the next iteration
          if next_n
             [new_link, n] = next_n
-            
-            if n.contig_problems?
-               console.warn("Warning: Contig #{n.id} has #{n.contig_problems.length} internal coverage problem(s) and is likely misassembled.  Problem: #{n.contig_problems[0].type} detected")
-            
             nodes_added[n.id] = n  
             edges_added.push(new_link)
             new_link.done = true
@@ -1422,7 +1451,7 @@ ccdetail : true -- Write connected component details\n
    
    o.write("\nProcessing steps completed (command history for this graph):\n")
    for p in j.processing?[..-2]
-      o.write("#{p[0]}\t#{p[1]}\t#{JSON.stringify(p[2]) if p[2]}\n")
+      o.write("#{p[0]}\t#{p[1]}\t#{p[2]}\t#{JSON.stringify(p[3]) if p[3]}\n")
 
    o.write("\nStash contains #{stash_stack.length} saved graph#{'s' if stash_stack.length isnt 1}.\n")
    if args.ccdetail? and stash_stack.length
@@ -3579,17 +3608,16 @@ file : \"filename.json[.gz]\" -- Specify a file name to write the JSON format se
       o.on("error", (err)->
           console.error("ERROR: open_output_stream could not write to file '#{args.file}'.")
           callback?(err, null))
-   
-   if args.pretty?
-      o.write(JSON.stringify(j, null, 1))
-   else
-      my_stringify(j, o)
-      
-   close_output_stream(o, (error) ->
-         if error
-            callback?(error, null)
-         else
-            callback?(null, j))
+
+   my_stringify(j, o, 2, (err) ->
+      if err
+         callback?(error, null)
+      else       
+         close_output_stream(o, (error) ->
+            if error
+               callback?(error, null)
+            else
+               callback?(null, j)))
 
 ###
 # read_json -- 
@@ -3625,20 +3653,13 @@ file : \"filename.json[.gz]\" -- Specify the name of a JSON format sequence grap
       callback?(null, j)
       return
 
-   read_input_stream(args.file, (error, read_buffer) -> 
+   read_input_stream(args.file, true, (error, read_buffer) -> 
            if error or not read_buffer
                  console.error("ERROR: Empty buffer returned for file: #{args.file}")
                  callback?(error or new Error("Empty buffer returned for file: #{args.file}"), null)
                  return
            else
-              try
-                 j = JSON.parse(read_buffer)
-              catch err
-                 console.error("ERROR: Problem parsing JSON data file #{args.file}")
-                 callback?(err, null)
-                 return
-              
-              read_buffer = null
+              j = read_buffer
               j.processing ?= []
               j.processing.push(["$",ss_version,'LOAD',clone_object(args)])
               callback?(null, j)) 
@@ -3725,7 +3746,7 @@ file : \"filename[.gz]\" -- Read commands from the named file\n
       script_next_cmd(null, j) 
 
    if args.file?
-      read_input_stream(args.file, queue_commands)
+      read_input_stream(args.file, false, queue_commands)
    else
       unless process.stderr._type? and process.stderr._type is 'tty'  
          console.log("ERROR: Interactive use of the SCRIPT command requires that STDERR not be redirected.\n")
@@ -3916,7 +3937,12 @@ pop_stash = (j, args={}, callback) ->
       if args.detailed_help?
          console.warn("
 \n
-Parameters:  None.\n
+Parameters:\n
+\n
+free : true -- Free the graph at the top of the stack without restoring its state.\n
+\n
+        Example: #{args.help} {\"free\":true} -- Discard most recently STASHed graph\n
+\n
 ")
       callback?(null, j)
       return
@@ -3925,11 +3951,12 @@ Parameters:  None.\n
       callback?(new Error("UNSTASH failed, stash is empty."), null)
       return
    else
-      hist = j.processing or []  # Preserve history across UNSTASH
 
       if args.free
          stash_stack.pop()  # Don't restore state
       else 
+         hist = j.processing or []  # Preserve history across UNSTASH
+         j = undefined
          j = stash_stack.pop()
          j.processing = hist  # Restore history
       

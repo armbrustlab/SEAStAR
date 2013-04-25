@@ -1,3 +1,16 @@
+### 0.4.5 ###
+
+- Fixed a bug in ref_select that prevented proper sequence reconstruction when
+reads were provided that lacked /1 or /2 suffixes on the read ids. This affects
+Illumina reads and SOLiD reads prepared using solid2fastq with the -x option.
+
+- Fixed issues in graph_ops which could cause poor performance or out of memory 
+errors when loading or saving very large JSON files, even when there is plenty 
+of memory available. With this change, it is recommended for performance reasons 
+that SEAStAR be run with node.js version 0.10 or higher.
+
+- Misc documentation fixes and enhancements
+
 ### 0.4.4 ###
 
 - Added new options to trimfastq supporting the output of FASTA format files and 

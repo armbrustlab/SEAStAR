@@ -50,6 +50,6 @@ set_tests_properties(fastq_nodup_runs PROPERTIES PASS_REGULAR_EXPRESSION "versio
 
 add_test(NAME fastq_nodup_test_data COMMAND bash -c "$<TARGET_FILE:fastq_nodup> -z --prefix=lambda_tst.d -l 13 -d 2 -e 3 ${CMAKE_BINARY_DIR}/output_test_data/lambda_reads ${CMAKE_BINARY_DIR}/output_test_data/lambda_reads_d; gunzip -c ${CMAKE_BINARY_DIR}/output_test_data/lambda_reads_d.{read1,read2}.fastq.gz | openssl md5 ")
 
-set_tests_properties(fastq_nodup_test_data PROPERTIES PASS_REGULAR_EXPRESSION "c4c8331dd1ffbe372ffe326617854ade" TIMEOUT 30)
+set_tests_properties(fastq_nodup_test_data PROPERTIES PASS_REGULAR_EXPRESSION "c4c8331dd1ffbe372ffe326617854ade" TIMEOUT 90)
 
 

@@ -26,7 +26,9 @@ The Basics
 * Tools for visualizing assembly graphs (e.g. [GraphViz](http://www.graphviz.org/), [ZGRViewer](http://zvtm.sourceforge.net/zgrviewer.html))
 * 16S Taxonomic classifiers (e.g. [RDP Classifier](http://sourceforge.net/projects/rdp-classifier/)) 
 
-This file contains information on how to build and install the SEAStAR tools. For information on using the tools themselves, please see the SEAStAR user guide.
+You can find out more about SEAStAR on its [Armbrust Lab Homepage](http://armbrustlab.ocean.washington.edu/SEAStAR) and obtain news regarding updates and related info by following [@SEAStAR_meta](https://twitter.com/SEAStAR_meta) on Twitter. 
+
+This file contains information on how to build and install the SEAStAR tools. For information on using the tools themselves, please see the included SEAStAR User Guide file.
 
 License
 ------------------------------
@@ -34,6 +36,7 @@ SEAStAR is released under the GPLv3 license, a copy of which is provided in the 
 
 Installation
 ------------------------------
+The instructions that follow are for building the SEAStAR tools from source code. However, if you'd initially like to try out SEAStAR by working through our "Quick Start" tutorial, we provide a "ready-to-go" [SEAStAR Virtual Machine appliance](http://armbrustlab.ocean.washington.edu/node/305) image that includes all of the necessary tools and a working sample dataset that can be run within VirtualBox without the need to compile any of the tools on your computer. This pre-built VM is intended as an aid to learning and we strongly advise against (and will not provide any help for) trying to use it for analysis of real datasets.
 
 SEAStAR is designed to build and run on any 64-bit Unix-like system, including Linux and Mac OS X version 10.7 or later. Many components of SEAStAR are optimized for multiple CPU cores and require substantial memory. We recommend a machine with a minimum of 4 CPU cores and 32 GB of RAM to run these tools.  Depending on your datasets and what you are trying to do (e.g. de novo assembly) you may require a substantially more powerful machine than this minimum recommendation. 
 
@@ -43,8 +46,8 @@ The SEAStAR package has dependencies on a small number of software packages that
  
 * [gcc](http://gcc.gnu.org) -- version 4.4 or newer, supporting [OpenMP](http://openmp.org). 
 * [cmake](http://www.cmake.org) -- version 2.8 or newer
-* [node.js](http://nodejs.org) -- version 0.8 or newer
-* [gawk](http://www.gnu.org/software/gawk/) -- version 3.1.5 or newer
+* [node.js](http://nodejs.org) -- version 0.8 or newer (version 0.10 or newer recommended)
+* [gawk](http://www.gnu.org/software/gawk/) -- version 3.1.5 or newer (version 4.0 or newer recommended))
 
 Additional instructions are available below for fulfilling these requirements for Mac OS X, and for programmers wishing to make modifications to the included source code.
 

@@ -35,11 +35,13 @@
 # For example:  node --max-old-space-size=4000 --max-new-space-size=4000 ...
 # (The included graph_ops (and nodewrap) scripts do this automatically) 
 #
-# Usage: [<input.json[.gz]>] <command> ['{parms}'] [<command> ['{parms}']...]\n
+# Usage: [-h|--help] [<input.json[.gz]>] [<script.go[.gz]>] [<command> ['{parms}']...]
 # 
-# Where: <input.json> is an optional datafile to initially LOAD\n
-#       <command> is one of the commands listed below\n
-#       '{params}' optionally specify parameters for a given command\n
+# Where: <input.json> is an optional datafile to initially LOAD
+#        <script.go> is an optional command SCRIPT file
+#        <command> is one of the valid commands
+#        '{params}' optionally specify parameters for a given command
+#        -h for help with running graph_ops
 #
 # Command list:  (type HELP <command> for more details about a given command):
 #
@@ -47,7 +49,7 @@
 
 
 (function() {
-  var add_ends, bisect, build_graph_refs, build_removed_graph_refs, calc_ccomps, calc_seq_stats, callback_list, cc_seq_len, check_connections, child_process, clone_object, close_output_stream, cmd, cmds, command_file, commands, cut_branches, cut_node, edge_director, err, execute_selection, export_dot, export_fasta, export_table, filter_edges, find_all_ends, find_connection, find_direct_connection, find_ends, find_indirect_connection, find_neighbors, fs, full_order, grab_ccomps, grab_clusts, grab_neighbors, graph_stats, graph_stats_cc, heuristic, make_directed, maximal_spanning_tree, my_bisect, my_stringify, node_problems, open_output_stream, output_help, path, perform_edits, pop_stash, prev_cmd, process_commands, push_stash, rc_tab, read_input_stream, read_json, relink, remove_graph_refs, remove_leaves, repl, resolve_path, rev_node, scaff_link, scaffold, scaffold_spanning_tree, ss_version, start_arg, stash_stack, tetracalc, use_heuristic, write_json, zlib, _i, _len, _ref;
+  var JSONStream, add_ends, bisect, build_graph_refs, build_removed_graph_refs, calc_ccomps, calc_seq_stats, callback_list, cc_seq_len, check_connections, child_process, clone_object, close_output_stream, cmd, cmds, command_file, commands, cut_branches, cut_node, edge_director, err, execute_selection, export_dot, export_fasta, export_table, filter_edges, find_all_ends, find_connection, find_direct_connection, find_ends, find_indirect_connection, find_neighbors, fs, full_order, grab_ccomps, grab_clusts, grab_neighbors, graph_stats, graph_stats_cc, heuristic, make_directed, maximal_spanning_tree, my_bisect, my_stringify, node_problems, open_output_stream, output_help, path, perform_edits, pop_stash, prev_cmd, process_commands, push_stash, rc_tab, read_input_stream, read_json, relink, remove_graph_refs, remove_leaves, repl, resolve_path, rev_node, scaff_link, scaffold, scaffold_spanning_tree, ss_version, start_arg, stash_stack, tetracalc, use_heuristic, write_json, zlib, _i, _len, _ref;
 
   fs = require('fs');
 
@@ -58,6 +60,8 @@
   repl = require('repl');
 
   child_process = require('child_process');
+
+  JSONStream = require('JSONStream');
 
   ss_version = "SS_BUILD_VERSION";
 
@@ -85,8 +89,8 @@
   */
 
 
-  read_input_stream = function(fn, cb) {
-    var input, inputfn, read_buffer;
+  read_input_stream = function(fn, parse, cb) {
+    var input, inputfn, obj_buffer, read_buffer;
 
     if (fn === '-') {
       input = process.stdin;
@@ -99,15 +103,25 @@
         input = fs.createReadStream(inputfn);
       }
     }
-    read_buffer = '';
-    return input.on('data', function(data) {
-      return read_buffer = read_buffer.concat(data);
-    }).on('end', function() {
-      return cb(null, read_buffer);
-    }).on('error', function(err) {
-      console.error("ERROR: read_input_stream could not open file '" + fn + "' for input.");
-      return cb(err, null);
-    });
+    if (parse) {
+      obj_buffer = null;
+      return input.pipe(JSONStream.parse()).on('root', function(data) {
+        return cb(null, data);
+      }).on('error', function(err) {
+        console.error("ERROR: JSON read_input_stream could not be opened or parsed '" + fn + "' for input.");
+        return cb(err, null);
+      });
+    } else {
+      read_buffer = '';
+      return input.on('data', function(data) {
+        return read_buffer = read_buffer.concat(data);
+      }).on('end', function() {
+        return cb(null, read_buffer);
+      }).on('error', function(err) {
+        console.error("ERROR: read_input_stream could not open file '" + fn + "' for input.");
+        return cb(err, null);
+      });
+    }
   };
 
   /*
@@ -172,40 +186,90 @@
     }
   };
 
-  my_stringify = function(j, o, l) {
-    var first, name, obj, _i, _len;
+  my_stringify = function(j, o, l, cb) {
+    var trav_cnt, traverse;
 
     if (l == null) {
-      l = 1;
+      l = 2;
     }
-    if (l && (j instanceof Array)) {
-      o.write("[");
-      first = true;
-      for (_i = 0, _len = j.length; _i < _len; _i++) {
-        obj = j[_i];
-        if (!first) {
-          o.write(",\n");
-        }
-        first = false;
-        my_stringify(obj, o, l - 1);
+    trav_cnt = 0;
+    traverse = function(stack, o, l, cb, buf) {
+      var k, work, _i, _ref, _ref1, _ref2, _results;
+
+      if (buf == null) {
+        buf = '';
       }
-      return o.write("]");
-    } else if (l && (typeof j === 'object')) {
-      o.write("{");
-      first = true;
-      for (name in j) {
-        obj = j[name];
-        if (!first) {
-          o.write(",\n");
+      trav_cnt++;
+      if (work = stack.pop()) {
+        if (l && (work.obj instanceof Array)) {
+          if (((_ref = work.keys) != null ? _ref.length : void 0) === 0) {
+            buf = buf + ']';
+            traverse(stack, o, l + 1, cb, buf);
+          } else {
+            if (work.keys != null) {
+              buf = buf + ',\n';
+            } else {
+              buf = buf + '[';
+              work.keys = (function() {
+                _results = [];
+                for (var _i = 0, _ref1 = work.obj.length; 0 <= _ref1 ? _i < _ref1 : _i > _ref1; 0 <= _ref1 ? _i++ : _i--){ _results.push(_i); }
+                return _results;
+              }).apply(this).reverse();
+            }
+            k = work.keys.pop();
+            stack.push({
+              'obj': work.obj,
+              'keys': work.keys
+            }, {
+              'obj': work.obj[k]
+            });
+            traverse(stack, o, l - 1, cb, buf);
+          }
+        } else if (l && (typeof work.obj === 'object')) {
+          if (((_ref2 = work.keys) != null ? _ref2.length : void 0) === 0) {
+            buf = buf + '}';
+            traverse(stack, o, l + 1, cb, buf);
+          } else {
+            if (work.keys != null) {
+              buf = buf + ',\n';
+            } else {
+              buf = buf + '{';
+              work.keys = Object.keys(work.obj).reverse();
+            }
+            k = work.keys.pop();
+            stack.push({
+              'obj': work.obj,
+              'keys': work.keys
+            }, {
+              'obj': work.obj[k]
+            });
+            buf = buf + ("\"" + k + "\":");
+            traverse(stack, o, l - 1, cb, buf);
+          }
+        } else {
+          buf = buf + JSON.stringify(work.obj);
+          if (buf.length > 32000 || trav_cnt > 25) {
+            o.write(buf, function(err) {
+              if (err) {
+                return cb(err);
+              } else {
+                return traverse(stack, o, l + 1, cb);
+              }
+            });
+          } else {
+            traverse(stack, o, l + 1, cb, buf);
+          }
         }
-        first = false;
-        o.write("\"" + name + "\":");
-        my_stringify(obj, o, l - 1);
+      } else {
+        o.write(buf + '\n', cb);
       }
-      return o.write("}");
-    } else {
-      return o.write(JSON.stringify(j));
-    }
+      return trav_cnt--;
+    };
+    return traverse([
+      {
+        "obj": j
+      }
+    ], o, l, cb);
   };
 
   clone_object = function(obj) {
@@ -923,9 +987,6 @@
       nodes_seen = {};
       edge_cand = [];
       while (n) {
-        if (n.contig_problems != null) {
-          console.warn("Warning: Contig " + n.id + " has " + n.contig_problems.length + " internal coverage problem(s) and is likely misassembled.  Problem: " + n.contig_problems[0].type + " detected");
-        }
         _ref3 = n.links;
         for (_j = 0, _len1 = _ref3.length; _j < _len1; _j++) {
           l = _ref3[_j];
@@ -1069,9 +1130,6 @@
         }
         if (next_n) {
           new_link = next_n[0], n = next_n[1];
-          if (n.contig_problems != null) {
-            console.warn("Warning: Contig " + n.id + " has " + n.contig_problems.length + " internal coverage problem(s) and is likely misassembled.  Problem: " + n.contig_problems[0].type + " detected");
-          }
           nodes_added[n.id] = n;
           edges_added.push(new_link);
           new_link.done = true;
@@ -1675,7 +1733,7 @@
     _ref8 = (_ref7 = j.processing) != null ? _ref7.slice(0, -1) : void 0;
     for (_m = 0, _len4 = _ref8.length; _m < _len4; _m++) {
       p = _ref8[_m];
-      o.write("" + p[0] + "\t" + p[1] + "\t" + (p[2] ? JSON.stringify(p[2]) : void 0) + "\n");
+      o.write("" + p[0] + "\t" + p[1] + "\t" + p[2] + "\t" + (p[3] ? JSON.stringify(p[3]) : void 0) + "\n");
     }
     o.write("\nStash contains " + stash_stack.length + " saved graph" + (stash_stack.length !== 1 ? 's' : void 0) + ".\n");
     if ((args.ccdetail != null) && stash_stack.length) {
@@ -4072,16 +4130,17 @@
         return typeof callback === "function" ? callback(err, null) : void 0;
       });
     }
-    if (args.pretty != null) {
-      o.write(JSON.stringify(j, null, 1));
-    } else {
-      my_stringify(j, o);
-    }
-    return close_output_stream(o, function(error) {
-      if (error) {
+    return my_stringify(j, o, 2, function(err) {
+      if (err) {
         return typeof callback === "function" ? callback(error, null) : void 0;
       } else {
-        return typeof callback === "function" ? callback(null, j) : void 0;
+        return close_output_stream(o, function(error) {
+          if (error) {
+            return typeof callback === "function" ? callback(error, null) : void 0;
+          } else {
+            return typeof callback === "function" ? callback(null, j) : void 0;
+          }
+        });
       }
     });
   };
@@ -4112,8 +4171,8 @@
       }
       return;
     }
-    return read_input_stream(args.file, function(error, read_buffer) {
-      var err, _ref;
+    return read_input_stream(args.file, true, function(error, read_buffer) {
+      var _ref;
 
       if (error || !read_buffer) {
         console.error("ERROR: Empty buffer returned for file: " + args.file);
@@ -4121,17 +4180,7 @@
           callback(error || new Error("Empty buffer returned for file: " + args.file), null);
         }
       } else {
-        try {
-          j = JSON.parse(read_buffer);
-        } catch (_error) {
-          err = _error;
-          console.error("ERROR: Problem parsing JSON data file " + args.file);
-          if (typeof callback === "function") {
-            callback(err, null);
-          }
-          return;
-        }
-        read_buffer = null;
+        j = read_buffer;
         if ((_ref = j.processing) == null) {
           j.processing = [];
         }
@@ -4242,7 +4291,7 @@
       return script_next_cmd(null, j);
     };
     if (args.file != null) {
-      return read_input_stream(args.file, queue_commands);
+      return read_input_stream(args.file, false, queue_commands);
     } else {
       if (!((process.stderr._type != null) && process.stderr._type === 'tty')) {
         console.log("ERROR: Interactive use of the SCRIPT command requires that STDERR not be redirected.\n");
@@ -4441,7 +4490,7 @@
     if (args.help != null) {
       console.warn("" + args.help + " -- Restore (pop) the current graph from the top of the stack (undo changes) ");
       if (args.detailed_help != null) {
-        console.warn("\nParameters:  None.\n");
+        console.warn("\nParameters:\n\nfree : true -- Free the graph at the top of the stack without restoring its state.\n\n        Example: " + args.help + " {\"free\":true} -- Discard most recently STASHed graph\n\n");
       }
       if (typeof callback === "function") {
         callback(null, j);
@@ -4453,10 +4502,11 @@
         callback(new Error("UNSTASH failed, stash is empty."), null);
       }
     } else {
-      hist = j.processing || [];
       if (args.free) {
         stash_stack.pop();
       } else {
+        hist = j.processing || [];
+        j = void 0;
         j = stash_stack.pop();
         j.processing = hist;
       }
