@@ -32,8 +32,13 @@
 # assumes the node.js (http://nodejs.org/) execution environment. 
 #
 # It should be run with additional memory allocated for the V8 javascript engine 
-# For example:  node --max-old-space-size=4000 --max-new-space-size=4000 ...
+# For example:  node --max-old-space-size=8000 --max-new-space-size=8000 ...
 # (The included graph_ops (and nodewrap) scripts do this automatically) 
+# Also, graph_ops has a highly fragmented memory allocation pattern that benefits
+# greatly from the use of node's --always-compact option, which directs the V8
+# Garbage Collector to compact allocated memory on every global sweep. This leads
+# to improved runtimes and avoidance of GC corner-cases that occasionally may 
+# lead to stability issues.
 #
 # Usage: [-h|--help] [<input.json[.gz]>] [<script.go[.gz]>] [<command> ['{parms}']...]
 # 
@@ -187,77 +192,83 @@
   };
 
   my_stringify = function(j, o, l, cb) {
-    var trav_cnt, traverse;
+    var max_buffer, max_recurse, trav_cnt, traverse;
 
     if (l == null) {
       l = 2;
     }
     trav_cnt = 0;
-    traverse = function(stack, o, l, cb, buf) {
-      var k, work, _i, _ref, _ref1, _ref2, _results;
+    max_buffer = 32000;
+    max_recurse = 25;
+    traverse = function(stack, o, cb, buf) {
+      var k, work, _i, _ref, _results;
 
       if (buf == null) {
         buf = '';
       }
       trav_cnt++;
       if (work = stack.pop()) {
-        if (l && (work.obj instanceof Array)) {
-          if (((_ref = work.keys) != null ? _ref.length : void 0) === 0) {
-            buf = buf + ']';
-            traverse(stack, o, l + 1, cb, buf);
-          } else {
-            if (work.keys != null) {
-              buf = buf + ',\n';
-            } else {
-              buf = buf + '[';
-              work.keys = (function() {
-                _results = [];
-                for (var _i = 0, _ref1 = work.obj.length; 0 <= _ref1 ? _i < _ref1 : _i > _ref1; 0 <= _ref1 ? _i++ : _i--){ _results.push(_i); }
-                return _results;
-              }).apply(this).reverse();
-            }
-            k = work.keys.pop();
-            stack.push({
-              'obj': work.obj,
-              'keys': work.keys
-            }, {
-              'obj': work.obj[k]
-            });
-            traverse(stack, o, l - 1, cb, buf);
+        if (work.lev && (work.obj instanceof Array)) {
+          if (work.keys == null) {
+            buf = buf + '[';
+            work.keys = (function() {
+              _results = [];
+              for (var _i = 0, _ref = work.obj.length; 0 <= _ref ? _i < _ref : _i > _ref; 0 <= _ref ? _i++ : _i--){ _results.push(_i); }
+              return _results;
+            }).apply(this).reverse();
+          } else if (work.keys.length) {
+            buf = buf + ',\n';
           }
-        } else if (l && (typeof work.obj === 'object')) {
-          if (((_ref2 = work.keys) != null ? _ref2.length : void 0) === 0) {
-            buf = buf + '}';
-            traverse(stack, o, l + 1, cb, buf);
+          if (work.keys.length === 0) {
+            buf = buf + ']';
+            traverse(stack, o, cb, buf);
           } else {
-            if (work.keys != null) {
-              buf = buf + ',\n';
-            } else {
-              buf = buf + '{';
-              work.keys = Object.keys(work.obj).reverse();
-            }
             k = work.keys.pop();
             stack.push({
               'obj': work.obj,
-              'keys': work.keys
+              'keys': work.keys,
+              'lev': work.lev
             }, {
-              'obj': work.obj[k]
+              'obj': work.obj[k],
+              'lev': work.lev - 1
+            });
+            traverse(stack, o, cb, buf);
+          }
+        } else if (work.lev && (typeof work.obj === 'object')) {
+          if (work.keys == null) {
+            buf = buf + '{';
+            work.keys = Object.keys(work.obj).reverse();
+          } else if (work.keys.length) {
+            buf = buf + ',\n';
+          }
+          if (work.keys.length === 0) {
+            buf = buf + '}';
+            traverse(stack, o, cb, buf);
+          } else {
+            k = work.keys.pop();
+            stack.push({
+              'obj': work.obj,
+              'keys': work.keys,
+              'lev': work.lev
+            }, {
+              'obj': work.obj[k],
+              'lev': work.lev - 1
             });
             buf = buf + ("\"" + k + "\":");
-            traverse(stack, o, l - 1, cb, buf);
+            traverse(stack, o, cb, buf);
           }
         } else {
           buf = buf + JSON.stringify(work.obj);
-          if (buf.length > 32000 || trav_cnt > 25) {
+          if (buf.length > max_buffer || trav_cnt > max_recurse) {
             o.write(buf, function(err) {
               if (err) {
                 return cb(err);
               } else {
-                return traverse(stack, o, l + 1, cb);
+                return setTimeout(traverse, 0, stack, o, cb);
               }
             });
           } else {
-            traverse(stack, o, l + 1, cb, buf);
+            traverse(stack, o, cb, buf);
           }
         }
       } else {
@@ -267,9 +278,10 @@
     };
     return traverse([
       {
-        "obj": j
+        "obj": j,
+        "lev": l
       }
-    ], o, l, cb);
+    ], o, cb);
   };
 
   clone_object = function(obj) {

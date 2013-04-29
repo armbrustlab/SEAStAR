@@ -1,3 +1,13 @@
+### 0.4.6 ###
+
+- Fixed bugs in graph_ops that on rare occasions led to "stack overflow" errors 
+and/or invalid JSON output files when using the DUMP command with very large
+sequence graph datasets.
+
+- Adjusted the "Garbage Collection" settings used with nodejs to improve 
+performance and work around a rare case where memory fragmentation caused node
+to allocate far more memory than required and become unstable.
+
 ### 0.4.5 ###
 
 - Fixed a bug in ref_select that prevented proper sequence reconstruction when

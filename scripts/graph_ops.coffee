@@ -31,8 +31,13 @@
 # assumes the node.js (http://nodejs.org/) execution environment. 
 #
 # It should be run with additional memory allocated for the V8 javascript engine 
-# For example:  node --max-old-space-size=4000 --max-new-space-size=4000 ...
+# For example:  node --max-old-space-size=8000 --max-new-space-size=8000 ...
 # (The included graph_ops (and nodewrap) scripts do this automatically) 
+# Also, graph_ops has a highly fragmented memory allocation pattern that benefits
+# greatly from the use of node's --always-compact option, which directs the V8
+# Garbage Collector to compact allocated memory on every global sweep. This leads
+# to improved runtimes and avoidance of GC corner-cases that occasionally may 
+# lead to stability issues.
 #
 # Usage: [-h|--help] [<input.json[.gz]>] [<script.go[.gz]>] [<command> ['{parms}']...]
 # 
@@ -161,53 +166,55 @@ close_output_stream = (out, cb) ->  # out = output stream, cb = callback when cl
 
 my_stringify = (j, o, l=2, cb) -> 
    trav_cnt = 0
+   max_buffer = 32000
+   max_recurse = 25
 
-   traverse = (stack, o, l, cb, buf = '') ->
+   traverse = (stack, o, cb, buf = '') ->
       trav_cnt++
       if work = stack.pop()
-         if (l and (work.obj instanceof Array))  # Handle traversing array objects
-            if work.keys?.length is 0
+         if (work.lev and (work.obj instanceof Array))  # Handle traversing array objects
+            unless work.keys?
+               buf = buf + '['
+               work.keys = [0...work.obj.length].reverse()
+            else if work.keys.length
+               buf = buf + ',\n'
+            if work.keys.length is 0
                buf = buf + ']'
-               traverse(stack, o, l+1, cb, buf)
+               traverse(stack, o, cb, buf)
             else
-               if work.keys?
-                  buf = buf + ',\n'
-               else 
-                  buf = buf + '['
-                  work.keys = [0...work.obj.length].reverse()
                k = work.keys.pop()
-               stack.push({'obj':work.obj,'keys':work.keys},{'obj':work.obj[k]})
-               traverse(stack, o, l-1, cb, buf)
-         else if (l and (typeof(work.obj) is 'object'))  # Handle traversing normal objects
-            if work.keys?.length is 0
+               stack.push({'obj':work.obj,'keys':work.keys,'lev':work.lev},{'obj':work.obj[k],'lev':work.lev-1})
+               traverse(stack, o, cb, buf)
+         else if (work.lev and (typeof(work.obj) is 'object'))  # Handle traversing normal objects
+            unless work.keys?
+               buf = buf + '{'
+               work.keys = Object.keys(work.obj).reverse()
+            else if work.keys.length
+               buf = buf + ',\n'
+            if work.keys.length is 0
                buf = buf + '}'
-               traverse(stack, o, l+1, cb, buf)
+               traverse(stack, o, cb, buf)
             else
-               if work.keys?
-                  buf = buf + ',\n'
-               else 
-                  buf = buf + '{'
-                  work.keys = Object.keys(work.obj).reverse()
                k = work.keys.pop()
-               stack.push({'obj':work.obj,'keys':work.keys},{'obj':work.obj[k]})
+               stack.push({'obj':work.obj,'keys':work.keys,'lev':work.lev},{'obj':work.obj[k],'lev':work.lev-1})
                buf = buf + "\"#{k}\":"
-               traverse(stack, o, l-1, cb, buf)
+               traverse(stack, o, cb, buf)
          else  # Handle all other cases
             buf = buf + JSON.stringify(work.obj)    # Buffer for performance, but
-            if buf.length > 32000 or trav_cnt > 25  # guard against excess recursion 
+            if buf.length > max_buffer or trav_cnt > max_recurse  # guard against excess recursion 
                o.write(buf, (err) ->
                   if err
                      cb(err)
-                  else
-                     traverse(stack, o, l+1, cb))
+                  else  # Let the I/O get out before next call
+                     setTimeout(traverse, 0, stack, o, cb))
             else  # Pass on writing for now
-               traverse(stack, o, l+1, cb, buf)
+               traverse(stack, o, cb, buf)
       else  # No more work, so clean up and invoke the callback    
          o.write(buf + '\n', cb)
       trav_cnt--
 
    # Invoke the traverse function with the input it expects
-   traverse([{"obj":j}], o, l, cb)
+   traverse([{"obj":j,"lev":l}], o, cb)
 
 ##
 # clone_object makes a deep copy of a JavaScript object (assumes JSON compliant, no cycles, etc)

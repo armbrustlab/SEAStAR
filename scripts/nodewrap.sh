@@ -77,7 +77,7 @@ v8default=$((2**10))  # The size of the 64bit V8 engine default memory limit
 maxold=$((pmem - headroom))
 
 if [[ $maxold -gt $v8default ]]; then
-    node --max-old-space-size="$maxold" "$jsfile" "$@"
+    node --always_compact --max-new-space-size=16384 --max-old-space-size="$maxold" "$jsfile" "$@"
 else
-    node "$jsfile" "$@"
+    node --always_compact --max-new-space-size=16384 "$jsfile" "$@"
 fi
