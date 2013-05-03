@@ -49,6 +49,10 @@
 # }
 ###
 
+unless process.version.split('.')[1] >= 10   # Require node version v0.x.y to be x >= 10
+   console.error("ERROR: nodejs version v0.10.0 or greater required.")
+   process.exit(1) 
+
 fs = require('fs')
 
 # Handle default filename and genus minimum percent abundance
@@ -116,70 +120,41 @@ out_tree.walk = (tree, prev_cnt, prev_cum) ->
          tree.sub[c.name] = c if c
          
    for c of tree.sub 
-      if tree.sub[c].num != 0 
+      if tree.sub[c].num != 0
          sub_tree = tree.sub[c]
          sub_tree.conf = sub_tree.conf / sub_tree.num
          sub_tree.w_conf = sub_tree.w_conf / sub_tree.pop
          sub_tree.cnt = prev_cnt
          sub_tree.cum = prev_cum
+         if sub_tree?.gapfill
+            delete sub_tree.gapfill
          out_tree.walk(sub_tree, prev_cnt, prev_cum)	
          prev_cnt += sub_tree.num
          prev_cum += sub_tree.pop
       else
          delete tree.sub[c]
 
-# Walk all lines in the RDP classifier output, return a list of lines for
-# genera which comprise >= minfrac fraction of the 16S abundance
-filter = (line_list, minperc) ->
-   genera = {}
-   for line in line_list
-      fields = parse_line line
-      genus = fields.tax_names.pop()
-      if genus of genera
-         genera[genus].percent += fields.percent
-         genera[genus].lines.push line
-      else
-         genera[genus] =
-            percent : fields.percent
-            lines : [line]
-   retlines = []
-   for genus, data of genera
-      if data.percent >= minperc
-         Array::push.apply retlines, data.lines
-   retlines
-
-parse_line = (line) ->
-   fields = {}
-   parts = line.split('\t')                         # Split on semicolons
-   [fields.sequence, fields.percent] = parts.shift().split('_')   # Split first field on "_" (remove 1st & 2nd)
-   fields.percent = parseFloat(fields.percent)                    # This is its estimated abundance
-   
-   # Parsed taxonomic names
-   parts.shift()
-   fields.tax_names = (p.replace(/"/g,'').trim() for p in parts by 3)
-   # Parsed taxonomic levels
-   parts.shift()
-   fields.tax_levels = (p.replace(/"/g,'').trim() for p in parts by 3)
-   # Parsed p-value data
-   parts.shift()
-   fields.tax_pvals = (parseFloat(p) for p in parts by 3)
-   fields
-
 # Walk all of the lines in the RDP classifier output 
 build = (line) ->
    fields = parse_line line
    
    # Walk down the branches of the RDP taxonomy tree and fill in the 
-   # information for this sequence.
+   # information for this sequence.  tax_names array can be used to find the
+   # next child node to move down to in the tree.
    prev = null
-   cur = out_tree
+   cur = out_tree  # start at root
    for tax_name, i in fields.tax_names
       # Add info for this sequence to any incertae sedis entries this script
       # already created for previous lines
       prev = cur
-      start = prev
-      while not (tax_name of cur.sub)
-         cur = cur.sub["#{start.name}_incertae_sedis"]
+      start = prev  # start is where parent of possible incertae_sedis entries
+      
+      # Check if next node down is an incertae_sedis layer added by
+      # fill_lineage_gap.  If yes, fill missing data in incertae_sedis layer.
+      # The check is: If no sub-node matches tax_name, or if it matches but has
+      # true gapfill property, then the next node must be custom incertae_sedis
+      while (not (tax_name of cur.sub)) or (cur.sub[tax_name].gapfill)
+         cur = cur.sub["#{next_incertae_sedis_name(cur)}"]
          prev = cur
          cur.num++
          cur.conf += fields.tax_pvals[i]
@@ -210,18 +185,39 @@ build = (line) ->
       length : 1.0
       name : fields.sequence
 
+parse_line = (line) ->
+   fields = {}
+   parts = line.split('\t')                         # Split on semicolons
+   [fields.sequence, fields.percent] = parts.shift().split('_')   # Split first field on "_" (remove 1st & 2nd)
+   fields.percent = parseFloat(fields.percent)                    # This is its estimated abundance
+   
+   # Parsed taxonomic names
+   parts.shift()
+   fields.tax_names = (p.replace(/"/g,'').trim() for p in parts by 3)
+   # Parsed taxonomic levels
+   parts.shift()
+   fields.tax_levels = (p.replace(/"/g,'').trim() for p in parts by 3)
+   # Parsed p-value data
+   parts.shift()
+   fields.tax_pvals = (parseFloat(p) for p in parts by 3)
+   fields
+
 # Fill in missing taxonomic levels between begin and end with incertae sedis
 # copies of begin
 fill_lineage_gap = (begin, end) ->
    if not begin?.level? or not end?.level?   # begin or end is not valid taxon
       return
+   if begin.level > end.level
+      console.log("ERROR: Out of order input tree detected.  Level of #{begin.name} (#{begin.level}) > #{end.name} (#{end.level})")
+      process.exit(1)
    if level_after[begin.level] == end.level  # no gap to fill
       return
    level = level_after[begin.level]
    cur = begin
+   insert_name = next_incertae_sedis_name(begin)
+   
    # Now insert taxa to fill gaps between levels
    while level != end.level
-      insert_name = "#{begin.name}_incertae_sedis"
       save = cur.sub  # save original sub
       cur.sub = {}
       cur.sub[insert_name] =
@@ -234,10 +230,40 @@ fill_lineage_gap = (begin, end) ->
             w_conf : begin.w_conf
             level  : level
             length : level - cur.level
+            gapfill: true  # to distinguish as manually inserted incertate_sedis, rather than pre-existing incertae_sedis. Remove before output
       level = level_after[level]
       cur = cur.sub[insert_name]
       cur.sub = save  # put original sub back
    end.length = end.level - cur.level  # recalculate end's length
+
+next_incertae_sedis_name = (node) ->
+   index = node.name.indexOf("incertae_sedis")
+   if (index != -1) and ((node.name.length - index) ==  "incertae_sedis".length)
+         # name ends with incertae_sedis, no need to modify
+         next_name = node.name
+      else
+         next_name = "#{node.name}_incertae_sedis"
+   return next_name
+
+# Walk all lines in the RDP classifier output, return a list of lines for
+# genera which comprise >= minfrac fraction of the 16S abundance
+filter = (line_list, minperc) ->
+   genera = {}
+   for line in line_list
+      fields = parse_line line
+      genus = fields.tax_names.pop()
+      if genus of genera
+         genera[genus].percent += fields.percent
+         genera[genus].lines.push line
+      else
+         genera[genus] =
+            percent : fields.percent
+            lines : [line]
+   retlines = []
+   for genus, data of genera
+      if data.percent >= minperc
+         Array::push.apply retlines, data.lines
+   retlines
 
 orig_lines = []
 process.stdin.on 'data', do ->

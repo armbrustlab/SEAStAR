@@ -52,7 +52,12 @@
 
 
 (function() {
-  var RDP_heir_fn, build, fill_lineage_gap, filter, fs, i, level_after, level_name, level_name2num, level_num, levels, minperc, orig_lines, out_tree, parse_line, _i, _len, _ref, _ref1;
+  var RDP_heir_fn, build, fill_lineage_gap, filter, fs, i, level_after, level_name, level_name2num, level_num, levels, minperc, next_incertae_sedis_name, orig_lines, out_tree, parse_line, _i, _len, _ref, _ref1;
+
+  if (!(process.version.split('.')[1] >= 10)) {
+    console.error("ERROR: nodejs version v0.10.0 or greater required.");
+    process.exit(1);
+  }
 
   fs = require('fs');
 
@@ -137,6 +142,9 @@
         sub_tree.w_conf = sub_tree.w_conf / sub_tree.pop;
         sub_tree.cnt = prev_cnt;
         sub_tree.cum = prev_cum;
+        if (sub_tree != null ? sub_tree.gapfill : void 0) {
+          delete sub_tree.gapfill;
+        }
         out_tree.walk(sub_tree, prev_cnt, prev_cum);
         prev_cnt += sub_tree.num;
         _results.push(prev_cum += sub_tree.pop);
@@ -147,32 +155,43 @@
     return _results;
   };
 
-  filter = function(line_list, minperc) {
-    var data, fields, genera, genus, line, retlines, _j, _len1;
+  build = function(line) {
+    var cur, fields, prev, start, tax_name, _j, _len1, _ref2;
 
-    genera = {};
-    for (_j = 0, _len1 = line_list.length; _j < _len1; _j++) {
-      line = line_list[_j];
-      fields = parse_line(line);
-      genus = fields.tax_names.pop();
-      if (genus in genera) {
-        genera[genus].percent += fields.percent;
-        genera[genus].lines.push(line);
-      } else {
-        genera[genus] = {
-          percent: fields.percent,
-          lines: [line]
-        };
+    fields = parse_line(line);
+    prev = null;
+    cur = out_tree;
+    _ref2 = fields.tax_names;
+    for (i = _j = 0, _len1 = _ref2.length; _j < _len1; i = ++_j) {
+      tax_name = _ref2[i];
+      prev = cur;
+      start = prev;
+      while ((!(tax_name in cur.sub)) || cur.sub[tax_name].gapfill) {
+        cur = cur.sub["" + (next_incertae_sedis_name(cur))];
+        prev = cur;
+        cur.num++;
+        cur.conf += fields.tax_pvals[i];
+        cur.w_conf += fields.tax_pvals[i] * fields.percent;
+        cur.pop += fields.percent;
       }
+      cur = cur.sub[tax_name];
+      fill_lineage_gap(prev, cur);
+      cur.num++;
+      cur.conf += fields.tax_pvals[i];
+      cur.w_conf += fields.tax_pvals[i] * fields.percent;
+      cur.pop += fields.percent;
     }
-    retlines = [];
-    for (genus in genera) {
-      data = genera[genus];
-      if (data.percent >= minperc) {
-        Array.prototype.push.apply(retlines, data.lines);
-      }
-    }
-    return retlines;
+    return cur.sub[fields.sequence] = {
+      pop: fields.percent,
+      cum: 0.0,
+      cnt: 0,
+      num: 1,
+      conf: fields.tax_pvals[fields.tax_pvals.length - 1],
+      w_conf: fields.percent * fields.tax_pvals[fields.tax_pvals.length - 1],
+      level: 7.0,
+      length: 1.0,
+      name: fields.sequence
+    };
   };
 
   parse_line = function(line) {
@@ -218,58 +237,23 @@
     return fields;
   };
 
-  build = function(line) {
-    var cur, fields, prev, start, tax_name, _j, _len1, _ref2;
-
-    fields = parse_line(line);
-    prev = null;
-    cur = out_tree;
-    _ref2 = fields.tax_names;
-    for (i = _j = 0, _len1 = _ref2.length; _j < _len1; i = ++_j) {
-      tax_name = _ref2[i];
-      prev = cur;
-      start = prev;
-      while (!(tax_name in cur.sub)) {
-        cur = cur.sub["" + start.name + "_incertae_sedis"];
-        prev = cur;
-        cur.num++;
-        cur.conf += fields.tax_pvals[i];
-        cur.w_conf += fields.tax_pvals[i] * fields.percent;
-        cur.pop += fields.percent;
-      }
-      cur = cur.sub[tax_name];
-      fill_lineage_gap(prev, cur);
-      cur.num++;
-      cur.conf += fields.tax_pvals[i];
-      cur.w_conf += fields.tax_pvals[i] * fields.percent;
-      cur.pop += fields.percent;
-    }
-    return cur.sub[fields.sequence] = {
-      pop: fields.percent,
-      cum: 0.0,
-      cnt: 0,
-      num: 1,
-      conf: fields.tax_pvals[fields.tax_pvals.length - 1],
-      w_conf: fields.percent * fields.tax_pvals[fields.tax_pvals.length - 1],
-      level: 7.0,
-      length: 1.0,
-      name: fields.sequence
-    };
-  };
-
   fill_lineage_gap = function(begin, end) {
     var cur, insert_name, level, save;
 
     if (((begin != null ? begin.level : void 0) == null) || ((end != null ? end.level : void 0) == null)) {
       return;
     }
+    if (begin.level > end.level) {
+      console.log("ERROR: Out of order input tree detected.  Level of " + begin.name + " (" + begin.level + ") > " + end.name + " (" + end.level + ")");
+      process.exit(1);
+    }
     if (level_after[begin.level] === end.level) {
       return;
     }
     level = level_after[begin.level];
     cur = begin;
+    insert_name = next_incertae_sedis_name(begin);
     while (level !== end.level) {
-      insert_name = "" + begin.name + "_incertae_sedis";
       save = cur.sub;
       cur.sub = {};
       cur.sub[insert_name] = {
@@ -281,13 +265,54 @@
         conf: begin.conf,
         w_conf: begin.w_conf,
         level: level,
-        length: level - cur.level
+        length: level - cur.level,
+        gapfill: true
       };
       level = level_after[level];
       cur = cur.sub[insert_name];
       cur.sub = save;
     }
     return end.length = end.level - cur.level;
+  };
+
+  next_incertae_sedis_name = function(node) {
+    var index, next_name;
+
+    index = node.name.indexOf("incertae_sedis");
+    if ((index !== -1) && ((node.name.length - index) === "incertae_sedis".length)) {
+      next_name = node.name;
+    } else {
+      next_name = "" + node.name + "_incertae_sedis";
+    }
+    return next_name;
+  };
+
+  filter = function(line_list, minperc) {
+    var data, fields, genera, genus, line, retlines, _j, _len1;
+
+    genera = {};
+    for (_j = 0, _len1 = line_list.length; _j < _len1; _j++) {
+      line = line_list[_j];
+      fields = parse_line(line);
+      genus = fields.tax_names.pop();
+      if (genus in genera) {
+        genera[genus].percent += fields.percent;
+        genera[genus].lines.push(line);
+      } else {
+        genera[genus] = {
+          percent: fields.percent,
+          lines: [line]
+        };
+      }
+    }
+    retlines = [];
+    for (genus in genera) {
+      data = genera[genus];
+      if (data.percent >= minperc) {
+        Array.prototype.push.apply(retlines, data.lines);
+      }
+    }
+    return retlines;
   };
 
   orig_lines = [];

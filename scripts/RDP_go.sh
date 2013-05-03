@@ -154,7 +154,10 @@ aligner="RDP_align"
 # Virtual memory limit for ulimit -v, in kilobytes.  Protects against
 # unintentionally bringing down the server
 vmem_limit=$(get_vmem_limit)
-ulimit -v "$vmem_limit"
+current_vmem_limit=$(ulimit -v)
+if [[ "$current_vmem_limit" == "unlimited" ]]; then
+    ulimit -v "$vmem_limit"
+fi
 
 ssdir=$(get_ssdir)
 

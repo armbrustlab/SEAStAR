@@ -1,6 +1,6 @@
 <link href="style.css" media="screen" rel="stylesheet" type="text/css" />
 
-<h1>SEAStAR User Guide, version 0.4.6</h1>
+<h1>SEAStAR User Guide, version 0.4.7</h1>
 <h4>Vaughn Iverson and Chris Berthiaume</h4>
 <h5><a href="http://armbrustlab.ocean.washington.edu">Armbrust Lab</a>, School of Oceanography, University of Washington</h5>
 <h2>Table of Contents</h2>
@@ -22,7 +22,7 @@
 <pre><code>ulimit -v 64000000</code></pre>
 <p>to any script that invokes high memory tools will effectively prevent a 64GB machine from being unintentionally brought down (i.e. thrashing the swap file) by an application that attempts to allocate more memory than is physically available.</p>
 <h3>License and citation</h3>
-<p>The SEAStAR tools are open source and are currently publicly distributed under the <a href="http://gplv3.fsf.org/">GPL version 3 license</a>, a copy of which is provided in a file names <code>COPYING</code> in the project root directory. By using this software, you are agreeing to be bound by the terms of this license. Please contact the authors if you are interested in discussing an alternative licensing arrangement.</p>
+<p>The SEAStAR tools are open source and are currently publicly distributed under the <a href="http://gplv3.fsf.org/">GPL version 3 license</a>, a copy of which is provided in a file named <code>COPYING</code> in the project root directory. By using this software, you are agreeing to be bound by the terms of this license. Please contact the authors if you are interested in discussing an alternative licensing arrangement.</p>
 <p>We are in the process of preparing several publications specific to the SEAStAR analysis pipeline and the custom tools it contains. In the interim, we ask that you cite the following paper (which was the first to use and describe these tools):</p>
 <blockquote>
 <p>Iverson, V., Morris, R. M., Frazar, C. D., Berthiaume, C. T., Morales, R. L .and Armbrust, E. V., Untangling Genomes from Metagenomes: Revealing an Uncultured Class of Marine Euryarchaeota, <a href="http://www.sciencemag.org/content/335/6068/587.abstract"><em>Science</em> <strong>335</strong> pp.587-590</a> (2012)</p>
@@ -1221,17 +1221,36 @@ graph_ops   # Same as above</code></pre>
   SCRIPT { &quot;file&quot; : &quot;do_something.go&quot; }   
 
   FASTA { &quot;file&quot; : &quot;sequence.fna&quot; }</code></pre>
-<p> Note that the <code>SCRIPT</code> command and the associated <code>.go</code> scripts are not intended to replace the UNIX shell. Notably, the scripts are entirely declarative, there are no variables, or ability to branch (if/then/else) or explicitly loop. However, using a combination of <code>graph_ops</code> commands, it is still possible to do some unexpectedly powerful things very efficiently:</p>
+</li>
+<li><p><code>tag : &lt;string&gt;</code></p>
+<p> Substitute the provided string in place of the &#39;@&#39; symbol in any output file names used by commands (e.g. <code>DUMP</code>) within the provided <code>SCRIPT</code> file.  NOTE: this tag renaming is not used within interactive SCRIPT command sessions.</p>
+<pre><code>  # Add the string &quot;Run1&quot; in place of the &#39;@&#39; character in the filenames of any 
+  # output files written by commands in the script my_script.go (e.g. &quot;@_output.json&quot; 
+  # will become &quot;Run1_output.json&quot; in a DUMP command). Works with any command that
+  # can write its output to a file.
+
+  SCRIPT {&quot;file&quot; : &quot;my_script.go&quot;, &quot;tag&quot; : &quot;Run1&quot;}        </code></pre>
+<p> The tag string will also substitute for runs of consecutive &#39;@&#39; characters, and for multiple distinct positions anywhere in an output file path. Note that as with all <code>graph_ops</code> output filenames, any resulting directory path must already exist. <code>graph_ops</code> will not create new directories in the course of writing output files.</p>
+<pre><code>  # String \&quot;Sample_A\&quot; will replace all runs of &#39;@&#39; characters anywhere in the 
+  # file path of files written by commands in the script my_script.go, for example:  
+  # ~/data/samples/@@@/@@@_output.json   
+  # will become:
+  # ~/data/samples/Sample_A/Sample_A_output.json
+
+  # NOTE! In this case, the ~/data/samples/Sample_A/ directory must already exist.
+
+  SCRIPT {&quot;file&quot; : &quot;my_script.go&quot;, &quot;tag&quot; : &quot;Sample_A&quot;}        </code></pre>
+<p> Note that the <code>SCRIPT</code> command and the associated <code>.go</code> scripts are not intended to replace the UNIX shell. Notably, the scripts are entirely declarative, there are no general variables, or ability to branch (if/then/else) or explicitly loop. However, using a combination of <code>graph_ops</code> commands, it is still possible to do some unexpectedly powerful things very efficiently:</p>
 <pre><code>  # This script is called: iterate.go 
   STASH
   SELCC
-  FASTA {&quot;file&quot;:&quot;ccseq_####.fna&quot;}
+  FASTA {&quot;file&quot;:&quot;@_ccseq_####.fna&quot;}
   UNSTASH
   SELCC {&quot;ccrange&quot;:[1,-1]}
   SCRIPT {&quot;file&quot;:&quot;iterate.go&quot;}</code></pre>
 <p> If the above script is invoked using this command: </p>
-<pre><code>  graph_ops assembly.json CCOMPS SCRIPT &#39;{&quot;file&quot;:&quot;iterate.go&quot;}&#39;</code></pre>
-<p> <code>graph_ops</code> will read in <code>assembly.json</code>, calculate the connected components of the sequence graph once, and then write the sequence from each individual connected component to a separate FASTA file, with output filenames automatically incrementing from <code>ccseq_0000.fna</code> to <code>ccseq_0234.fna</code> (assuming there are 235 connected components in the assembly).</p>
+<pre><code>  graph_ops assembly.json CCOMPS SCRIPT &#39;{&quot;file&quot;:&quot;iterate.go&quot;, &quot;tag&quot;:&quot;Run1&quot;}&#39;</code></pre>
+<p> <code>graph_ops</code> will read in <code>assembly.json</code>, calculate the connected components of the sequence graph once, and then write the sequence from each individual connected component to a separate FASTA file, with output filenames automatically incrementing from <code>Run1_ccseq_0000.fna</code> to <code>Run1_ccseq_0234.fna</code> (assuming there are 235 connected components in the assembly).</p>
 </li>
 </ul>
 <h3><a name="HELP"><code>HELP</code></a></h3>

@@ -44,6 +44,10 @@
 # Command line: [options] infile.fna [heal_file.fna] 
 #
 
+unless process.version.split('.')[1] >= 10   # Require node version v0.x.y to be x >= 10
+   console.error("ERROR: nodejs version v0.10.0 or greater required.")
+   process.exit(1) 
+
 verbose = false
 
 fs = require('fs')

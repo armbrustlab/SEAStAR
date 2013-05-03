@@ -1,6 +1,6 @@
 <link href="style.css" media="screen" rel="stylesheet" type="text/css" />
 
-SEAStAR User Guide, version 0.4.6
+SEAStAR User Guide, version 0.4.7
 ==============================
 ####Vaughn Iverson and Chris Berthiaume
 
@@ -37,7 +37,7 @@ to any script that invokes high memory tools will effectively prevent a 64GB mac
 
 ###License and citation
 
-The SEAStAR tools are open source and are currently publicly distributed under the [GPL version 3 license](http://gplv3.fsf.org/), a copy of which is provided in a file names `COPYING` in the project root directory. By using this software, you are agreeing to be bound by the terms of this license. Please contact the authors if you are interested in discussing an alternative licensing arrangement.
+The SEAStAR tools are open source and are currently publicly distributed under the [GPL version 3 license](http://gplv3.fsf.org/), a copy of which is provided in a file named `COPYING` in the project root directory. By using this software, you are agreeing to be bound by the terms of this license. Please contact the authors if you are interested in discussing an alternative licensing arrangement.
 
 We are in the process of preparing several publications specific to the SEAStAR analysis pipeline and the custom tools it contains. In the interim, we ask that you cite the following paper (which was the first to use and describe these tools):
 
@@ -1863,21 +1863,44 @@ Use contents of a file as a series of `graph_ops` commands to run. Commands and 
         
         FASTA { "file" : "sequence.fna" }
 
-   Note that the `SCRIPT` command and the associated `.go` scripts are not intended to replace the UNIX shell. Notably, the scripts are entirely declarative, there are no variables, or ability to branch (if/then/else) or explicitly loop. However, using a combination of `graph_ops` commands, it is still possible to do some unexpectedly powerful things very efficiently:
++ `tag : <string>`
+
+   Substitute the provided string in place of the '@' symbol in any output file names used by commands (e.g. `DUMP`) within the provided `SCRIPT` file.  NOTE: this tag renaming is not used within interactive SCRIPT command sessions.
+
+        # Add the string "Run1" in place of the '@' character in the filenames of any 
+        # output files written by commands in the script my_script.go (e.g. "@_output.json" 
+        # will become "Run1_output.json" in a DUMP command). Works with any command that
+        # can write its output to a file.
+        
+        SCRIPT {"file" : "my_script.go", "tag" : "Run1"}        
+
+   The tag string will also substitute for runs of consecutive '@' characters, and for multiple distinct positions anywhere in an output file path. Note that as with all `graph_ops` output filenames, any resulting directory path must already exist. `graph_ops` will not create new directories in the course of writing output files.
+
+        # String \"Sample_A\" will replace all runs of '@' characters anywhere in the 
+        # file path of files written by commands in the script my_script.go, for example:  
+        # ~/data/samples/@@@/@@@_output.json   
+        # will become:
+        # ~/data/samples/Sample_A/Sample_A_output.json
+        
+        # NOTE! In this case, the ~/data/samples/Sample_A/ directory must already exist.
+        
+        SCRIPT {"file" : "my_script.go", "tag" : "Sample_A"}        
+
+   Note that the `SCRIPT` command and the associated `.go` scripts are not intended to replace the UNIX shell. Notably, the scripts are entirely declarative, there are no general variables, or ability to branch (if/then/else) or explicitly loop. However, using a combination of `graph_ops` commands, it is still possible to do some unexpectedly powerful things very efficiently:
    
         # This script is called: iterate.go 
         STASH
         SELCC
-        FASTA {"file":"ccseq_####.fna"}
+        FASTA {"file":"@_ccseq_####.fna"}
         UNSTASH
         SELCC {"ccrange":[1,-1]}
         SCRIPT {"file":"iterate.go"}
 
    If the above script is invoked using this command: 
         
-        graph_ops assembly.json CCOMPS SCRIPT '{"file":"iterate.go"}'
+        graph_ops assembly.json CCOMPS SCRIPT '{"file":"iterate.go", "tag":"Run1"}'
 
-   `graph_ops` will read in `assembly.json`, calculate the connected components of the sequence graph once, and then write the sequence from each individual connected component to a separate FASTA file, with output filenames automatically incrementing from `ccseq_0000.fna` to `ccseq_0234.fna` (assuming there are 235 connected components in the assembly).
+   `graph_ops` will read in `assembly.json`, calculate the connected components of the sequence graph once, and then write the sequence from each individual connected component to a separate FASTA file, with output filenames automatically incrementing from `Run1_ccseq_0000.fna` to `Run1_ccseq_0234.fna` (assuming there are 235 connected components in the assembly).
    
 [`HELP`]: #HELP
 ###<a name="HELP">`HELP`</a>

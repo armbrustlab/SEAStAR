@@ -29,6 +29,11 @@
 (function() {
   var build, error_codes, levels, taxa;
 
+  if (!(process.version.split('.')[1] >= 10)) {
+    console.error("ERROR: nodejs version v0.10.0 or greater required.");
+    process.exit(1);
+  }
+
   taxa = [];
 
   levels = {

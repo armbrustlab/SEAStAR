@@ -51,6 +51,10 @@
 #
 ###
 
+unless process.version.split('.')[1] >= 10   # Require node version v0.x.y to be x >= 10
+   console.error("ERROR: nodejs version v0.10.0 or greater required.")
+   process.exit(1) 
+
 fs = require('fs')       # Node.js built-in filesystem access module
 zlib = require('zlib')   # Node.js built-in zlib (de)compression library 
 path = require('path')   # Node.js built-in filename path parsing library
@@ -109,12 +113,36 @@ read_input_stream = (fn, parse, cb) ->  # fn = Filename, cb = callback passing o
               cb(err, null))
 
 ###
-# Helper functions to uniformly handle writing to a file, a gzipped file or stdout 
+# Helper function crates an object to uniformly handle writing to a file, a gzipped file or stdout
+# Treat return like a stream, implements on, write and end methods. Smoothes-over the differences
+# between the different output possibilities.
 ###
-open_output_stream = (fn) ->   # fn = Filename, returns open stream to write to
+open_output_stream = (fn, tag = '') ->   # fn = Filename, returns open stream to write to
+   
+   out = {}
+   
+   out.on = (sig, cb) ->
+      this.o.on(sig, cb)
+   
+   out.write = (buf, cb) ->
+      this.o.write(buf, cb)
+      
+   out.end = (cb) ->   
+      if this.fh?   # Nothing to do for system streams
+         this.o.on("error", (err)->cb(err))  
+         this.fh.on("close", ()->setImmediate(cb,null))  # Wait for actual I/O device file to close  
+         this.o.end()
+      else
+         cb(null)
    
    if fn  # If there's a filename, then a stream needs to be created
       fn = resolve_path(fn)   # Get the path into standard form
+
+      # The tag functionality substitutes all discrete runs of @ symbols with an optional tag 
+      # passed in from outside of a script, etc.
+      if tag_rep = fn.match(/(@+)/)
+         console.warn("INFO: Substituting '#{tag}' for '#{tag_rep[1]}' in file #{fn}")
+         fn = fn.replace(/@+/g,tag)
 
       # The renumber functionality below triggers special file renaming logic when the 
       # passed name contains one or more '#' characters in a row.  In this case, these 
@@ -131,33 +159,27 @@ open_output_stream = (fn) ->   # fn = Filename, returns open stream to write to
       else if fs.existsSync(fn)
          console.warn("WARNING: Overwriting file #{fn}")
       
-      fout = fs.createWriteStream(fn)  # Create the file
+      try
+         fout = fs.createWriteStream(fn)  # Create the file
+      catch error
+         console.error("ERROR: Could not open file; #{fn}")
+         return null
 
       if fout  
          if fn.slice(-3) is '.gz'  # If the filename ends in .gz, then pipe output through gzip
             gz = zlib.createGzip()
             gz.pipe(fout)
-            out = gz
+            out.o = gz
+            out.fh = fout
          else          
-            out = fout
+            out.o = fout
+            out.fh = fout
       else
          out = null
    else  # Otherwise STDOUT is ready to go 
-      out = process.stdout
+      out.o = process.stdout
    
-   out   # Return the output stream
-
-###
-# This file must be called to close the stream opened by the function above 
-###
-close_output_stream = (out, cb) ->  # out = output stream, cb = callback when closed
-   unless (out is process.stdout) or (out is process.stderr)  # Nothing to do for system streams
-      out.on("error", (err)->cb(err))  # If out is the write stream
-      out.on("close", ()->cb(null))  # If out is the write stream
-      out.on("end", ()->cb(null))    # If out is a Gzip stream
-      out.end()
-   else
-      cb(null)
+   out   # Return the output object
 
 ##
 # my_stringify writes JSON output progressively to a stream, avoiding the creation of a 
@@ -206,11 +228,15 @@ my_stringify = (j, o, l=2, cb) ->
                   if err
                      cb(err)
                   else  # Let the I/O get out before next call
-                     setTimeout(traverse, 0, stack, o, cb))
+                     setImmediate(traverse, stack, o, cb))
             else  # Pass on writing for now
                traverse(stack, o, cb, buf)
       else  # No more work, so clean up and invoke the callback    
-         o.write(buf + '\n', cb)
+         o.write(buf + '\n', (err) ->
+            if err
+               cb(err)
+            else  # Let the I/O get out before next call
+               setImmediate(cb, null))
       trav_cnt--
 
    # Invoke the traverse function with the input it expects
@@ -1339,7 +1365,7 @@ Parameters:\n
 \n
 thresh : <float> -- Bitscore threshold\n
 \n
-        Example: #{args.help} {\"thresh\":500.0}' -- Default. Remove all edges scoring\n
+        Example: #{args.help} {\"thresh\":500.0} -- Default. Remove all edges scoring\n
         less than 500.0 bits.\n
 ")
       callback?(null, j)
@@ -1394,7 +1420,7 @@ ccdetail : true -- Write connected component details\n
       callback?(null, j)
       return
 
-   o = open_output_stream(args.file)
+   o = open_output_stream(args.file, args.tag)
    
    # Handle error opening file
    unless o
@@ -1460,7 +1486,7 @@ ccdetail : true -- Write connected component details\n
    for p in j.processing?[..-2]
       o.write("#{p[0]}\t#{p[1]}\t#{p[2]}\t#{JSON.stringify(p[3]) if p[3]}\n")
 
-   o.write("\nStash contains #{stash_stack.length} saved graph#{'s' if stash_stack.length isnt 1}.\n")
+   o.write("\nStash contains #{stash_stack.length} saved graph#{if stash_stack.length isnt 1 then 's' else ''}.\n")
    if args.ccdetail? and stash_stack.length
       o.write("\nCommand histories for all stashed graphs (top to bottom of stack)\n")
       stash_stack.reverse()
@@ -1469,7 +1495,7 @@ ccdetail : true -- Write connected component details\n
          for p in s.processing?[..-2]
             o.write("#{p[0]}\t#{p[1]}\t#{p[2]}\t#{JSON.stringify(p[3]) if p[3]}\n")
       stash_stack.reverse() 
-   close_output_stream(o, (error) ->
+   o.end((error) ->
          if error
             callback?(error, null)
          else
@@ -1563,7 +1589,7 @@ colored_edges : true -- Draw edges colored by the GC% of the connected contigs\n
       callback?(null, j)
       return
 
-   o = open_output_stream(args.file)
+   o = open_output_stream(args.file, args.tag)
 
    # Handle error opening file
    unless o
@@ -1669,7 +1695,7 @@ colored_edges : true -- Draw edges colored by the GC% of the connected contigs\n
 
    remove_graph_refs(j)
 
-   close_output_stream(o, (error) ->
+   o.end((error) ->
          if error
             callback?(error, null)
          else
@@ -1731,7 +1757,7 @@ abundance : true -- append relative abundance values to the FASTA sequence IDs\n
       return
 
    unless args.stream?
-      o = open_output_stream(args.file)
+      o = open_output_stream(args.file, args.tag)
    else
       o = args.stream   # This is a special internal case, passing in a stream to write to
       
@@ -1754,7 +1780,7 @@ abundance : true -- append relative abundance values to the FASTA sequence IDs\n
             else
                o.write(">#{name}\n")
             o.write("#{node.recon_seq}\n")
-      close_output_stream(o, (error) ->
+      o.end((error) ->
          if error
             callback?(error, null)
          else
@@ -1784,7 +1810,7 @@ abundance : true -- append relative abundance values to the FASTA sequence IDs\n
       # In this case the stream is a file
       if args.no_merge_scaffs
          write_scaffolds(o)
-         close_output_stream(o, (error) ->
+         o.end((error) ->
          if error
             callback?(error, null)
          else
@@ -1818,7 +1844,7 @@ abundance : true -- append relative abundance values to the FASTA sequence IDs\n
          ) 
 
          scaf.stdout.on('end', () ->
-            close_output_stream(o, (error) ->
+            o.end((error) ->
                if error
                   callback?(error, null)
                else
@@ -1884,7 +1910,7 @@ header : true -- write a header row with labels for each column\n
       callback?(null, j)
       return
 
-   o = open_output_stream(args.file)
+   o = open_output_stream(args.file, args.tag)
    
    # Handle error opening file
    unless o
@@ -1923,7 +1949,7 @@ desc\n
 #{node.desc}\n
 ")
 
-   close_output_stream(o, (error) ->
+   o.end((error) ->
          if error
             callback?(error, null)
          else
@@ -3352,7 +3378,7 @@ detail : true -- Provide extra per contig detail\n
       callback?(null, j)
       return
 
-   o = open_output_stream(args.file)
+   o = open_output_stream(args.file, args.tag)
 
    # Handle error opening file
    unless o
@@ -3392,7 +3418,7 @@ detail : true -- Provide extra per contig detail\n
    for type, count of prob_types
       o.write("\t#{type}: #{count}\n")
    
-   close_output_stream(o, (error) ->
+   o.end((error) ->
          if error
             callback?(error, null)
          else
@@ -3605,7 +3631,7 @@ file : \"filename.json[.gz]\" -- Specify a file name to write the JSON format se
       callback?(null, j)
       return
 
-   o = open_output_stream(args.file)
+   o = open_output_stream(args.file, args.tag)
    
    # Handle error opening file
    unless o
@@ -3618,9 +3644,9 @@ file : \"filename.json[.gz]\" -- Specify a file name to write the JSON format se
 
    my_stringify(j, o, 2, (err) ->
       if err
-         callback?(error, null)
+         callback?(err, null)
       else       
-         close_output_stream(o, (error) ->
+         o.end((error) ->
             if error
                callback?(error, null)
             else
@@ -3689,11 +3715,25 @@ Parameters:\n
 \n
 file : \"filename[.gz]\" -- Read commands from the named file\n
 \n
-        Example: #{args.help} {\"file\":\"my_script.txt\"} -- Read and run commands from\n
+        Example: #{args.help} {\"file\":\"my_script.go\"} -- Read and run commands from\n
         the file my_script.txt\n
 \n
         Example: #{args.help} -- Enter an interactive (command line) session at this point\n
         typing commands one at a time\n
+\n
+tag : \"filename_part\" -- Part of a filename to include in files written from this script\n
+          NOTE: tag renaming is not used within interactive SCRIPT command sessions.\n
+\n
+        Example: #{args.help} {\"file\":\"my_script.go\", \"tag\":\"Run1\"} -- Add the \n
+        string \"Run1\" in place of the '@' character in the filenames of any output files\n
+        written by commands in the script my_script.go (e.g. \"@_output.json\" would\n
+        become \"Run1_output.json\").\n
+\n
+        Example: #{args.help} {\"file\":\"my_script.go\", \"tag\":\"Sample_A\"} -- Add the \n
+        string \"Sample_A\" in place of runs of '@' characters anywhere in the file path\n
+        of files written by commands in the script my_script.go, for example:\n
+        \"~/data/samples/@@@/@@@_output.json\" would become:\n
+        \"~/data/samples/Sample_A/Sample_A_output.json\"\n
 ")
       callback?(null, j)
       return
@@ -3718,9 +3758,12 @@ file : \"filename[.gz]\" -- Read commands from the named file\n
                   callback?(err, null)
                   return
             else
-               cmd_args = null
+               cmd_args = null               
+            
+            if cmd_args?.file? and args.tag? and not (cmd is 'SCRIPT' or cmd is 'LOAD')
+               cmd_args.tag = args.tag 
                
-            if (cmd is 'SCRIPT') and not cmd_args?.file?
+            if (cmd is 'SCRIPT') and not cmd_args?.file? 
                callback?(new Error("Invalid command: You may not launch an interactive SCRIPT session from within a SCRIPT."), null)
                return
             else 

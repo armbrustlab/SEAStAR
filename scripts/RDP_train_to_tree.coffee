@@ -47,6 +47,10 @@
 #      "sub" : {<child nodes by name, or empty if a leaf>}
 # }
 
+unless process.version.split('.')[1] >= 10   # Require node version v0.x.y to be x >= 10
+   console.error("ERROR: nodejs version v0.10.0 or greater required.")
+   process.exit(1) 
+
 taxa = [] # This is a working array of taxa records indexed by taxid
 
 levels = 

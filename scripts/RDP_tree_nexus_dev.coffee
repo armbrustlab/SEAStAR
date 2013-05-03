@@ -36,6 +36,10 @@
 # And prunes branches from the tree with no representative sequences.
 #
 
+unless process.version.split('.')[1] >= 10   # Require node version v0.x.y to be x >= 10
+   console.error("ERROR: nodejs version v0.10.0 or greater required.")
+   process.exit(1) 
+
 norm = 1.0;		# This variable is used to normalize all releative populations to 100% total
 
 walk = (tree) ->

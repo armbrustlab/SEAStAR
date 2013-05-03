@@ -54,6 +54,11 @@
 (function() {
   var fs, i, input_files, merge, output_tree, path, sample_file, sample_name, walk, _i, _len, _ref;
 
+  if (!(process.version.split('.')[1] >= 10)) {
+    console.error("ERROR: nodejs version v0.10.0 or greater required.");
+    process.exit(1);
+  }
+
   fs = require('fs');
 
   path = require('path');

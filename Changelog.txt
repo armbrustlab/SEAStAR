@@ -1,3 +1,22 @@
+### 0.4.7 ###
+- Added the "tag" parameter to the graph_ops SCRIPT command, allowing for .go
+script files to be more easily reused, by enabling them to write output files 
+with different filenames and/or into different directory paths. 
+
+- Fixed a bug in RDP_tree_dev.coffee that did not properly handle pre-existing
+incertae_sedis nodes.
+
+- Fixed a bug in RDP_go that may caused it to exit with an error if a vmem
+limit was already set before running the script.
+
+- nodejs version 0.10 or higher is now required to run graph_ops, seq_scaffold
+and other SEAStAR tools requiring command-line Javascript support.
+
+- Fixed a bug that occasionally produced truncated files when using gzip 
+compressed output in graph_ops when run using nodejs version 0.10.x.
+
+- Fixed assorted typos in help strings and documentation.
+
 ### 0.4.6 ###
 
 - Fixed bugs in graph_ops that on rare occasions led to "stack overflow" errors 

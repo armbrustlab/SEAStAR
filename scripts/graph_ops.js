@@ -54,7 +54,12 @@
 
 
 (function() {
-  var JSONStream, add_ends, bisect, build_graph_refs, build_removed_graph_refs, calc_ccomps, calc_seq_stats, callback_list, cc_seq_len, check_connections, child_process, clone_object, close_output_stream, cmd, cmds, command_file, commands, cut_branches, cut_node, edge_director, err, execute_selection, export_dot, export_fasta, export_table, filter_edges, find_all_ends, find_connection, find_direct_connection, find_ends, find_indirect_connection, find_neighbors, fs, full_order, grab_ccomps, grab_clusts, grab_neighbors, graph_stats, graph_stats_cc, heuristic, make_directed, maximal_spanning_tree, my_bisect, my_stringify, node_problems, open_output_stream, output_help, path, perform_edits, pop_stash, prev_cmd, process_commands, push_stash, rc_tab, read_input_stream, read_json, relink, remove_graph_refs, remove_leaves, repl, resolve_path, rev_node, scaff_link, scaffold, scaffold_spanning_tree, ss_version, start_arg, stash_stack, tetracalc, use_heuristic, write_json, zlib, _i, _len, _ref;
+  var JSONStream, add_ends, bisect, build_graph_refs, build_removed_graph_refs, calc_ccomps, calc_seq_stats, callback_list, cc_seq_len, check_connections, child_process, clone_object, cmd, cmds, command_file, commands, cut_branches, cut_node, edge_director, err, execute_selection, export_dot, export_fasta, export_table, filter_edges, find_all_ends, find_connection, find_direct_connection, find_ends, find_indirect_connection, find_neighbors, fs, full_order, grab_ccomps, grab_clusts, grab_neighbors, graph_stats, graph_stats_cc, heuristic, make_directed, maximal_spanning_tree, my_bisect, my_stringify, node_problems, open_output_stream, output_help, path, perform_edits, pop_stash, prev_cmd, process_commands, push_stash, rc_tab, read_input_stream, read_json, relink, remove_graph_refs, remove_leaves, repl, resolve_path, rev_node, scaff_link, scaffold, scaffold_spanning_tree, ss_version, start_arg, stash_stack, tetracalc, use_heuristic, write_json, zlib, _i, _len, _ref;
+
+  if (!(process.version.split('.')[1] >= 10)) {
+    console.error("ERROR: nodejs version v0.10.0 or greater required.");
+    process.exit(1);
+  }
 
   fs = require('fs');
 
@@ -130,15 +135,44 @@
   };
 
   /*
-  # Helper functions to uniformly handle writing to a file, a gzipped file or stdout
+  # Helper function crates an object to uniformly handle writing to a file, a gzipped file or stdout
+  # Treat return like a stream, implements on, write and end methods. Smoothes-over the differences
+  # between the different output possibilities.
   */
 
 
-  open_output_stream = function(fn) {
-    var fout, gz, inc, out, renumber;
+  open_output_stream = function(fn, tag) {
+    var error, fout, gz, inc, out, renumber, tag_rep;
 
+    if (tag == null) {
+      tag = '';
+    }
+    out = {};
+    out.on = function(sig, cb) {
+      return this.o.on(sig, cb);
+    };
+    out.write = function(buf, cb) {
+      return this.o.write(buf, cb);
+    };
+    out.end = function(cb) {
+      if (this.fh != null) {
+        this.o.on("error", function(err) {
+          return cb(err);
+        });
+        this.fh.on("close", function() {
+          return setImmediate(cb, null);
+        });
+        return this.o.end();
+      } else {
+        return cb(null);
+      }
+    };
     if (fn) {
       fn = resolve_path(fn);
+      if (tag_rep = fn.match(/(@+)/)) {
+        console.warn("INFO: Substituting '" + tag + "' for '" + tag_rep[1] + "' in file " + fn);
+        fn = fn.replace(/@+/g, tag);
+      }
       if (renumber = fn.match(/([^#]*)(#+)([^#]*)/)) {
         inc = 0;
         renumber[2] = renumber[2].replace(/#/g, '0');
@@ -151,44 +185,30 @@
       } else if (fs.existsSync(fn)) {
         console.warn("WARNING: Overwriting file " + fn);
       }
-      fout = fs.createWriteStream(fn);
+      try {
+        fout = fs.createWriteStream(fn);
+      } catch (_error) {
+        error = _error;
+        console.error("ERROR: Could not open file; " + fn);
+        return null;
+      }
       if (fout) {
         if (fn.slice(-3) === '.gz') {
           gz = zlib.createGzip();
           gz.pipe(fout);
-          out = gz;
+          out.o = gz;
+          out.fh = fout;
         } else {
-          out = fout;
+          out.o = fout;
+          out.fh = fout;
         }
       } else {
         out = null;
       }
     } else {
-      out = process.stdout;
+      out.o = process.stdout;
     }
     return out;
-  };
-
-  /*
-  # This file must be called to close the stream opened by the function above
-  */
-
-
-  close_output_stream = function(out, cb) {
-    if (!((out === process.stdout) || (out === process.stderr))) {
-      out.on("error", function(err) {
-        return cb(err);
-      });
-      out.on("close", function() {
-        return cb(null);
-      });
-      out.on("end", function() {
-        return cb(null);
-      });
-      return out.end();
-    } else {
-      return cb(null);
-    }
   };
 
   my_stringify = function(j, o, l, cb) {
@@ -264,7 +284,7 @@
               if (err) {
                 return cb(err);
               } else {
-                return setTimeout(traverse, 0, stack, o, cb);
+                return setImmediate(traverse, stack, o, cb);
               }
             });
           } else {
@@ -272,7 +292,13 @@
           }
         }
       } else {
-        o.write(buf + '\n', cb);
+        o.write(buf + '\n', function(err) {
+          if (err) {
+            return cb(err);
+          } else {
+            return setImmediate(cb, null);
+          }
+        });
       }
       return trav_cnt--;
     };
@@ -1584,7 +1610,7 @@
     if (args.help != null) {
       console.warn("" + args.help + " -- Remove all edges scoring less than thresh bits");
       if (args.detailed_help != null) {
-        console.warn("\nParameters:\n\nthresh : <float> -- Bitscore threshold\n\n        Example: " + args.help + " {\"thresh\":500.0}' -- Default. Remove all edges scoring\n        less than 500.0 bits.\n");
+        console.warn("\nParameters:\n\nthresh : <float> -- Bitscore threshold\n\n        Example: " + args.help + " {\"thresh\":500.0} -- Default. Remove all edges scoring\n        less than 500.0 bits.\n");
       }
       if (typeof callback === "function") {
         callback(null, j);
@@ -1633,7 +1659,7 @@
       }
       return;
     }
-    o = open_output_stream(args.file);
+    o = open_output_stream(args.file, args.tag);
     if (!o) {
       if (typeof callback === "function") {
         callback(new Error("open_output_stream could not open file '" + args.file + "' for output."), null);
@@ -1747,7 +1773,7 @@
       p = _ref8[_m];
       o.write("" + p[0] + "\t" + p[1] + "\t" + p[2] + "\t" + (p[3] ? JSON.stringify(p[3]) : void 0) + "\n");
     }
-    o.write("\nStash contains " + stash_stack.length + " saved graph" + (stash_stack.length !== 1 ? 's' : void 0) + ".\n");
+    o.write("\nStash contains " + stash_stack.length + " saved graph" + (stash_stack.length !== 1 ? 's' : '') + ".\n");
     if ((args.ccdetail != null) && stash_stack.length) {
       o.write("\nCommand histories for all stashed graphs (top to bottom of stack)\n");
       stash_stack.reverse();
@@ -1762,7 +1788,7 @@
       }
       stash_stack.reverse();
     }
-    return close_output_stream(o, function(error) {
+    return o.end(function(error) {
       if (error) {
         return typeof callback === "function" ? callback(error, null) : void 0;
       } else {
@@ -1822,7 +1848,7 @@
       }
       return;
     }
-    o = open_output_stream(args.file);
+    o = open_output_stream(args.file, args.tag);
     if (!o) {
       if (typeof callback === "function") {
         callback(new Error("open_output_stream could not open file '" + args.file + "' for output."), null);
@@ -1896,7 +1922,7 @@
       o.write("}\n");
     }
     remove_graph_refs(j);
-    return close_output_stream(o, function(error) {
+    return o.end(function(error) {
       if (error) {
         return typeof callback === "function" ? callback(error, null) : void 0;
       } else {
@@ -1938,7 +1964,7 @@
       return;
     }
     if (args.stream == null) {
-      o = open_output_stream(args.file);
+      o = open_output_stream(args.file, args.tag);
     } else {
       o = args.stream;
     }
@@ -1967,7 +1993,7 @@
           o.write("" + node.recon_seq + "\n");
         }
       }
-      return close_output_stream(o, function(error) {
+      return o.end(function(error) {
         if (error) {
           return typeof callback === "function" ? callback(error, null) : void 0;
         } else {
@@ -2016,7 +2042,7 @@
       };
       if (args.no_merge_scaffs) {
         write_scaffolds(o);
-        close_output_stream(o, function(error) {}, error ? typeof callback === "function" ? callback(error, null) : void 0 : typeof callback === "function" ? callback(null, j) : void 0);
+        o.end(function(error) {}, error ? typeof callback === "function" ? callback(error, null) : void 0 : typeof callback === "function" ? callback(null, j) : void 0);
       } else {
         if (typeof args.scaff === 'string') {
           options = args.scaff.split(/\s+/);
@@ -2034,7 +2060,7 @@
           return process.stderr.write(data);
         });
         scaf.stdout.on('end', function() {
-          return close_output_stream(o, function(error) {
+          return o.end(function(error) {
             if (error) {
               return typeof callback === "function" ? callback(error, null) : void 0;
             } else {
@@ -2078,7 +2104,7 @@
       }
       return;
     }
-    o = open_output_stream(args.file);
+    o = open_output_stream(args.file, args.tag);
     if (!o) {
       if (typeof callback === "function") {
         callback(new Error("open_output_stream could not open file '" + args.file + "' for output."), null);
@@ -2098,7 +2124,7 @@
       node = _ref[name];
       o.write("" + name + "\t" + node.bits + "\t" + node.rd_cnt + "\t" + node.int_cov + "\t" + node.rel_ab + "\t" + node.cov + "\t" + node.rd_len + "\t" + node.seq_len + "\t" + ((_ref1 = node.pct_gc) != null ? _ref1 : 'NA') + "\t" + node.name + "\t" + node.desc + "\n");
     }
-    return close_output_stream(o, function(error) {
+    return o.end(function(error) {
       if (error) {
         return typeof callback === "function" ? callback(error, null) : void 0;
       } else {
@@ -3859,7 +3885,7 @@
       }
       return;
     }
-    o = open_output_stream(args.file);
+    o = open_output_stream(args.file, args.tag);
     if (!o) {
       if (typeof callback === "function") {
         callback(new Error("open_output_stream could not open file '" + args.file + "' for output."), null);
@@ -3922,7 +3948,7 @@
       count = prob_types[type];
       o.write("\t" + type + ": " + count + "\n");
     }
-    return close_output_stream(o, function(error) {
+    return o.end(function(error) {
       if (error) {
         return typeof callback === "function" ? callback(error, null) : void 0;
       } else {
@@ -4130,7 +4156,7 @@
       }
       return;
     }
-    o = open_output_stream(args.file);
+    o = open_output_stream(args.file, args.tag);
     if (!o) {
       if (typeof callback === "function") {
         callback(new Error("open_output_stream could not open file '" + args.file + "' for output."), null);
@@ -4144,9 +4170,9 @@
     }
     return my_stringify(j, o, 2, function(err) {
       if (err) {
-        return typeof callback === "function" ? callback(error, null) : void 0;
+        return typeof callback === "function" ? callback(err, null) : void 0;
       } else {
-        return close_output_stream(o, function(error) {
+        return o.end(function(error) {
           if (error) {
             return typeof callback === "function" ? callback(error, null) : void 0;
           } else {
@@ -4216,7 +4242,7 @@
     if (args.help != null) {
       console.warn("" + args.help + " -- Use contents of file as a series of commands, or read from the console if\n          no file provided");
       if (args.detailed_help != null) {
-        console.warn("\nParameters:\n\nfile : \"filename[.gz]\" -- Read commands from the named file\n\n        Example: " + args.help + " {\"file\":\"my_script.txt\"} -- Read and run commands from\n        the file my_script.txt\n\n        Example: " + args.help + " -- Enter an interactive (command line) session at this point\n        typing commands one at a time\n");
+        console.warn("\nParameters:\n\nfile : \"filename[.gz]\" -- Read commands from the named file\n\n        Example: " + args.help + " {\"file\":\"my_script.go\"} -- Read and run commands from\n        the file my_script.txt\n\n        Example: " + args.help + " -- Enter an interactive (command line) session at this point\n        typing commands one at a time\n\ntag : \"filename_part\" -- Part of a filename to include in files written from this script\n          NOTE: tag renaming is not used within interactive SCRIPT command sessions.\n\n        Example: " + args.help + " {\"file\":\"my_script.go\", \"tag\":\"Run1\"} -- Add the \n        string \"Run1\" in place of the '@' character in the filenames of any output files\n        written by commands in the script my_script.go (e.g. \"@_output.json\" would\n        become \"Run1_output.json\").\n\n        Example: " + args.help + " {\"file\":\"my_script.go\", \"tag\":\"Sample_A\"} -- Add the \n        string \"Sample_A\" in place of runs of '@' characters anywhere in the file path\n        of files written by commands in the script my_script.go, for example:\n        \"~/data/samples/@@@/@@@_output.json\" would become:\n        \"~/data/samples/Sample_A/Sample_A_output.json\"\n");
       }
       if (typeof callback === "function") {
         callback(null, j);
@@ -4252,6 +4278,9 @@
             }
           } else {
             cmd_args = null;
+          }
+          if (((cmd_args != null ? cmd_args.file : void 0) != null) && (args.tag != null) && !(cmd === 'SCRIPT' || cmd === 'LOAD')) {
+            cmd_args.tag = args.tag;
           }
           if ((cmd === 'SCRIPT') && ((cmd_args != null ? cmd_args.file : void 0) == null)) {
             if (typeof callback === "function") {

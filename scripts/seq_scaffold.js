@@ -30,6 +30,11 @@
   var cmds, fs, heal_fn, heal_m, heal_max, heal_n, heal_seq, heal_string, input, inputfn, output, overlap_m, overlap_max, overlap_n, p, parm, process_heal_fasta, process_scaffs, rc_tab, rev_comp, scaff_string, scaffs, ss_version, verbose, zlib,
     __slice = [].slice;
 
+  if (!(process.version.split('.')[1] >= 10)) {
+    console.error("ERROR: nodejs version v0.10.0 or greater required.");
+    process.exit(1);
+  }
+
   verbose = false;
 
   fs = require('fs');

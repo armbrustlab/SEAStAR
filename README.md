@@ -46,7 +46,7 @@ The SEAStAR package has dependencies on a small number of software packages that
  
 * [gcc](http://gcc.gnu.org) -- version 4.4 or newer, supporting [OpenMP](http://openmp.org). 
 * [cmake](http://www.cmake.org) -- version 2.8 or newer
-* [node.js](http://nodejs.org) -- version 0.8 or newer (version 0.10 or newer recommended)
+* [node.js](http://nodejs.org) -- version 0.10 or newer
 * [gawk](http://www.gnu.org/software/gawk/) -- version 3.1.5 or newer (version 4.0 or newer recommended))
 
 Additional instructions are available below for fulfilling these requirements for Mac OS X, and for programmers wishing to make modifications to the included source code.
