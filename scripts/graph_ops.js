@@ -54,7 +54,7 @@
 
 
 (function() {
-  var JSONStream, add_ends, bisect, build_graph_refs, build_removed_graph_refs, calc_ccomps, calc_seq_stats, callback_list, cc_seq_len, check_connections, child_process, clone_object, cmd, cmds, command_file, commands, cut_branches, cut_node, edge_director, err, execute_selection, export_dot, export_fasta, export_table, filter_edges, find_all_ends, find_connection, find_direct_connection, find_ends, find_indirect_connection, find_neighbors, fs, full_order, grab_ccomps, grab_clusts, grab_neighbors, graph_stats, graph_stats_cc, heuristic, make_directed, maximal_spanning_tree, my_bisect, my_stringify, node_problems, open_output_stream, output_help, path, perform_edits, pop_stash, prev_cmd, process_commands, push_stash, rc_tab, read_input_stream, read_json, relink, remove_graph_refs, remove_leaves, repl, resolve_path, rev_node, scaff_link, scaffold, scaffold_spanning_tree, ss_version, start_arg, stash_stack, tetracalc, use_heuristic, write_json, zlib, _i, _len, _ref;
+  var JSONStream, add_ends, bisect, build_graph_refs, build_removed_graph_refs, calc_ccomps, calc_seq_stats, callback_list, cc_seq_len, check_connections, child_process, clone_object, cmd, cmds, command_file, commands, cut_branches, cut_node, edge_director, err, execute_selection, export_dot, export_fasta, export_table, filter_edges, find_all_ends, find_connection, find_direct_connection, find_ends, find_indirect_connection, find_neighbors, fs, full_order, grab_ccomps, grab_clusts, grab_neighbors, graph_stats, graph_stats_cc, heuristic, make_directed, maximal_spanning_tree, my_bisect, my_stringify, node_problems, open_output_stream, output_help, path, perform_edits, pop_stash, prev_cmd, process_commands, push_stash, read_input_stream, read_json, relink, remove_graph_refs, remove_leaves, repl, resolve_path, reverse_comp, scaff_link, scaffold, scaffold_spanning_tree, ss_version, start_arg, stash_stack, tetracalc, use_heuristic, write_json, zlib, _i, _len, _ref;
 
   if (!(process.version.split('.')[1] >= 10)) {
     console.error("ERROR: nodejs version v0.10.0 or greater required.");
@@ -877,35 +877,34 @@
   };
 
   /*
-  # rev_node - Reverse a node's sequence (mate-pair positions are handled by edge_director)
+  # reverse_comp - Reverse complement a sequence
   */
 
 
-  rc_tab = {
-    'A': 'T',
-    'T': 'A',
-    'G': 'C',
-    'C': 'G',
-    'X': 'X',
-    'M': 'K',
-    'K': 'M',
-    'R': 'Y',
-    'Y': 'R',
-    'W': 'S',
-    'S': 'W',
-    'V': 'B',
-    'B': 'V',
-    'H': 'D',
-    'D': 'H',
-    'N': 'N'
-  };
+  reverse_comp = function(seq) {
+    var rc_tab;
 
-  rev_node = function(n) {
-    if (!(n.ref_str || (n.recon_seq == null))) {
-      return n.recon_seq = n.recon_seq.toUpperCase().split("").reverse().map(function(b) {
-        return rc_tab[b];
-      }).join("");
-    }
+    rc_tab = {
+      'A': 'T',
+      'T': 'A',
+      'G': 'C',
+      'C': 'G',
+      'X': 'X',
+      'M': 'K',
+      'K': 'M',
+      'R': 'Y',
+      'Y': 'R',
+      'W': 'S',
+      'S': 'W',
+      'V': 'B',
+      'B': 'V',
+      'H': 'D',
+      'D': 'H',
+      'N': 'N'
+    };
+    return seq.toUpperCase().split("").reverse().map(function(b) {
+      return rc_tab[b];
+    }).join("");
   };
 
   /*
@@ -968,7 +967,9 @@
           if (!(e = edge_director(l[2], n, l[0]))) {
             throw "make_directed: Improper edge type " + e.dir + " detected between nodes: " + n.id + " and " + l[2].id;
           }
-          rev_node(n);
+          if (!(n.ref_str || (n.recon_seq == null))) {
+            n.recon_seq = reverse_comp(n.recon_seq);
+          }
         }
       }
     }
@@ -1389,7 +1390,7 @@
       }
     }
     if (strict && (head_nodes.length !== 1 || tail_nodes.length !== 1)) {
-      throw "find_ends: multiple head/tail nodes found in scaffolded CC. SLICE must be run before use of this command.";
+      throw Error("find_ends: multiple head/tail nodes found in scaffolded CC.");
     }
     return [head_nodes, tail_nodes];
   };
@@ -1482,6 +1483,7 @@
           head_node = find_ends(j, c, true)[0][0];
         } catch (_error) {
           err = _error;
+          remove_graph_refs(j);
           if (typeof callback === "function") {
             callback(err, null);
           }
@@ -1947,7 +1949,7 @@
     if (args.help != null) {
       console.warn("" + args.help + " --Write sequences contained in the current graph data to a FASTA format file.");
       if (args.detailed_help != null) {
-        console.warn("\nParameters:\n\nfile : \"filename.fasta[.gz]\" -- name of FASTA format file to write sequence to\n\n        Example: " + args.help + " {\"file\":\"my_seq.fasta\"} -- Write stats to the file\n        my_seq.fasta\n\n        Example: " + args.help + " {\"file\":\"-\"} -- Default. Write sequence to STDOUT\n\nscaff : true -- Output fully scaffolded sequences (using seq_scaffold tool)\n\n        Example: " + args.help + " {\"scaff\":true} -- Output scaffolded contig sequences\n\n                NOTE: Using this option as in the above example will run seq_scaffold with its\n        default settings.  As an advanced option, this parameter can also accept a string\n        argument, which will be passed along to the external seq_scaffold tool as its\n        [options] parameter string. Run with --help for help with the settings offered by\n        seq_scaffold and the default values.\n\n        Example: " + args.help + " {\"scaff\":\"--help\"}\n\n        Example: " + args.help + " {\"scaff\":\"--overlap=7 --heal=othercontigs.fna\"}\n\nno_merge_scaffs : true -- Write contig sequences in scaffold order with a scaffold ID in\n        each header, ready to be provided to the seq_scaffold tool\n\n        Example: " + args.help + " {\"no_merge_scafs\":true} -- Output ordered contig sequences\n\nabundance : true -- append relative abundance values to the FASTA sequence IDs\n\n        Example: " + args.help + " {\"abundance\":true} -- Attach abundances\n");
+        console.warn("\nParameters:\n\nfile : \"filename.fasta[.gz]\" -- name of FASTA format file to write sequence to\n\n        Example: " + args.help + " {\"file\":\"my_seq.fasta\"} -- Write stats to the file\n        my_seq.fasta\n\n        Example: " + args.help + " {\"file\":\"-\"} -- Default. Write sequence to STDOUT\n\nscaff : true -- Output fully scaffolded sequences (using seq_scaffold tool)\n\n        Example: " + args.help + " {\"scaff\":true} -- Output scaffolded contig sequences\n\n                NOTE: Using this option as in the above example will run seq_scaffold with its\n        default settings.  As an advanced option, this parameter can also accept a string\n        argument, which will be passed along to the external seq_scaffold tool as its\n        [options] parameter string. Run with --help for help with the settings offered by\n        seq_scaffold and the default values.\n\n        Example: " + args.help + " {\"scaff\":\"--help\"}\n\n        Example: " + args.help + " {\"scaff\":\"--overlap=7 --heal=othercontigs.fna\"}\n\nno_merge_scaffs : true -- Write contig sequences in scaffold order with a scaffold ID in\n        each header, ready to be provided to the seq_scaffold tool\n\n        Example: " + args.help + " {\"no_merge_scaffs\":true} -- Output ordered contig sequences\n\nabundance : true -- append relative abundance values to the FASTA sequence IDs\n\n        Example: " + args.help + " {\"abundance\":true} -- Attach abundances\n");
       }
       if (typeof callback === "function") {
         callback(null, j);
@@ -1993,9 +1995,9 @@
           o.write("" + node.recon_seq + "\n");
         }
       }
-      return o.end(function(error) {
-        if (error) {
-          return typeof callback === "function" ? callback(error, null) : void 0;
+      return o.end(function(err) {
+        if (err) {
+          return typeof callback === "function" ? callback(err, null) : void 0;
         } else {
           return typeof callback === "function" ? callback(null, j) : void 0;
         }
@@ -2042,7 +2044,13 @@
       };
       if (args.no_merge_scaffs) {
         write_scaffolds(o);
-        o.end(function(error) {}, error ? typeof callback === "function" ? callback(error, null) : void 0 : typeof callback === "function" ? callback(null, j) : void 0);
+        o.end(function(err) {
+          if (err) {
+            return typeof callback === "function" ? callback(err, null) : void 0;
+          } else {
+            return typeof callback === "function" ? callback(null, j) : void 0;
+          }
+        });
       } else {
         if (typeof args.scaff === 'string') {
           options = args.scaff.split(/\s+/);
@@ -2240,14 +2248,16 @@
   #     ccnum = number of a cc to select
   #     ccrange = start and end ccnums to select a range e.g. [0,10] or [1,-1]
   #     ccnums = list of numbers of ccs to select
+  #     shift = select all but the first ccomp, like [1,-1] 
   #     min_nodes = minimum number of nodes in cc
   #     min_seqlen = minimum amount of sequence in nodes in cc
+  #     sequence = sequence to search for 
   #
   */
 
 
   grab_ccomps = function(j, args, callback) {
-    var c, cc, err, i, id, new_cclist, nid, nodes, _i, _j, _k, _l, _len, _len1, _len2, _len3, _len4, _len5, _len6, _m, _n, _o, _p, _ref, _ref1, _ref2, _ref3, _ref4, _ref5, _ref6, _ref7, _ref8, _ref9, _results;
+    var c, cc, err, i, id, new_cclist, nid, nodes, revseq, seq, _i, _j, _k, _l, _len, _len1, _len2, _len3, _len4, _len5, _len6, _len7, _len8, _m, _n, _o, _p, _q, _r, _ref, _ref1, _ref2, _ref3, _ref4, _ref5, _ref6, _ref7, _ref8, _ref9, _results;
 
     if (args == null) {
       args = {};
@@ -2255,7 +2265,7 @@
     if (args.help != null) {
       console.warn("" + args.help + " -- Select specific connected components for further processing");
       if (args.detailed_help != null) {
-        console.warn("\nParameters:\n\nccname : \"contig_name\" -- Select the connected component containing the named contig\n\n        Example: " + args.help + " {\"ccname\":\"NODE_1234\"} -- Select the connected component\n        containing the contig named NODE_1234\nccnames : [\"contig_name1\",\"contig_name2\",...] -- Select the connected component(s)\n        containing the named contigs\n\n        Example: " + args.help + " {\"ccnames\":[\"NODE_1234\",\"NODE_5678\"]} -- Select the\n        connected components containing the contigs named NODE_1234 and NODE_5678\n\nccnum : <int> -- Select connected component number <int>\n\n        Example: " + args.help + " {\"ccnum\":0} -- Default. Select connected component 0.\n\nccnums : [<int>,<int>,...] -- Select the connected components from the list of numbers\n\n        Example: " + args.help + " {\"ccnums\":[1,2]} -- Select the second and third\n        connected components (numbering is zero based)\n\nccrange : [<int1>,<int2>] -- Select the connected components numbered in the range\n        <int1>..<int2> (inclusive).\n\n        NOTE: <int> may be negative, indicating positions at the end of the list of\n        connected components.\n\n        Example: " + args.help + " {\"ccrange\":[0,5]} -- Select the first 6 connected\n        components\n\n        Example: " + args.help + " {\"ccrange\":[-5,-1]} -- Select the last 5 connected\n        components\n\nmin_nodes : <int> -- Select connected components with <int> or more nodes.\n\n        Example: " + args.help + " {\"min_nodes\":2} -- Select connected components\n        with 2 or more nodes.\n\nmin_seqlen : <int> -- Select connected components with <int> or more sequence within nodes.\n\n        Example: " + args.help + " {\"min_seqlen\":1000} -- Select connected components containing\n        at least 1000 bases of sequence.\n        ");
+        console.warn("\nParameters:\n\nccname : \"contig_name\" -- Select the connected component containing the named contig\n\n        Example: " + args.help + " {\"ccname\":\"NODE_1234\"} -- Select the connected component\n        containing the contig named NODE_1234\nccnames : [\"contig_name1\",\"contig_name2\",...] -- Select the connected component(s)\n        containing the named contigs\n\n        Example: " + args.help + " {\"ccnames\":[\"NODE_1234\",\"NODE_5678\"]} -- Select the\n        connected components containing the contigs named NODE_1234 and NODE_5678\n\nccnum : <int> -- Select connected component number <int>\n\n        Example: " + args.help + " {\"ccnum\":0} -- Default. Select connected component 0.\n\nccnums : [<int>,<int>,...] -- Select the connected components from the list of numbers\n\n        Example: " + args.help + " {\"ccnums\":[1,2]} -- Select the second and third\n        connected components (numbering is zero based)\n\nccrange : [<int1>,<int2>] -- Select the connected components numbered in the range\n        <int1>..<int2> (inclusive). See also: 'shift' option below.\n\n        NOTE: <int> may be negative, indicating positions at the end of the list of\n        connected components.\n \n        Example: " + args.help + " {\"ccrange\":[0,5]} -- Select the first 6 connected\n        components\n\n        Example: " + args.help + " {\"ccrange\":[-5,-1]} -- Select the last 5 connected\n        components\n\nshift : true -- Select all connected components except the first one.\n\n        Example: " + args.help + " {\"shift\":true} -- Drop the first connected component.\n\n        This is like " + args.help + " {\"ccrange\":[1,-1]} except it doesn't generate a\n        fatal error when there is only one remaining connected component, allowing\n        processing to potentially continue in any calling SCRIPT commands.\n\nmin_nodes : <int> -- Select connected components with <int> or more nodes.\n\n        Example: " + args.help + " {\"min_nodes\":2} -- Select connected components\n        with 2 or more nodes.\n\nmin_seqlen : <int> -- Select connected components with <int> or more sequence within nodes.\n\n        Example: " + args.help + " {\"min_seqlen\":1000} -- Select connected components containing\n        at least 1000 bases of sequence.\n\nsequence : <string> -- Select connected components containing the provided DNA sequence.\n        NOTE! This isn't BLAST, the sequence must match exactly. Any differences, including\n        ambiguity codes, etc. will prevent matching. The only extra thing that is done is the\n        reverse complement of the provided sequence is also searched.\n\n        Example: " + args.help + " {\"sequence\":\"AGACTAGCAGATATACGATAACGATACGATACGAT\"}\n        Select connected components containing the provided sequence (or its reverse\n        complement).\n\n");
       }
       if (typeof callback === "function") {
         callback(null, j);
@@ -2274,10 +2284,28 @@
       }
       return;
     }
-    if (args.ccname != null) {
+    if (args.sequence) {
+      args.ccnums = [];
+      revseq = reverse_comp(args.sequence);
       _ref = j.connected_comps;
       for (i = _i = 0, _len = _ref.length; _i < _len; i = ++_i) {
         c = _ref[i];
+        for (_j = 0, _len1 = c.length; _j < _len1; _j++) {
+          nid = c[_j];
+          if (seq = j.nodes[nid].recon_seq) {
+            if (seq.indexOf(args.sequence) !== -1 || seq.indexOf(revseq) !== -1) {
+              args.ccnums.push(i);
+              break;
+            }
+          }
+        }
+      }
+    } else if (args.shift) {
+      args.ccrange = [1, -1];
+    } else if (args.ccname != null) {
+      _ref1 = j.connected_comps;
+      for (i = _k = 0, _len2 = _ref1.length; _k < _len2; i = ++_k) {
+        c = _ref1[i];
         if (!(c.indexOf(args.ccname) !== -1)) {
           continue;
         }
@@ -2286,12 +2314,12 @@
       }
     } else if (args.ccnames != null) {
       args.ccnums = [];
-      _ref1 = args.ccnames;
-      for (_j = 0, _len1 = _ref1.length; _j < _len1; _j++) {
-        id = _ref1[_j];
-        _ref2 = j.connected_comps;
-        for (i = _k = 0, _len2 = _ref2.length; _k < _len2; i = ++_k) {
-          c = _ref2[i];
+      _ref2 = args.ccnames;
+      for (_l = 0, _len3 = _ref2.length; _l < _len3; _l++) {
+        id = _ref2[_l];
+        _ref3 = j.connected_comps;
+        for (i = _m = 0, _len4 = _ref3.length; _m < _len4; i = ++_m) {
+          c = _ref3[i];
           if (!(c.indexOf(id) !== -1 && args.ccnums.indexOf(i) === -1)) {
             continue;
           }
@@ -2301,7 +2329,26 @@
       }
     } else if (args.ccnum != null) {
       args.ccnums = [args.ccnum];
-    } else if (args.ccrange != null) {
+    } else if (args.min_nodes != null) {
+      args.ccnums = [];
+      _ref4 = j.connected_comps;
+      for (i = _n = 0, _len5 = _ref4.length; _n < _len5; i = ++_n) {
+        c = _ref4[i];
+        if (c.length >= args.min_nodes) {
+          args.ccnums.push(i);
+        }
+      }
+    } else if (args.min_seqlen != null) {
+      args.ccnums = [];
+      _ref5 = j.connected_comps;
+      for (i = _o = 0, _len6 = _ref5.length; _o < _len6; i = ++_o) {
+        c = _ref5[i];
+        if (cc_seq_len(j, c) >= args.min_seqlen) {
+          args.ccnums.push(i);
+        }
+      }
+    }
+    if (args.ccrange != null) {
       if (args.ccrange[0] < 0) {
         args.ccrange[0] = j.connected_comps.length + args.ccrange[0];
       }
@@ -2310,33 +2357,15 @@
       }
       args.ccnums = (function() {
         _results = [];
-        for (var _l = _ref3 = args.ccrange[0], _ref4 = args.ccrange[1]; _ref3 <= _ref4 ? _l <= _ref4 : _l >= _ref4; _ref3 <= _ref4 ? _l++ : _l--){ _results.push(_l); }
+        for (var _p = _ref6 = args.ccrange[0], _ref7 = args.ccrange[1]; _ref6 <= _ref7 ? _p <= _ref7 : _p >= _ref7; _ref6 <= _ref7 ? _p++ : _p--){ _results.push(_p); }
         return _results;
       }).apply(this);
-    } else if (args.min_nodes != null) {
-      args.ccnums = [];
-      _ref5 = j.connected_comps;
-      for (i = _m = 0, _len3 = _ref5.length; _m < _len3; i = ++_m) {
-        c = _ref5[i];
-        if (c.length >= args.min_nodes) {
-          args.ccnums.push(i);
-        }
-      }
-    } else if (args.min_seqlen != null) {
-      args.ccnums = [];
-      _ref6 = j.connected_comps;
-      for (i = _n = 0, _len4 = _ref6.length; _n < _len4; i = ++_n) {
-        c = _ref6[i];
-        if (cc_seq_len(j, c) >= args.min_seqlen) {
-          args.ccnums.push(i);
-        }
-      }
-    } else {
-      if ((_ref7 = args.ccnums) == null) {
-        args.ccnums = [0];
-      }
     }
     if (args.ccnums == null) {
+      args.ccnums = [0];
+    }
+    if (!args.ccnums.length) {
+      remove_graph_refs(j);
       if (typeof callback === "function") {
         callback(new Error("No connected components found matching selection criteria"), null);
       }
@@ -2345,23 +2374,34 @@
     nodes = {};
     new_cclist = [];
     _ref8 = args.ccnums;
-    for (_o = 0, _len5 = _ref8.length; _o < _len5; _o++) {
-      cc = _ref8[_o];
+    for (_q = 0, _len7 = _ref8.length; _q < _len7; _q++) {
+      cc = _ref8[_q];
       if (j.connected_comps[cc] == null) {
-        if (typeof callback === "function") {
-          callback(new Error("Invalid selected ccnum: " + cc + ".  ccnums are zero-based and there are only " + j.connected_comps.length + " ccomps in this graph."), null);
+        remove_graph_refs(j);
+        if (args.shift) {
+          if (typeof callback === "function") {
+            callback(null, void 0);
+          }
+        } else {
+          if (typeof callback === "function") {
+            callback(new Error("Invalid selected ccnum: " + cc + ".  ccnums are zero-based and there are only " + j.connected_comps.length + " ccomps in this graph."), null);
+          }
         }
         return;
       }
       new_cclist.push(j.connected_comps[cc]);
       _ref9 = j.connected_comps[cc];
-      for (_p = 0, _len6 = _ref9.length; _p < _len6; _p++) {
-        nid = _ref9[_p];
+      for (_r = 0, _len8 = _ref9.length; _r < _len8; _r++) {
+        nid = _ref9[_r];
         nodes[nid] = j.nodes[nid];
       }
     }
     execute_selection(j, nodes);
-    delete j.connected_comps;
+    if (!args.preserve_ccomps) {
+      delete j.connected_comps;
+    } else {
+      j.connected_comps = new_cclist;
+    }
     remove_graph_refs(j);
     return typeof callback === "function" ? callback(null, j) : void 0;
   };
@@ -2492,6 +2532,9 @@
           _ref3 = find_ends(j, c, true), (_ref4 = _ref3[0], head_node = _ref4[0]), (_ref5 = _ref3[1], tail_node = _ref5[0]);
         } catch (_error) {
           err = _error;
+          remove_graph_refs(j, null, (function(e) {
+            return delete e.pluck_iteration;
+          }));
           if (typeof callback === "function") {
             callback(err, null);
           }
@@ -2543,7 +2586,7 @@
 
 
   find_direct_connection = function(head, tail, thresh) {
-    var edge, select_edge, try_dir_links, _ref, _ref1, _ref2, _ref3;
+    var edge, select_edge, try_dir_links, _ref, _ref1, _ref2, _ref3, _ref4, _ref5, _ref6, _ref7;
 
     if (thresh == null) {
       thresh = 0;
@@ -2551,13 +2594,16 @@
     try_dir_links = function(h, t) {
       var e, l, _i, _len, _ref;
 
-      _ref = h.rem_links;
-      for (_i = 0, _len = _ref.length; _i < _len; _i++) {
-        l = _ref[_i];
-        if (l[1].id === t.id && (e = edge_director(t, h, l[0])) && t.id === e.n1) {
-          break;
-        } else {
-          e = null;
+      e = null;
+      if (h && t) {
+        _ref = h.rem_links;
+        for (_i = 0, _len = _ref.length; _i < _len; _i++) {
+          l = _ref[_i];
+          if (l[1].id === t.id && (e = edge_director(t, h, l[0])) && t.id === e.n1) {
+            break;
+          } else {
+            e = null;
+          }
         }
       }
       if (e) {
@@ -2571,17 +2617,17 @@
       select_edge = edge;
       thresh = edge[0].bits;
     }
-    if ((edge = try_dir_links(head.outlinks[0][1], tail)) && ((_ref1 = edge[0]) != null ? _ref1.bits : void 0) > thresh) {
+    if ((edge = try_dir_links((_ref1 = head.outlinks[0]) != null ? _ref1[1] : void 0, tail)) && ((_ref2 = edge[0]) != null ? _ref2.bits : void 0) > thresh) {
       head = head.outlinks[0][1];
       select_edge = edge;
       thresh = edge[0].bits;
     }
-    if ((edge = try_dir_links(head, tail.inlinks[0][1])) && ((_ref2 = edge[0]) != null ? _ref2.bits : void 0) > thresh) {
+    if ((edge = try_dir_links(head, (_ref3 = tail.inlinks[0]) != null ? _ref3[1] : void 0)) && ((_ref4 = edge[0]) != null ? _ref4.bits : void 0) > thresh) {
       tail = tail.inlinks[0][1];
       select_edge = edge;
       thresh = edge[0].bits;
     }
-    if ((edge = try_dir_links(head.outlinks[0][1], tail.inlinks[0][1])) && ((_ref3 = edge[0]) != null ? _ref3.bits : void 0) > thresh) {
+    if ((edge = try_dir_links((_ref5 = head.outlinks[0]) != null ? _ref5[1] : void 0, (_ref6 = tail.inlinks[0]) != null ? _ref6[1] : void 0)) && ((_ref7 = edge[0]) != null ? _ref7.bits : void 0) > thresh) {
       head = head.outlinks[0][1];
       tail = tail.inlinks[0][1];
       select_edge = edge;
@@ -2596,7 +2642,7 @@
 
 
   find_indirect_connection = function(head, tail, thresh) {
-    var result, select_result, try_indir_links, _ref, _ref1, _ref2, _ref3, _ref4, _ref5, _ref6, _ref7;
+    var result, select_result, try_indir_links, _ref, _ref1, _ref10, _ref11, _ref2, _ref3, _ref4, _ref5, _ref6, _ref7, _ref8, _ref9;
 
     if (thresh == null) {
       thresh = 0;
@@ -2604,48 +2650,52 @@
     try_indir_links = function(h, t) {
       var eh, et, hnodes, l, _i, _j, _len, _len1, _ref, _ref1;
 
-      hnodes = {};
-      _ref = h.rem_links;
-      for (_i = 0, _len = _ref.length; _i < _len; _i++) {
-        l = _ref[_i];
-        hnodes[l[1].id] = l;
-      }
-      _ref1 = t.rem_links;
-      for (_j = 0, _len1 = _ref1.length; _j < _len1; _j++) {
-        l = _ref1[_j];
-        if (hnodes[l[1].id] != null) {
-          if ((et = edge_director(t, l[1], l[0])) && (t.id === et.n1) && (eh = edge_director(hnodes[l[1].id][1], h, hnodes[l[1].id][0])) && (h.id === eh.n2)) {
-            break;
-          } else {
-            et = null;
-            eh = null;
+      et = null;
+      eh = null;
+      if (h && t) {
+        hnodes = {};
+        _ref = h.rem_links;
+        for (_i = 0, _len = _ref.length; _i < _len; _i++) {
+          l = _ref[_i];
+          hnodes[l[1].id] = l;
+        }
+        _ref1 = t.rem_links;
+        for (_j = 0, _len1 = _ref1.length; _j < _len1; _j++) {
+          l = _ref1[_j];
+          if (hnodes[l[1].id] != null) {
+            if ((et = edge_director(t, l[1], l[0])) && (t.id === et.n1) && (eh = edge_director(hnodes[l[1].id][1], h, hnodes[l[1].id][0])) && (h.id === eh.n2)) {
+              break;
+            } else {
+              et = null;
+              eh = null;
+            }
           }
         }
-      }
-      if (et && eh) {
-        return [et, eh];
-      } else {
-        return null;
+        if (et && eh) {
+          return [et, eh];
+        } else {
+          return null;
+        }
       }
     };
     select_result = null;
-    if ((result = try_indir_links(head.outlinks[0][1], tail.inlinks[0][1])) && (result != null ? (_ref = result[0]) != null ? _ref.bits : void 0 : void 0) > thresh && (result != null ? (_ref1 = result[1]) != null ? _ref1.bits : void 0 : void 0) > thresh) {
+    if ((result = try_indir_links((_ref = head.outlinks[0]) != null ? _ref[1] : void 0, (_ref1 = tail.inlinks[0]) != null ? _ref1[1] : void 0)) && (result != null ? (_ref2 = result[0]) != null ? _ref2.bits : void 0 : void 0) > thresh && (result != null ? (_ref3 = result[1]) != null ? _ref3.bits : void 0 : void 0) > thresh) {
       head = head.outlinks[0][1];
       tail = tail.inlinks[0][1];
       select_result = result;
       thresh = Math.min(result[0].bits, result[1].bits);
     }
-    if ((result = try_indir_links(head, tail.inlinks[0][1])) && (result != null ? (_ref2 = result[0]) != null ? _ref2.bits : void 0 : void 0) > thresh && (result != null ? (_ref3 = result[1]) != null ? _ref3.bits : void 0 : void 0) > thresh) {
+    if ((result = try_indir_links(head, (_ref4 = tail.inlinks[0]) != null ? _ref4[1] : void 0)) && (result != null ? (_ref5 = result[0]) != null ? _ref5.bits : void 0 : void 0) > thresh && (result != null ? (_ref6 = result[1]) != null ? _ref6.bits : void 0 : void 0) > thresh) {
       tail = tail.inlinks[0][1];
       select_result = result;
       thresh = Math.min(result[0].bits, result[1].bits);
     }
-    if ((result = try_indir_links(head.outlinks[0][1], tail)) && (result != null ? (_ref4 = result[0]) != null ? _ref4.bits : void 0 : void 0) > thresh && (result != null ? (_ref5 = result[1]) != null ? _ref5.bits : void 0 : void 0) > thresh) {
+    if ((result = try_indir_links((_ref7 = head.outlinks[0]) != null ? _ref7[1] : void 0, tail)) && (result != null ? (_ref8 = result[0]) != null ? _ref8.bits : void 0 : void 0) > thresh && (result != null ? (_ref9 = result[1]) != null ? _ref9.bits : void 0 : void 0) > thresh) {
       head = head.outlinks[0][1];
       select_result = result;
       thresh = Math.min(result[0].bits, result[1].bits);
     }
-    if ((result = try_indir_links(head, tail)) && (result != null ? (_ref6 = result[0]) != null ? _ref6.score : void 0 : void 0) > thresh && (result != null ? (_ref7 = result[1]) != null ? _ref7.score : void 0 : void 0) > thresh) {
+    if ((result = try_indir_links(head, tail)) && (result != null ? (_ref10 = result[0]) != null ? _ref10.score : void 0 : void 0) > thresh && (result != null ? (_ref11 = result[1]) != null ? _ref11.score : void 0 : void 0) > thresh) {
       select_result = result;
       thresh = Math.min(result[0].bits, result[1].bits);
     }
@@ -2734,6 +2784,9 @@
           _ref7 = find_ends(j, cc, true), (_ref8 = _ref7[0], h2 = _ref8[0]), (_ref9 = _ref7[1], t2 = _ref9[0]);
         } catch (_error) {
           err = _error;
+          remove_graph_refs(j, (function(n) {
+            return delete n.ccnum;
+          }));
           if (typeof callback === "function") {
             callback(err, null);
           }
@@ -2947,7 +3000,7 @@
       _ref13 = j.removed_edges;
       for (_o = 0, _len6 = _ref13.length; _o < _len6; _o++) {
         e = _ref13[_o];
-        if (((e != null) && ((nodes_added[e.n1] != null) && (nodes_added[e.n2] != null))) && e[0].score >= args.thresh) {
+        if (((e != null) && ((nodes_added[e.n1] != null) && (nodes_added[e.n2] != null))) && e.score >= args.thresh) {
           if ((edge = edge_director(e.src, e.tar, e))) {
             edges_added.push(edge);
           }
@@ -3068,6 +3121,7 @@
         _ref5 = find_ends(j, c, true), (_ref6 = _ref5[0], head = _ref6[0]), (_ref7 = _ref5[1], tail = _ref7[0]);
       } catch (_error) {
         err = _error;
+        remove_graph_refs(j);
         if (typeof callback === "function") {
           callback(err, null);
         }
@@ -3480,7 +3534,7 @@
             source_nodes.push(e[1]);
           }
         }
-        if (args.rescue && (source_nodes.length === 0) && (tsort.length !== j.connected_comps[cci].length)) {
+        if (!args.no_rescue && (source_nodes.length === 0) && (tsort.length !== j.connected_comps[cci].length)) {
           remove_cands = (function() {
             var _l, _len3, _ref2, _results;
 
@@ -3610,6 +3664,7 @@
         node = find_ends(j, c, true)[0][0];
       } catch (_error) {
         err = _error;
+        remove_graph_refs(j);
         if (typeof callback === "function") {
           callback(err, null);
         }
@@ -3780,16 +3835,6 @@
       }
       return;
     }
-    try {
-      build_graph_refs(j);
-      build_removed_graph_refs(j);
-    } catch (_error) {
-      err = _error;
-      if (typeof callback === "function") {
-        callback(err, null);
-      }
-      return;
-    }
     node = j.nodes[args.name];
     new_node = {};
     if (!node) {
@@ -3807,6 +3852,16 @@
     if (!(args.start < args.end && args.end < node.seq_len)) {
       if (typeof callback === "function") {
         callback(new Error('CUTND requires valid "start" and "end" arguments.'), null);
+      }
+      return;
+    }
+    try {
+      build_graph_refs(j);
+      build_removed_graph_refs(j);
+    } catch (_error) {
+      err = _error;
+      if (typeof callback === "function") {
+        callback(err, null);
       }
       return;
     }
@@ -3993,7 +4048,7 @@
     console.warn("CLUST: invoking tetracalc tool");
     cluster_json = "";
     if (args.options) {
-      options = args.options.split('\s+');
+      options = args.options.split(/\s+/);
       options.push('-');
     } else {
       options = ['-'];
@@ -4029,7 +4084,6 @@
     });
     return export_fasta(j, {
       "scaff": true,
-      "merge_scaffs": true,
       "stream": tet.stdin,
       "verbose": args.verbose
     });
@@ -4043,12 +4097,13 @@
   # clustnum : Choose a cluster by number
   # clustnums : Choose a list of clusters
   # clustrange : Choose multiple clusters by a range of numbers 
+  # shift : Remove the first cluster
   #
   */
 
 
   grab_clusts = function(j, args, callback) {
-    var cl, err, new_cclist, new_clusts, new_scaffs, scaf_id, _i, _j, _k, _len, _len1, _ref, _ref1, _ref2, _ref3, _ref4, _results;
+    var cc, ci, cl, err, new_cclist, new_clusts, new_scaffs, nid, sc, scaf_id, sn, _i, _j, _k, _l, _len, _len1, _len2, _ref, _ref1, _ref2, _ref3, _ref4, _ref5, _results;
 
     if (args == null) {
       args = {};
@@ -4056,7 +4111,7 @@
     if (args.help != null) {
       console.warn("" + args.help + " -- Select clusters of scaffolds for further processing");
       if (args.detailed_help != null) {
-        console.warn("\nParameters:\n\nclustnum : <int> -- Select a specific cluster\n\n        Example: " + args.help + " '{\"clustnum\":0}' -- select the first cluster\n\nclustnums : [<int1>, <int2>, ...] -- Select specific clusters\n\n        Example: " + args.help + " '{\"clustnums\":[0,3,5]}' -- select these three clusters\n\nclustrange : [<int1>, <int2>] -- Select a range of clusters\n\n        Example: " + args.help + " '{\"clustrange\":[0,5]}' -- select the first six clusters\n\n        Example: " + args.help + " '{\"clustrange\":[-5,-1]}' -- select the last five clusters\n\n        Example: " + args.help + " '{\"clustrange\":[0,-2]}' -- select all clusters except the\n        last one\n\nexclusive : true -- Remove all scaffolds outside of the selected clusters\n\n        Example: " + args.help + " '{\"exclusive\":false}' -- Default. Keep all unselected scaffolds.\n");
+        console.warn("\nParameters:\n\nclustnum : <int> -- Select a specific cluster\n\n        Example: " + args.help + " '{\"clustnum\":0}' -- select the first cluster\n\nclustnums : [<int1>, <int2>, ...] -- Select specific clusters\n\n        Example: " + args.help + " '{\"clustnums\":[0,3,5]}' -- select these three clusters\n\nclustrange : [<int1>, <int2>] -- Select a range of clusters. See also: 'shift' option below.\n\n        Example: " + args.help + " '{\"clustrange\":[0,5]}' -- select the first six clusters\n\n        Example: " + args.help + " '{\"clustrange\":[-5,-1]}' -- select the last five clusters\n\n        Example: " + args.help + " '{\"clustrange\":[0,-2]}' -- select all clusters except the\n        last one\n\nshift : true -- Select all clusters except the first one.\n\n        Example: " + args.help + " {\"shift\":true} -- Drop the first cluster.\n\n        This is like " + args.help + " {\"clustrange\":[1,-1]} except it doesn't generate a\n        fatal error when there is only one remaining cluster, allowing processing to\n        potentially continue in any calling SCRIPT commands.\n\nexclusive : true -- Remove all scaffolds outside of the selected clusters\n\n        Example: " + args.help + " '{\"exclusive\":false}' -- Default. Keep all unselected scaffolds.\n");
       }
       if (typeof callback === "function") {
         callback(null, j);
@@ -4077,6 +4132,9 @@
         callback(err, null);
       }
       return;
+    }
+    if (args.shift) {
+      args.clustrange = [1, -1];
     }
     if (args.clustnum != null) {
       args.clustnums = [args.clustnum];
@@ -4104,8 +4162,15 @@
     for (_j = 0, _len = _ref3.length; _j < _len; _j++) {
       cl = _ref3[_j];
       if (j.clusters[cl] == null) {
-        if (typeof callback === "function") {
-          callback(new Error("Invalid selected clustnum: " + cl + ".  clustnums are zero-based and there are only " + j.clusters.length + " clusters in this graph."), null);
+        remove_graph_refs(j);
+        if (args.shift) {
+          if (typeof callback === "function") {
+            callback(null, void 0);
+          }
+        } else {
+          if (typeof callback === "function") {
+            callback(new Error("Invalid selected clustnum: " + cl + ".  clustnums are zero-based and there are only " + j.clusters.length + " clusters in this graph."), null);
+          }
         }
         return;
       }
@@ -4121,8 +4186,22 @@
     }
     if (args.exclusive) {
       grab_ccomps(j, {
-        "ccnums": new_cclist
+        "ccnums": new_cclist,
+        "preserve_ccomps": true
       });
+      for (sn in new_scaffs) {
+        sc = new_scaffs[sn];
+        nid = sc.nodes[0];
+        _ref5 = j.connected_comps;
+        for (ci = _l = 0, _len2 = _ref5.length; _l < _len2; ci = ++_l) {
+          cc = _ref5[ci];
+          if (!(cc.indexOf(nid) !== -1)) {
+            continue;
+          }
+          sc.ccnum = ci;
+          break;
+        }
+      }
     }
     j.clusters = new_clusts;
     j.scaffolds = new_scaffs;
@@ -4250,7 +4329,7 @@
       return;
     }
     queue_commands = function(error, read_buffer) {
-      var argstr, cmd, cmd_args, err, l, lines, script_cmds, script_next_cmd, _i, _len, _ref;
+      var argstr, cmd, cmd_args, err, l, lines, script_cmds, script_next_cmd, _i, _len, _ref, _ref1;
 
       if (error || !read_buffer) {
         if (typeof callback === "function") {
@@ -4279,8 +4358,10 @@
           } else {
             cmd_args = null;
           }
-          if (((cmd_args != null ? cmd_args.file : void 0) != null) && (args.tag != null) && !(cmd === 'SCRIPT' || cmd === 'LOAD')) {
-            cmd_args.tag = args.tag;
+          if (((cmd_args != null ? cmd_args.file : void 0) != null) && (args.tag != null) && !(cmd === 'LOAD')) {
+            if ((_ref1 = cmd_args.tag) == null) {
+              cmd_args.tag = args.tag;
+            }
           }
           if ((cmd === 'SCRIPT') && ((cmd_args != null ? cmd_args.file : void 0) == null)) {
             if (typeof callback === "function") {
@@ -4299,32 +4380,39 @@
       }
       read_buffer = null;
       script_next_cmd = function(err, j) {
-        var cmd_func, _ref1, _ref2;
+        var cmd_func, err_str, no_data_str, _ref2, _ref3;
 
+        no_data_str = "No data, ending SCRIPT processing.";
         if (err) {
-          console.error("ERROR terminating SCRIPT processing: " + err.message + "\n");
-          if (typeof callback === "function") {
-            callback(err, null);
+          err_str = "SCRIPT aborted due to error in command execution.";
+          if (err.message !== no_data_str) {
+            if (err.message !== err_str) {
+              console.error("ERROR terminating SCRIPT processing: " + err.message + "\n");
+              err = Error(err_str);
+            }
+            if (typeof callback === "function") {
+              callback(err, null);
+            }
+            return;
           }
-          return;
         }
         if (script_cmds.length) {
-          _ref1 = script_cmds.shift(), cmd_func = _ref1[0], cmd_args = _ref1[1], cmd = _ref1[2];
+          _ref2 = script_cmds.shift(), cmd_func = _ref2[0], cmd_args = _ref2[1], cmd = _ref2[2];
           if (!(((j != null ? j.nodes : void 0) != null) || cmd === 'LOAD' || cmd === 'SCRIPT' || cmd === 'UNSTASH' || cmd === 'HELP')) {
             if (typeof callback === "function") {
-              callback(new Error("No data, ending SCRIPT processing."), null);
+              callback(new Error(no_data_str), null);
             }
             return;
           }
           if (cmd !== 'HELP') {
             if (j != null) {
-              if ((_ref2 = j.processing) != null) {
-                _ref2.push([args.file, ss_version, cmd, clone_object(cmd_args)]);
+              if ((_ref3 = j.processing) != null) {
+                _ref3.push([args.file, ss_version, cmd, clone_object(cmd_args)]);
               }
             }
           }
           console.warn("Executing (" + args.file + ") " + cmd + " " + (JSON.stringify(cmd_args)));
-          return cmd_func(j, cmd_args, script_next_cmd);
+          return setImmediate(cmd_func, j, cmd_args, script_next_cmd);
         } else {
           return typeof callback === "function" ? callback(null, j) : void 0;
         }
@@ -4352,7 +4440,7 @@
         terminal: true,
         ignoreUndefined: true,
         "eval": function(l, cx, fn, cb) {
-          var arg_json, argstr, cmd, cmd_func, err, _ref, _ref1;
+          var arg_json, argstr, cmd, cmd_func, err, _ref;
 
           _ref = l.slice(1, -1).trim().replace(/\t|\n/, " ").split(" ", 2), cmd = _ref[0], argstr = _ref[1];
           cmd = cmd.toUpperCase();
@@ -4367,11 +4455,11 @@
                 cb(null, void 0);
                 return;
               }
-              return cmd_func(j, arg_json, function(j) {
+              return setImmediate(cmd_func, j, arg_json, function(j) {
                 return cb(null, void 0);
               });
             } else {
-              return cmd_func(j, {
+              return setImmediate(cmd_func, j, {
                 'topic': argstr
               }, function(j) {
                 return cb(null, void 0);
@@ -4398,17 +4486,19 @@
               return cb(null, void 0);
             } else {
               cmd_func = commands[cmd];
-              if (j != null) {
-                if ((_ref1 = j.processing) != null) {
-                  _ref1.push([">>", ss_version, cmd, clone_object(args)]);
-                }
-              }
-              return cmd_func(j, args, function(err, return_j) {
+              return setImmediate(cmd_func, j, args, function(err, return_j) {
+                var _ref1;
+
                 if (err || !return_j) {
                   console.error("ERROR: " + err.message + "\n");
                   console.warn("\nCommand failed: Please examine the above error messages and try again.\n");
                 } else {
                   j = return_j;
+                  if (j != null) {
+                    if ((_ref1 = j.processing) != null) {
+                      _ref1.push([">>", ss_version, cmd, clone_object(args)]);
+                    }
+                  }
                 }
                 return cb(null, void 0);
               });
@@ -4657,7 +4747,7 @@ For examples and/or detailed help with specific commands, type:  HELP <command>\
           }
         }
         console.warn("Executing " + cmd + " " + (JSON.stringify(cmd_args)));
-        return cmd_func(j, cmd_args, call_next_cmd);
+        return setImmediate(cmd_func, j, cmd_args, call_next_cmd);
       }
     };
     return call_next_cmd(null, json);

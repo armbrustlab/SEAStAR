@@ -339,7 +339,6 @@ input.on('data', (data) -> scaff_string = scaff_string.concat(data))
                 .on('end', () -> 
                    process_heal_fasta(heal_string)
                    process_scaffs(scaff_string)
-                   process.stdout.end()
                    )
         else 
            process_scaffs(scaff_string)

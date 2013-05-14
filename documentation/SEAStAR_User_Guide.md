@@ -1,6 +1,6 @@
 <link href="style.css" media="screen" rel="stylesheet" type="text/css" />
 
-SEAStAR User Guide, version 0.4.7
+SEAStAR User Guide, version 0.4.8
 ==============================
 ####Vaughn Iverson and Chris Berthiaume
 
@@ -1061,7 +1061,7 @@ Write sequences contained in the current graph data to a FASTA format file
    Example:
    
         # Output ordered contig sequences
-        FASTA {"no_merge_scafs":true}
+        FASTA {"no_merge_scaffs":true}
 
 + `abundance : true`
    
@@ -1376,7 +1376,7 @@ Calculate the current assembly graph connected components. Note, this is a low-l
 [`SELCC`]: #SELCC
 ###<a name="SELCC">`SELCC`</a>
 
-Select specific connected components for further processing. "Unselected" connected components are saved in a "removed" data structure and may be recalled with other commands (TBD such as?)
+Select specific connected components for further processing. "Unselected" connected components are saved in a "removed" data structure and may be recalled with other commands.
 
 **Parameters:**
 
@@ -1427,6 +1427,15 @@ Select specific connected components for further processing. "Unselected" connec
         # Select the last 5 connected components
         SELCC {"ccrange":[-5,-1]}
 
++ `shift : true`
+
+   Select all connected components except the first one. This is like `SELCC {"ccrange":[1,-1]}` except it doesn't generate an error when there is only one remaining connected component, allowing processing to potentially continue in any calling `SCRIPT` commands.
+
+   Example: 
+   
+        # Drop the first connected component.
+        SELCC {"shift":true}
+
 + `min_nodes : <int>`
    
    Select connected components with <int> or more nodes.
@@ -1444,6 +1453,16 @@ Select specific connected components for further processing. "Unselected" connec
         
         # Select connected components containing at least 1000 bases of sequence.
         SELCC {"min_seqlen":1000}
+
++ `sequence : <string>` 
+
+   Select connected components containing the provided DNA sequence. NOTE! This isn't BLAST, the sequence must match exactly. Any differences, including ambiguity codes, will prevent matching. The only extra thing that is done is the reverse complement of the provided sequence is also searched.
+
+   Example:
+
+        # Select connected components containing the provided sequence 
+        # (or its reverse complement).        
+        SELCC {"sequence":"AGACTAGCAGATATACGATAACGATACGATACGAT"}
 
 [`SELCLUST`]: #SELCLUST
 ###<a name="SELCLUST">`SELCLUST`</a>
@@ -1484,6 +1503,15 @@ Select clusters of scaffolds for further processing
 
         # select all clusters except the last one
         SELCLUST '{"clustrange":[0,-2]}'
+
++ `shift : true`
+
+   Select all clusters except the first one. This is like `SELCLUST {"clustrange":[1,-1]}` except it doesn't generate an error when there is only one remaining cluster, allowing processing to potentially continue in any calling `SCRIPT` commands.
+
+   Example: 
+   
+        # Drop the first cluster.
+        SELCLUST {"shift":true}
 
 + `exclusive : true`
 
@@ -1893,7 +1921,7 @@ Use contents of a file as a series of `graph_ops` commands to run. Commands and 
         SELCC
         FASTA {"file":"@_ccseq_####.fna"}
         UNSTASH
-        SELCC {"ccrange":[1,-1]}
+        SELCC {"shift":true}
         SCRIPT {"file":"iterate.go"}
 
    If the above script is invoked using this command: 

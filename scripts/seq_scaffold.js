@@ -420,8 +420,7 @@
         return heal_string = heal_string.concat(data);
       }).on('end', function() {
         process_heal_fasta(heal_string);
-        process_scaffs(scaff_string);
-        return process.stdout.end();
+        return process_scaffs(scaff_string);
       });
     } else {
       return process_scaffs(scaff_string);

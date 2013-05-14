@@ -1,6 +1,6 @@
 <link href="style.css" media="screen" rel="stylesheet" type="text/css" />
 
-<h1>SEAStAR User Guide, version 0.4.7</h1>
+<h1>SEAStAR User Guide, version 0.4.8</h1>
 <h4>Vaughn Iverson and Chris Berthiaume</h4>
 <h5><a href="http://armbrustlab.ocean.washington.edu">Armbrust Lab</a>, School of Oceanography, University of Washington</h5>
 <h2>Table of Contents</h2>
@@ -655,7 +655,7 @@ TGTTGTGCGCGCCATAGCGAGGGGCTCAGCACGCGTC
 <p> Write contig sequences in scaffold order with a scaffold ID in each header, ready to be provided to the <code>seq_scaffold</code> tool (but do not run it).</p>
 <p> Example:</p>
 <pre><code>  # Output ordered contig sequences
-  FASTA {&quot;no_merge_scafs&quot;:true}</code></pre>
+  FASTA {&quot;no_merge_scaffs&quot;:true}</code></pre>
 </li>
 <li><p><code>abundance : true</code></p>
 <p> Append relative abundance values to the FASTA sequence IDs. This is for use with downstream classification and visualization tools, such as for the 16S rDNA analysis pipeline vignette.</p>
@@ -879,7 +879,7 @@ TGTTGTGCGCGCCATAGCGAGGGGCTCAGCACGCGTC
 </li>
 </ul>
 <h3><a name="SELCC"><code>SELCC</code></a></h3>
-<p>Select specific connected components for further processing. &quot;Unselected&quot; connected components are saved in a &quot;removed&quot; data structure and may be recalled with other commands (TBD such as?)</p>
+<p>Select specific connected components for further processing. &quot;Unselected&quot; connected components are saved in a &quot;removed&quot; data structure and may be recalled with other commands.</p>
 <p><strong>Parameters:</strong></p>
 <ul>
 <li><p><code>ccname : &quot;contig_name&quot;</code></p>
@@ -915,6 +915,12 @@ TGTTGTGCGCGCCATAGCGAGGGGCTCAGCACGCGTC
   # Select the last 5 connected components
   SELCC {&quot;ccrange&quot;:[-5,-1]}</code></pre>
 </li>
+<li><p><code>shift : true</code></p>
+<p> Select all connected components except the first one. This is like <code>SELCC {&quot;ccrange&quot;:[1,-1]}</code> except it doesn&#39;t generate an error when there is only one remaining connected component, allowing processing to potentially continue in any calling <code>SCRIPT</code> commands.</p>
+<p> Example: </p>
+<pre><code>  # Drop the first connected component.
+  SELCC {&quot;shift&quot;:true}</code></pre>
+</li>
 <li><p><code>min_nodes : &lt;int&gt;</code></p>
 <p> Select connected components with <int> or more nodes.</p>
 <p> Example:</p>
@@ -926,6 +932,13 @@ TGTTGTGCGCGCCATAGCGAGGGGCTCAGCACGCGTC
 <p> Example:</p>
 <pre><code>  # Select connected components containing at least 1000 bases of sequence.
   SELCC {&quot;min_seqlen&quot;:1000}</code></pre>
+</li>
+<li><p><code>sequence : &lt;string&gt;</code> </p>
+<p> Select connected components containing the provided DNA sequence. NOTE! This isn&#39;t BLAST, the sequence must match exactly. Any differences, including ambiguity codes, will prevent matching. The only extra thing that is done is the reverse complement of the provided sequence is also searched.</p>
+<p> Example:</p>
+<pre><code>  # Select connected components containing the provided sequence 
+  # (or its reverse complement).        
+  SELCC {&quot;sequence&quot;:&quot;AGACTAGCAGATATACGATAACGATACGATACGAT&quot;}</code></pre>
 </li>
 </ul>
 <h3><a name="SELCLUST"><code>SELCLUST</code></a></h3>
@@ -955,6 +968,12 @@ TGTTGTGCGCGCCATAGCGAGGGGCTCAGCACGCGTC
 
   # select all clusters except the last one
   SELCLUST &#39;{&quot;clustrange&quot;:[0,-2]}&#39;</code></pre>
+</li>
+<li><p><code>shift : true</code></p>
+<p> Select all clusters except the first one. This is like <code>SELCLUST {&quot;clustrange&quot;:[1,-1]}</code> except it doesn&#39;t generate an error when there is only one remaining cluster, allowing processing to potentially continue in any calling <code>SCRIPT</code> commands.</p>
+<p> Example: </p>
+<pre><code>  # Drop the first cluster.
+  SELCLUST {&quot;shift&quot;:true}</code></pre>
 </li>
 <li><p><code>exclusive : true</code></p>
 </li>
@@ -1246,7 +1265,7 @@ graph_ops   # Same as above</code></pre>
   SELCC
   FASTA {&quot;file&quot;:&quot;@_ccseq_####.fna&quot;}
   UNSTASH
-  SELCC {&quot;ccrange&quot;:[1,-1]}
+  SELCC {&quot;shift&quot;:true}
   SCRIPT {&quot;file&quot;:&quot;iterate.go&quot;}</code></pre>
 <p> If the above script is invoked using this command: </p>
 <pre><code>  graph_ops assembly.json CCOMPS SCRIPT &#39;{&quot;file&quot;:&quot;iterate.go&quot;, &quot;tag&quot;:&quot;Run1&quot;}&#39;</code></pre>

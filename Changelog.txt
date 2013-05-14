@@ -1,4 +1,46 @@
+### 0.4.8 ###
+
+- Added the new "shift" option to the graph_ops SELCC and SELCLUST commands
+to enable smoother iterative constucts in script.go files. This provides a 
+shorthand way to keep all but the first clust or cc, (like range [1,-1], 
+but without generating an error when called with only one clust or cc 
+remaining.
+
+- Added a new "sequence" option to the graph_ops SELCC command that allows
+selecting one or more connected components based on the present of an exact
+matching DNA subsequence (or its reverse compliment) 
+
+- Added a feature in graph_ops allowing scaffolds to survive use of SELCLUST 
+command with the "exclusive" option set to "true". Previously, rerunning 
+the SCAFF command was necessary in this case.
+
+- Fixed a bug in the graph_ops SCRIPT command option "tag" which prevented 
+the tag value from propagating into recursive SCRIPT commands as intended.
+
+- Fixed a bug in graph_ops that could cause crashes in the RELINK command 
+when invoked with the "complete" option set to true. 
+
+- Fixed bugs in graph_ops that caused corruption of STASHed graphs when an 
+invalid range of values was provided to the SELCC or SELCLUST commands.
+
+- Fixed a bug in the graph_ops CLUST command that caused tetracalc to fail 
+when multiple commandline options were provided via the "options" parameter.
+
+- Fixed a bug in the graph_ops FASTA command that could cause additional 
+problems if filesystem errors were encountered in writing the output data.
+
+- Fixed a bug in seq_scaffold that would cause an error at the end of writing
+to stdout on some platforms.
+
+- Fixed a bug in trimfastq that incorrectly counted mate-paired reads with
+--only_mates.
+
+- Upgraded included zlib to version 1.2.8
+
+- Fixed a few typos in documentation and help strings.
+
 ### 0.4.7 ###
+
 - Added the "tag" parameter to the graph_ops SCRIPT command, allowing for .go
 script files to be more easily reused, by enabling them to write output files 
 with different filenames and/or into different directory paths. 

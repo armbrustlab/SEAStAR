@@ -476,7 +476,8 @@ int main(int argc, char *argv[]) {
 
 #pragma omp section 
         {   // Velvet mates writer
-            ss_stream_writer(out_mates_fn, mates_out_pipe[0], gzip->count);
+            // Divide count by 2 because both R1 and R2 reads go through this writer
+            mp_cnt = ss_stream_writer(out_mates_fn, mates_out_pipe[0], gzip->count)  / 2 / read_count_divisor;
         }
         
 #pragma omp section 
@@ -661,7 +662,9 @@ int main(int argc, char *argv[]) {
     }
 
     mp_org = R1_org;
-    mp_cnt = R1_cnt;
+    if (!only_mates->count) {
+        mp_cnt = R1_cnt;
+    }
     
     printf("\nMatepairs: Before: %lu, After: %lu\n", mp_org, mp_cnt);
     printf("Singlets: Before: %lu %lu After: %lu %lu\n", singlet1_org, singlet2_org, s1_cnt, s2_cnt);
