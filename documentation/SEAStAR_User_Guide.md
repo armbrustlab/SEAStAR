@@ -1,6 +1,6 @@
 <link href="style.css" media="screen" rel="stylesheet" type="text/css" />
 
-SEAStAR User Guide, version 0.4.8
+SEAStAR User Guide, version 0.4.9
 ==============================
 ####Vaughn Iverson and Chris Berthiaume
 
@@ -54,13 +54,13 @@ This section is a quick introduction to using SEAStAR tools for some common use 
 + [Learning the Linux Shell](http://linuxcommand.org/learning_the_shell.php)
 + [Introduction to the OS X Unix Command Line](http://www.matisse.net/osx/intro_unix/0_outline.html)
 
-This tutorial assumes that you have already installed the SEAStAR software. For instructions see the `README` file in the SEAStAR root directory. Although the SEAStAR tools can be quite memory and resource intensive, with the data used in this tutorial you should be able to comforably complete all of the steps below on a modern laptop with a dual-core processor and 2GB of RAM.
+This tutorial assumes that you have already installed the SEAStAR software. If you are working from the [SEAStAR Quick Start virtual machine appliance](http://armbrustlab.ocean.washington.edu/node/305) file in VirtualBox, your environment is already set-up and ready to go, so you can skip to the next section: [Read Preparation][read_prep].
+
+For SEAStAR installation instructions see the `README` file in the SEAStAR root directory. Although the SEAStAR tools can be quite memory and resource intensive, with the data used in this tutorial you should be able to comforably complete all of the steps below on a modern laptop with a dual-core processor and 2GB of RAM.
 
 The data used in these examples are actual raw SOLiD sequence reads corresponding to the [Lambda phage](http://www.ncbi.nlm.nih.gov/nuccore/NC_001416.1) genome, and can be found in the `test_data` subdirectory of the SEAStAR source directory. 
 
-If you are working from the [SEAStAR Quick Start virtual machine appliance](http://armbrustlab.ocean.washington.edu/node/305) file in VirtualBox, your environment is already set-up and ready to go, so you can skip to the next section: [Read Preparation][read_prep].
-
-Otherwise, create a new working directory and copy the following files from the `test_data` directory into that directory.
+Create a new working directory and copy the following files from the `test_data` directory into that directory.
 
     # Substitute the actual path to your SEAStAR "source directory" for 
     # [SEASTAR_src] in the copy commands below:
@@ -580,11 +580,12 @@ Write FASTA format files instead of FASTQ files for all outputs. FASTA files are
 `ref_select` has a lot of options, and depending on what type of analysis you are doing, you may use quite a few of them. However, at its simplest, `ref_select` reads one or more SAM alignment files and writes a JSON "sequence graph" to STDOUT:
 
     ref_select alignment.sam > seq_graph.json
+
+Note that `ref_select` may also write warnings, errors and diagnostic information to STDERR, so it is important to keep STDOUT and STDERR separate when saving the output to a file, or the resulting saved JSON data file syntax may be corrupted by messages written to STDERR.
     
 Of course, since these types of files may be very large, you may prefer to keep everything compressed:
 
     ref_select alignment.sam.gz | gzip -c > seq_graph.json.gz
-
     
 Because `ref_select` has many options, and produces many different kinds of outputs, we made the decision to organise all of the output data into a single output stream in a standard text-based format ([JSON][JSON_ref]), that is flexible and straightforward to process in any language. The JSON formatted output produced by `ref_select` is documented in the appendix: [JSON Sequence Graph File Format Reference][JSON]. However, for most tasks you will not need to look directly into theses files because the `graph_ops` tool will handle that work for you (including the work of extracting data into other standard file formats). 
 
@@ -610,7 +611,7 @@ Because `ref_select` has many options, and produces many different kinds of outp
 
         # Rather than inserting contigs as above, they are reconstructed from the alignment
         # and the provided read FASTQ files
-        ref_select -q -m -r mates.read1.fastq -r mates.read1.fastq alignment_read1.sam alignment_read2.sam > seq_graph.json
+        ref_select -q -m -r mates.read1.fastq -r mates.read2.fastq alignment_read1.sam alignment_read2.sam > seq_graph.json
 
         # Produce scaffolded sequence (where .go file is graph_ops SCRIPT)...
         graph_ops seq_graph.json run_scaffold_pipeline.go > scaffolds.fna
@@ -620,7 +621,7 @@ Because `ref_select` has many options, and produces many different kinds of outp
         # Write two new read files for all reads (and their mates) that did not map in the alignment
         # NOTE: this is the one exception to the "all data goes into the JSON stream" principle described above. 
         # Filtered read output data is written to `FASTQ` format files, with a prefix specified using --read_output
-        ref_select --read_output=filtered_ --output_nomatch -r mates.read1.fastq -r mates.read1.fastq alignment_read1.sam alignment_read2.sam
+        ref_select --read_output=filtered_ --output_nomatch -r mates.read1.fastq -r mates.read2.fastq alignment_read1.sam alignment_read2.sam
 
 The approaches used by `ref_select` to accomplish these tasks are described in more detail in the methods section of ([Iverson, *et al.* 2012](http://www.sciencemag.org/content/335/6068/587.abstract)).  
 
@@ -772,9 +773,13 @@ Modifies `--read_output` to write gzip compressed output files.
 ###`ref_select` parameters for generating read pairing statistics `[options]` : 
 `[--mp_mate_lim=<n>]` `[--mp_share_lim=<n>]` `[--mp_strict]` `[--mp_inserts]` `[--mp_circular]` `[--mp_cutoff=<n>]`
 
+<b>`--mp_mate_cnt=<n>`</b>
+
+Minimum count of mapping read-pairs for generation of a mate-pair linking edge in the output graph (normal or internal). Default is 2, meaning that no edges consisting of a single read-pair will be output.
+
 <b>`--mp_mate_lim=<n>`</b>
 
-Minimum bitscore threshold for generation of a mate-pair linking edge in the output graph (normal or internal). Default is 250.0 bits.
+Minimum bitscore threshold for generation of a mate-pair linking edge in the output graph (normal or internal). Default is 0.0 bits, however `--mp_mate_count` above will put a floor on lowest scoring edges output.
 
 <b>`--mp_share_lim=<n>`</b>
 
@@ -886,6 +891,8 @@ where:
         FASTA {"file":"sequence.fna"}
 
 Running `graph_ops` without ***any*** options will launch in interactive mode, equivalent to: `graph_ops SCRIPT`
+
+Note that many `graph_ops` commands may write warnings, errors and diagnostic information to STDERR, so it is important to keep STDOUT and STDERR separate when using commands such as `DUMP`, `DOT`, `TABLE`, or `FASTA` (without specifying an output filename) and redirecting the STDOUT of `graph_ops` to a file. Likewise, only one such output command may use STDOUT per run of `graph_ops` (e.g. redirecting the output of both `FASTA` and `DUMP` to the same file with result in a file that is both invalid JSON and invalid FASTA format.)
 
 ###`graph_ops` `<command>` summary:
   
@@ -1619,7 +1626,7 @@ Reconnect previously removed connections between contigs. `RELINK` can move cont
         
         # Restore edges to all contigs within the connected compontent(s) containing 
         # these two contigs
-        RELINK {"names":["NODE_1234","NODE_5678"]} 
+        RELINK {"ccnames":["NODE_1234","NODE_5678"]} 
 
 + `radius : <int>`
    
@@ -2026,6 +2033,8 @@ The above example shows an input FASTA file with two scaffolds of two contigs ea
 
 In `<healfile.fna>` the sequences do not need to be in any particular order and the FASTA header sequence identifiers do not need to be unique. Note, that it is possible to simultaneously use more than one alternate assembly for "healing" by simply concatenating those assemblies into a single file.
 
+Note that `seq_scaffold` may also write warnings, errors and diagnostic information to STDERR, so it is important to keep STDOUT and STDERR separate when saving the output to a file, or the resulting saved FASTA data may be corrupted by messages written to STDERR.
+
 ####`seq_scaffold` optional parameters `[options]`:
 `[-h|--help|]` `[--overlap=<n>]` `[--trim=<n>]` `[--max=<n>]` `[--heal=<healfile.fna>]` `[--heal_overlap=<n>]` `[--heal_trim=<n>]` `[--heal_max=<n>]` `[--verbose]`
 
@@ -2088,6 +2097,8 @@ In most cases you will run the `tetracalc` tool indirectly from within `graph_op
                  ... 
            ]
     }
+
+Note that `tetracalc` may also write warnings, errors and diagnostic information to STDERR, so it is important to keep STDOUT and STDERR separate when saving the output to a file, or the resulting saved JSON data may be corrupted by messages written to STDERR.
 
 ####`tetracalc` optional parameters `[options]`:
 `[-h|--help]` `[--version]` `[--merge_tar=<n>]` `[-m <n>|--min_len=<n>]` `[--num_threads=<n>]` 
@@ -2370,6 +2381,7 @@ The different `edges` lists (`edges`, `removed_edges`, `internal_edges`, `shared
               "n1" : "",          #  A first node, referenced by name, and a 
               "n2" : "",          #  second node. This are the same for internal_edges 
               "dir" : "",         #  Direction of this edge: "FB", "FF", "BB" or "forward" 
+              "num" : <int>,      #  Number of mapped read-pairs represented by this link
               "bits" : <float>,   #  Total bitscore of read-pairs participating in edge
               "p1" : <int>,       #  Mean mapping coordinate in the first node
               "p2" : <int>,       #  Mean mapping coordinate in the second node

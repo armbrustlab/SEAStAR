@@ -183,6 +183,7 @@ typedef struct seq_list_st {
     float shared_bitscore;
     int seq_num;
     int mean_pos;
+    int num_reads;
     seq_entry *seq_ptr;
 } seq_list_entry;
 
@@ -317,7 +318,8 @@ int main(const int argc, char *argv[]) {
     float bit_frac = 0.00;
     
     float share_lim = 500.0;    // Bit score limited for mate-pair analysis output
-    float mate_lim = 250.0;
+    int min_mate_cnt = 2;
+    float mate_lim = 0.0;
     
     int split_len = 0;
     unsigned int mp_cutoff_len = 0;
@@ -419,7 +421,8 @@ int main(const int argc, char *argv[]) {
     struct arg_rem *sep5 = arg_rem(NULL, "\n==== Options for generating mate-pairing statistics ====\n");
     
     struct arg_dbl *mp_share_lim = arg_dbl0(NULL,"mp_share_lim","<n>","Minimum bitscore for shared sequence reporting [500.0]");
-    struct arg_dbl *mp_mate_lim = arg_dbl0(NULL,"mp_mate_lim","<n>","Minimum bitscore for sequence mate-pair link reporting [250.0]");
+    struct arg_int *mp_mate_cnt = arg_int0(NULL,"mp_mate_cnt","<n>","Minimum number of pairs for sequence mate-pair link reporting [2]");
+    struct arg_dbl *mp_mate_lim = arg_dbl0(NULL,"mp_mate_lim","<n>","Minimum bitscore for sequence mate-pair link reporting [use mp_mate_cnt only]");
     struct arg_lit *mp_strict = arg_lit0(NULL,"mp_strict","No mate-pair links between sequences for pairs that both map within a single sequence. [FALSE]");
     struct arg_lit *mp_inserts = arg_lit0(NULL,"mp_inserts","Perform insert size estimation using all sequences. [FALSE]");
     struct arg_lit *mp_circ = arg_lit0(NULL,"mp_circular","Allow circular self-linking mate-pairs joining ends of a single sequence. [FALSE]");
@@ -436,7 +439,7 @@ int main(const int argc, char *argv[]) {
     struct arg_end *end = arg_end(20);
 
     void *argtable[] = {sep1, h, version, v, detail, detail_file, seq_recon, seq_ref, mp_analysis, split, sep, sep_r, rollup, seed, num_threads, sep2, t, frac, t_frac, l, s, r,
-        nt, a, no_rand, sim_frac, exclude, exclude_file, invert_ex, sep3, detailed, w, detect_dups, sep4, ambig_tol, read_out, read_out_nomap, read_out_gz, sep5, mp_share_lim, mp_mate_lim, mp_strict,
+        nt, a, no_rand, sim_frac, exclude, exclude_file, invert_ex, sep3, detailed, w, detect_dups, sep4, ambig_tol, read_out, read_out_nomap, read_out_gz, sep5, mp_share_lim, mp_mate_cnt, mp_mate_lim, mp_strict,
         mp_inserts, mp_circ, mp_cutoff, sep6, read_files, rev_read_files, f_bwa_samse, c, fr, f, end};
     
     int arg_errors = 0;
@@ -653,6 +656,21 @@ int main(const int argc, char *argv[]) {
             }
         }
     }
+
+    if (mp_mate_cnt->count) {
+        if (!mp_analysis->count) {
+            fprintf(stderr, "ERROR: mp_mate_cnt may only be used when mate pair analysis (-m) is enabled.\n");
+            exit(EXIT_FAILURE);
+        } else {
+            if (mp_mate_cnt->ival[0] < 0) {
+                fprintf(stderr, "ERROR: mp_mate_cnt must be >= 0\n");
+                exit(EXIT_FAILURE);
+            } else {
+                min_mate_cnt = mp_mate_cnt->ival[0];
+            }
+        }
+    }
+
     
     if ((!mp_inserts->count) && mp_circ->count) {
         fprintf(stderr, "ERROR: --mp_circular requires --mp_inserts.\n");
@@ -1678,12 +1696,12 @@ int main(const int argc, char *argv[]) {
                                             memset(shared_seq, 0, sizeof(seq_hash_entry));
                                             shared_seq->seq_num = r2->seq_ptr->seq_num;
                                             HASH_ADD_INT(fwd_seq_hashes,seq_num,shared_seq);
-                                        } 
+                                        }
                                         
                                         // Update the info shared in common: minimum bitscore of the mapping of the two mates
                                         shared_seq->shared_bitscore += (r_ptr2->bit_info < read_table[read->r_id].bit_info) ? r_ptr2->bit_info : read_table[read->r_id].bit_info;
                                         shared_seq->num_reads++;
-                                        // Position at center of read -- Negative if sequences are on opposite strands  NOTE! SOLiD Specific!  Same stand Same Orientation!
+                                        // Position at center of read -- Negative if sequences are on opposite strands  NOTE! Assumes same-stand same-orientation!
                                         shared_seq->pos_sum += (abs(read->seq_pos) + (r_ptr2->read_len >> 1)) * ((((long int) read->seq_pos * (long int) r2->seq_pos) < 0) ? -1 : 1);
                                         
                                     } else { // Else this is a "backward" mate
@@ -1712,9 +1730,9 @@ int main(const int argc, char *argv[]) {
                                         // Update the info shared in common: minimum bitscore of the mapping of the two mates
                                         shared_seq->shared_bitscore += (r_ptr2->bit_info < read_table[read->r_id].bit_info) ? r_ptr2->bit_info : read_table[read->r_id].bit_info;;
                                         shared_seq->num_reads++;
-                                        // Position at center of read -- Negative if sequences are on opposite strands  NOTE! SOLiD Specific!  Same stand Same Orientation!
+                                        // Position at center of read -- Negative if sequences are on opposite strands  NOTE! Assumes same-stand same-orientation!
                                         shared_seq->pos_sum += (abs(read->seq_pos) + (r_ptr2->read_len >> 1)) * ((((long int) read->seq_pos * (long int) r2->seq_pos) < 0) ? -1 : 1);
-                                    }
+                                     }
                                 }
                             }
                         }
@@ -1734,7 +1752,8 @@ int main(const int argc, char *argv[]) {
                         // Make a sorted singly linked list of shared sequences
                         ss_HASH_FOREACH(seq_hashes, shared_seq) {
                             seq->shared[cnt].shared_bitscore = shared_seq->shared_bitscore; 
-                            seq->shared[cnt].mean_pos = shared_seq->pos_sum / shared_seq->num_reads; 
+                            seq->shared[cnt].mean_pos = shared_seq->pos_sum / shared_seq->num_reads;
+                            seq->shared[cnt].num_reads = shared_seq->num_reads;
                             seq->shared[cnt].seq_num = shared_seq->seq_num;
                             seq->shared[cnt].seq_ptr = seq_array[shared_seq->seq_num];
                             cnt++;
@@ -1765,7 +1784,8 @@ int main(const int argc, char *argv[]) {
                         // Make a sorted singly linked list of shared sequences
                         ss_HASH_FOREACH(fwd_seq_hashes, shared_seq) {
                             seq->forward[cnt].shared_bitscore = shared_seq->shared_bitscore; 
-                            seq->forward[cnt].mean_pos = shared_seq->pos_sum / shared_seq->num_reads; 
+                            seq->forward[cnt].mean_pos = shared_seq->pos_sum / shared_seq->num_reads;
+                            seq->forward[cnt].num_reads = shared_seq->num_reads;
                             seq->forward[cnt].seq_num = shared_seq->seq_num;
                             seq->forward[cnt].seq_ptr = seq_array[shared_seq->seq_num];
                             cnt++;
@@ -1796,7 +1816,8 @@ int main(const int argc, char *argv[]) {
                         // Make a sorted singly linked list of shared sequences
                         ss_HASH_FOREACH(bwd_seq_hashes, shared_seq) {
                             seq->backward[cnt].shared_bitscore = shared_seq->shared_bitscore; 
-                            seq->backward[cnt].mean_pos = shared_seq->pos_sum / shared_seq->num_reads; 
+                            seq->backward[cnt].mean_pos = shared_seq->pos_sum / shared_seq->num_reads;
+                            seq->backward[cnt].num_reads = shared_seq->num_reads;
                             seq->backward[cnt].seq_num = shared_seq->seq_num;
                             seq->backward[cnt].seq_ptr = seq_array[shared_seq->seq_num];
                             cnt++;
@@ -3446,6 +3467,7 @@ int main(const int argc, char *argv[]) {
     JSON_LIT_PROP("separate_strands", sep->count ? "true" : "false");  JSON_COMMA;
     if (mp_analysis->count) { 
         JSON_FLT_PROP("mp_share_lim", share_lim);  JSON_COMMA;
+        JSON_INT_PROP("mp_mate_cnt", min_mate_cnt);  JSON_COMMA;
         JSON_FLT_PROP("mp_mate_lim", mate_lim);  JSON_COMMA;
         JSON_LIT_PROP("mp_strict", mp_strict->count ? "true" : "false");  JSON_COMMA;
         JSON_LIT_PROP("mp_inserts", mp_inserts->count ? "true" : "false");  JSON_COMMA;
@@ -3596,6 +3618,7 @@ int main(const int argc, char *argv[]) {
                     JSON_STR_PROP("n1", utstring_body(&seq->seq_id));  JSON_COMMA;
                     JSON_STR_PROP("n2", utstring_body(&seq->shared[x].seq_ptr->seq_id));  JSON_COMMA;
                     JSON_FLT_PROP("bits", seq->shared[x].shared_bitscore);  JSON_COMMA;
+                    JSON_INT_PROP("num", seq->shared[x].num_reads);  JSON_COMMA;
                     JSON_INT_PROP("p1", seq->shared[x].mean_pos);  JSON_COMMA;
                     JSON_INT_PROP("p2", s_ptr->shared[y].mean_pos);
                     JSON_END_OBJ;
@@ -3619,12 +3642,12 @@ int main(const int argc, char *argv[]) {
             // Backward edges
             for (int x = 0; x < seq->num_backward; x++) {
                 
-                if (seq != seq->backward[x].seq_ptr) {
-                    continue;   // Only handling self-links here 
-                }
-                
                 if (seq->backward[x].shared_bitscore < mate_lim) {
                     break;
+                }
+
+                if ((seq->backward[x].num_reads < min_mate_cnt) || (seq != seq->backward[x].seq_ptr)) {
+                    continue;   // Only handling self-links here
                 }
                 
                 if (seq->num_forward) {
@@ -3642,6 +3665,7 @@ int main(const int argc, char *argv[]) {
                             JSON_STR_PROP("n1", utstring_body(&seq->seq_id));  JSON_COMMA;
                             JSON_STR_PROP("n2", utstring_body(&seq->seq_id));  JSON_COMMA;
                             JSON_FLT_PROP("bits", seq->backward[x].shared_bitscore);  JSON_COMMA;
+                            JSON_INT_PROP("num", seq->backward[x].num_reads);  JSON_COMMA;
                             JSON_INT_PROP("p1", seq->forward[y].mean_pos);  JSON_COMMA;
                             JSON_INT_PROP("p2", seq->backward[x].mean_pos);
                             JSON_END_OBJ;
@@ -3672,7 +3696,7 @@ int main(const int argc, char *argv[]) {
                     break;
                 }
                 
-                if ((seq == seq->backward[x].seq_ptr) || (seq->backward[x].seq_ptr->abundance == 0.0)) {
+                if ((seq->backward[x].num_reads < min_mate_cnt) || (seq == seq->backward[x].seq_ptr) || (seq->backward[x].seq_ptr->abundance == 0.0)) {
                     continue;   // Self-links have already been handled
                 }
                 
@@ -3693,6 +3717,7 @@ int main(const int argc, char *argv[]) {
                         JSON_STR_PROP("n2", utstring_body(&seq->seq_id));  JSON_COMMA;
                         JSON_STR_PROP("dir", "FB");  JSON_COMMA;
                         JSON_FLT_PROP("bits", seq->backward[x].shared_bitscore);  JSON_COMMA;
+                        JSON_INT_PROP("num", seq->backward[x].num_reads);  JSON_COMMA;
                         JSON_INT_PROP("p1", s_ptr->forward[y].mean_pos);  JSON_COMMA;
                         JSON_INT_PROP("p2", seq->backward[x].mean_pos);
                     } else {
@@ -3704,6 +3729,7 @@ int main(const int argc, char *argv[]) {
                         JSON_STR_PROP("n2", utstring_body(&seq->backward[x].seq_ptr->seq_id));  JSON_COMMA;
                         JSON_STR_PROP("dir", "BB");  JSON_COMMA;
                         JSON_FLT_PROP("bits", seq->backward[x].shared_bitscore);  JSON_COMMA;
+                        JSON_INT_PROP("num", seq->backward[x].num_reads);  JSON_COMMA;
                         JSON_INT_PROP("p1", seq->backward[x].mean_pos);  JSON_COMMA;
                         JSON_INT_PROP("p2", s_ptr->backward[y].mean_pos);
                     }
@@ -3718,7 +3744,7 @@ int main(const int argc, char *argv[]) {
                     break;
                 }
                 
-                if ((seq == seq->forward[x].seq_ptr) || (seq->forward[x].seq_ptr->abundance == 0.0)) {
+                if ((seq->forward[x].num_reads < min_mate_cnt) || (seq == seq->forward[x].seq_ptr) || (seq->forward[x].seq_ptr->abundance == 0.0)) {
                     continue;   // Self-links have already been handled
                 }
                 
@@ -3743,6 +3769,7 @@ int main(const int argc, char *argv[]) {
                         JSON_STR_PROP("n2", utstring_body(&seq->forward[x].seq_ptr->seq_id));  JSON_COMMA;
                         JSON_STR_PROP("dir", "FB");  JSON_COMMA;
                         JSON_FLT_PROP("bits", seq->forward[x].shared_bitscore);  JSON_COMMA;
+                        JSON_INT_PROP("num", seq->forward[x].num_reads);  JSON_COMMA;
                         JSON_INT_PROP("p1", seq->forward[x].mean_pos);  JSON_COMMA;
                         JSON_INT_PROP("p2", s_ptr->backward[y].mean_pos);
                         
@@ -3755,6 +3782,7 @@ int main(const int argc, char *argv[]) {
                         JSON_STR_PROP("n2", utstring_body(&seq->forward[x].seq_ptr->seq_id));  JSON_COMMA;
                         JSON_STR_PROP("dir", "FF");  JSON_COMMA;
                         JSON_FLT_PROP("bits", seq->forward[x].shared_bitscore);  JSON_COMMA;
+                        JSON_INT_PROP("num", seq->forward[x].num_reads);  JSON_COMMA;
                         JSON_INT_PROP("p1", seq->forward[x].mean_pos);  JSON_COMMA;
                         JSON_INT_PROP("p2", s_ptr->forward[y].mean_pos);
                     } 

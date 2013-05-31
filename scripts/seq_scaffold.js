@@ -105,7 +105,7 @@
 
 
   process_scaffs = function(fasta) {
-    var c, cf, cfmax, contig, cr, crmax, frame, i, j, l, m, match, max, n, name, ns, num_contigs, overlap, pad, pf, pfmax, pr, prev_contig, prmax, r, rc, rev_contig, rev_prev_contig, rp, s, scaf, scaf_ind, scaff_cnt, scaff_names, scaff_num, scaff_nums, scafout, seqs, x, y, _i, _j, _k, _l, _len, _len1, _len2, _len3, _len4, _len5, _len6, _len7, _len8, _m, _n, _o, _p, _q, _r, _ref, _ref1, _ref10, _ref11, _ref12, _ref13, _ref14, _ref2, _ref3, _ref4, _ref5, _ref6, _ref7, _ref8, _ref9, _results, _s, _t, _u, _v, _w, _x;
+    var c, cf, cfmax, contig, cr, crmax, frame, i, j, l, m, match, max, n, name, ns, num_contigs, overlap, pad, pf, pfmax, pr, prev_contig, prmax, r, rc, rev_contig, rev_prev_contig, rp, s, scaf, scaf_ind, scaff_cnt, scaff_names, scaff_num, scaff_nums, scafout, seqs, trim_match, x, y, _i, _j, _k, _l, _len, _len1, _len2, _len3, _len4, _len5, _len6, _len7, _len8, _m, _n, _o, _p, _q, _r, _ref, _ref1, _ref10, _ref11, _ref12, _ref13, _ref14, _ref2, _ref3, _ref4, _ref5, _ref6, _ref7, _ref8, _ref9, _results, _s, _t, _u, _v, _w, _x;
 
     num_contigs = [];
     scaff_cnt = 0;
@@ -127,8 +127,11 @@
       if ((_ref3 = num_contigs[scaff_num]) == null) {
         num_contigs[scaff_num] = 0;
       }
-      scaffs[scaff_num].push(seqs.join("").toUpperCase().match(/[ACGT]{10}.*[ACGT]{10}/)[0]);
-      num_contigs[scaff_num]++;
+      trim_match = seqs.join("").toUpperCase().match(/[ACGT]{10}.*[ACGT]{10}/);
+      if (trim_match) {
+        scaffs[scaff_num].push(trim_match[0]);
+        num_contigs[scaff_num]++;
+      }
     }
     if (heal_seq) {
       n = heal_n;

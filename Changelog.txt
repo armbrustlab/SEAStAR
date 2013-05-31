@@ -1,3 +1,27 @@
+### 0.4.9 ###
+
+- Added a new parameter to ref_select and changed the default behavior when
+determining which potential edges to write to the assembly graph. Previously,
+only edges scoring 250.0 bits or greater were written by default. A new 
+parameter: --mp_mate_cnt has been introduced to complement the existing 
+parameter --mp_mate_lim. It has a default value of 2, and it is the
+minimum number of read-pairs that must be represented in an edge for it
+to be written (regardless of bitscore). With this change, the default value 
+of --mp_mate_lim is now 0.0. Many more edges will now be output by default,
+although scripts written to use --mp_mate_lim will continue to work correctly,
+with the slight change that they will no longer receive edges that are backed
+by only a single read-pair. The exact previous behavior can be obtained by
+adding --mp_mate_cnt=1 to the ref_select parameters. 
+
+- In conjuction with the above change, the JSON assembly graph file now  
+includes the read count for each output edge recorded in a new member called 
+"num".
+
+- Fixed a bug in seq_scaffold that could cause it to crash when a contig
+with fewer than 20 unambiguous bases was encountered.
+
+- Documentation fixes and additions.
+
 ### 0.4.8 ###
 
 - Added the new "shift" option to the graph_ops SELCC and SELCLUST commands

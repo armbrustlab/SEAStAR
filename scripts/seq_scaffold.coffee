@@ -103,8 +103,10 @@ process_scaffs = (fasta) ->
       num_contigs[scaff_num] ?= 0
       # Trim ambiguity codes from the ends of scaffolds, requiring 10 non-ambiguity reads
       # at the new ends of each scaffold.
-      scaffs[scaff_num].push(seqs.join("").toUpperCase().match(/[ACGT]{10}.*[ACGT]{10}/)[0])
-      num_contigs[scaff_num]++
+      trim_match = seqs.join("").toUpperCase().match(/[ACGT]{10}.*[ACGT]{10}/)
+      if trim_match
+         scaffs[scaff_num].push(trim_match[0])
+         num_contigs[scaff_num]++
 
    # Try to heal gaps between contigs using the alternate assembly sequence
 

@@ -2566,7 +2566,7 @@ ccname : \"contig_name\" -- Use all contigs in the connected component containin
 ccnames : [\"contig_name1\",\"contig_name2\",...] -- Restore edges to all contigs\n
         in the connected components containing these contigs\n
 \n
-        Example: #{args.help} {\"names\":[\"NODE_1234\",\"NODE_5678\"]} -- Restore edges\n
+        Example: #{args.help} {\"ccnames\":[\"NODE_1234\",\"NODE_5678\"]} -- Restore edges\n
         to all contigs within the connected compontent(s) containing these two contigs\n
 \n
 radius : <int> -- Expand the sphere of restored connections to neighbors\n
