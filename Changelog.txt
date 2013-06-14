@@ -1,3 +1,12 @@
+### 0.4.10 ###
+
+- Fixed a bug in ref_select where text in FASTQ read headers after the first
+space was not stripped away.  In reads with header text after the first space
+this would prevent correct read ID matching and would affect reference sequence
+reconstruction and matching/non-matching read output.
+
+- Documentation improvements
+
 ### 0.4.9 ###
 
 - Added a new parameter to ref_select and changed the default behavior when

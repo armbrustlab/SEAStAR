@@ -1,6 +1,6 @@
 <link href="style.css" media="screen" rel="stylesheet" type="text/css" />
 
-<h1>SEAStAR User Guide, version 0.4.9</h1>
+<h1>SEAStAR User Guide, version 0.4.10</h1>
 <h4>Vaughn Iverson and Chris Berthiaume</h4>
 <h5><a href="http://armbrustlab.ocean.washington.edu">Armbrust Lab</a>, School of Oceanography, University of Washington</h5>
 <h2>Table of Contents</h2>
@@ -132,7 +132,7 @@ FASTA {&quot;scaff&quot;:true,&quot;file&quot;:&quot;lambda_scaffs.fna&quot;}</c
 # bitscore. Red arrows are added dependencies to produce a fully ordered layout for SCAFF.
 
 for i in lambda_asm?.dot; do neato -Tpdf $i &gt; ${i##.*}.pdf; done</code></pre>
-<p>You should now be able to load the PDF files with your favorite PDF viewer in order from <code>lambda_asm0.pdf</code> through <code>lambda_asm6.pdf</code> to see the effect of each <code>graph_ops</code> command in the script above. Each graph represents the state of the assembly before/after each successive step, showing the operation of graph_ops as it run on this example dataset.  </p>
+<p>You should now be able to load the PDF files with your favorite PDF viewer in order from <code>lambda_asm0.pdf</code> through <code>lambda_asm6.pdf</code> to see the effect of each <code>graph_ops</code> command in the script above. Each graph represents the state of the assembly before/after each successive step, showing the operation of graph_ops as it operated on this example dataset.  </p>
 <h3>Estimating 16S sequence abundance</h3>
 <p>The tools in SEAStAR can be used to create a pipeline for estimating sequence abundance in a short-read data set.  This is particularly useful for assessing community composition in a metagenomic sample through alignments to a 16S database.  See vignettes/RDP/RDP_vignette.html for a walk-through of an implementation of this pipeline using the <a href="http://rdp.cme.msu.edu/">RDP</a> 16S database.</p>
 <hr>
@@ -367,8 +367,18 @@ TGTTGTGCGCGCCATAGCGAGGGGCTCAGCACGCGTC
 </li>
 </ol>
 <p>The approaches used by <code>ref_select</code> to accomplish these tasks are described in more detail in the methods section of (<a href="http://www.sciencemag.org/content/335/6068/587.abstract">Iverson, <em>et al.</em> 2012</a>).  </p>
-<p>The <code>[options]</code> reference below splits the various parameters into general categories related to the above tasks. </p>
-<h3><code>ref_select</code> basic parameters <code>[options]</code> :</h3>
+<h3>The <code>[options]</code> reference below organizes the various parameters into general categories related to the above tasks:</h3>
+<ul>
+<li><a href="#ref_select_basic">Basic parameters</a></li>
+<li><a href="#ref_select_bitscore">Bitscore calculation and reference selection parameters</a></li>
+<li><a href="#ref_select_coverage">Coverage calculation parameters</a></li>
+<li><a href="#ref_select_recon">Sequence reconstruction and read filtering parameters</a></li>
+<li><a href="#ref_select_pairing">Read pairing statistical parameters</a></li>
+<li><a href="#ref_select_inputs">Input file parameters</a>
+<br>
+<br></li>
+</ul>
+<h3><a name="ref_select_basic"><code>ref_select</code> basic parameters</a> <code>[options]</code> :</h3>
 <p><code>[-h|--help]</code> <code>[-v|--version]</code> <code>[--verbose]</code> <code>[-d &lt;seq_id&gt;|--detail=&lt;seq_id&gt;]...</code> <code>[--detail_file=&lt;detail_file&gt;]</code> <code>[-q|--recon_seq]</code> <code>[--ref=&lt;ref_file&gt;]</code> <code>[-m|--mate_pair]</code> <code>[--split=&lt;n&gt;]</code> <code>[--separate_strands]</code>  <code>[--rollup]</code> <code>[--seed=&lt;n&gt;]</code> <code>[--num_threads=&lt;n&gt;]</code> </p>
 <p><b><code>-h</code> / <code>--help</code></b></p>
 <p>Request help.</p>
@@ -396,7 +406,7 @@ TGTTGTGCGCGCCATAGCGAGGGGCTCAGCACGCGTC
 <p>SEAStAR uses its own random number generator (for reproducibility among different platforms). You may use a different seed to investigate what difference randomized decisions made in the analysis are having on the results. By default <code>--seed=12345</code>.</p>
 <p><b><code>--num_threads=&lt;n&gt;</code></b></p>
 <p><code>ref_select</code> is highly multithreaded to support modern multi-core processors. Sometimes you will want to restrict the number of cores it uses (e.g. to prevent resource competition on clusters or shared computers, or when you are running more than one instance of <code>ref_select</code> at a time on a given computer.)  By default <code>--num_threads</code> is the number of cores on the machine (including &quot;hyper-threads&quot;).</p>
-<h3><code>ref_select</code> parameters for bitscore calculation and reference selection <code>[options]</code> :</h3>
+<h3><a name="ref_select_bitscore"><code>ref_select</code> parameters for bitscore calculation and reference selection</a> <code>[options]</code> :</h3>
 <p><code>[-t &lt;n&gt;|--bit_thresh=&lt;n&gt;]</code> <code>[-f &lt;n&gt;|--bit_fraction=&lt;n&gt;]</code> <code>[-l &lt;n&gt;|--read_map_limit=&lt;n&gt;]</code> <code>[-s|--second_chance_reads]</code> <code>[--relax_read_sharing]</code> <code>[--all_taxa]</code> <code>[-a|--absolute_bitscores]</code> <code>[--no_rand]</code> <code>[--sim_frac=&lt;n&gt;]</code> <code>[-e &lt;seq_id&gt;|--exclude=&lt;seq_id&gt;]...</code> <code>[--exclude_file=&lt;exclude_file&gt;]</code> <code>[--invert_exclude]</code> </p>
 <p><b><code>-t &lt;n&gt;</code> / <code>--bit_thresh=&lt;n&gt;</code></b></p>
 <p>Minimum bitscore value for a ref sequence to be selected for output. Default &gt; 0.0, all sequences with a positive bitscore. NOTE: if both --bit_fraction and --bit_thresh are used, the highest resulting threshold will be used. Use of selection thresholds is useful for selecting a &quot;noise floor&quot; to exclude sequences that have only a small number of reads uniquely aligning, which in a large sequence database (e.g. 16S rDNA databases) may only reflect sequencing errors. </p>
@@ -422,7 +432,7 @@ TGTTGTGCGCGCCATAGCGAGGGGCTCAGCACGCGTC
 <p>Filename of file containing sequence ids to treat as in <code>--exclude</code>. Format is a plain text file with one <code>&lt;seq_id&gt;</code> per line.</p>
 <p><b><code>--invert_exclude</code></b></p>
 <p><code>--exclude</code> or <code>--exclude_file</code> sequences are inverted; that is, exclude all sequences except those specified. </p>
-<h3><code>ref_select</code> parameters for coverage calculations <code>[options]</code> :</h3>
+<h3><a name="ref_select_coverage"><code>ref_select</code> parameters for coverage calculations</a> <code>[options]</code> :</h3>
 <p><code>[--per_base]</code> <code>[-w &lt;n&gt;|--cov_window=&lt;n&gt;]</code> <code>[--detect_dups]</code>  </p>
 <p><b><code>--per_base</code></b></p>
 <p>Per base statistics (coverage; and when <code>--mate_pair</code> is enabled, physical coverage and mean insert length) will be generated and output for all selected reference sequences (or only those specified by <code>--detail</code>).</p>
@@ -430,7 +440,7 @@ TGTTGTGCGCGCCATAGCGAGGGGCTCAGCACGCGTC
 <p>Fixed read length for use in calculating per position coverage. By default the actual length of each read is used when available in the FASTQ readnames (<a href="#FASTQ">see the SEAStAR FASTQ format guide</a> for details.)  If the readnames do not include length information and <code>--cov_window</code> isn&#39;t specified, then 49 nucleotides is the default fixed read length used. </p>
 <p><b><code>--detect_dups</code></b></p>
 <p>Perform additional analysis to detect likely collapsed duplications. Assumes relatively uniform coverage (i.e. a single isolate genome). Results are reported in the <code>contig_problems</code> section of the <a href="#JSON">JSON sequence graph</a>. </p>
-<h4><code>ref_select</code> parameters for sequence reconstruction and read filtering <code>[options]</code> :</h4>
+<h4><a name="ref_select_recon"><code>ref_select</code> parameters for sequence reconstruction and read filtering</a> <code>[options]</code> :</h4>
 <p><code>[--ambig_tol=&lt;n&gt;]</code> <code>[--read_output=&lt;prefix&gt;]</code> <code>[--output_nomatch]</code> <code>[--read_output_gzip]</code> </p>
 <p><b><code>--ambig_tol=&lt;n&gt;</code></b></p>
 <p>Tolerance adjusting the sensitivity for generating ambiguity codes in output sequence reconstructed from read alignments. In the range: 0.0 - 1.0. 1.0 = no ambiguities, majority rules base calling. Default is 0.2</p>
@@ -440,7 +450,7 @@ TGTTGTGCGCGCCATAGCGAGGGGCTCAGCACGCGTC
 <p>Inverse the meaning <code>--read_output</code> to write only reads that do not align with any reference sequence (whose mates also do not align).</p>
 <p><b><code>--read_output_gzip</code></b></p>
 <p>Modifies <code>--read_output</code> to write gzip compressed output files.</p>
-<h3><code>ref_select</code> parameters for generating read pairing statistics <code>[options]</code> :</h3>
+<h3>,a name=&quot;ref_select_pairing&quot;&gt;<code>ref_select</code> parameters for generating read pairing statistics</a> <code>[options]</code> :</h3>
 <p><code>[--mp_mate_lim=&lt;n&gt;]</code> <code>[--mp_share_lim=&lt;n&gt;]</code> <code>[--mp_strict]</code> <code>[--mp_inserts]</code> <code>[--mp_circular]</code> <code>[--mp_cutoff=&lt;n&gt;]</code></p>
 <p><b><code>--mp_mate_cnt=&lt;n&gt;</code></b></p>
 <p>Minimum count of mapping read-pairs for generation of a mate-pair linking edge in the output graph (normal or internal). Default is 2, meaning that no edges consisting of a single read-pair will be output.</p>
@@ -456,14 +466,14 @@ TGTTGTGCGCGCCATAGCGAGGGGCTCAGCACGCGTC
 <p>Allow circular self-linking mate-pairs to join the opposite ends of a single sequence.</p>
 <p><b><code>--mp_cutoff=&lt;n&gt;</code></b></p>
 <p>Insert size cutoff for inclusion of an individual mate-pair in per base statistics. Setting this option for some reasonable upper limit of the length of a valid insert will prevent sequence duplications from improperly skewing estimation of the true mean insert size. </p>
-<h3><code>ref_select</code> parameters for specifying additional input files <code>[options]</code> :</h3>
+<h3><a name="ref_select_inputs"><code>ref_select</code> parameters for specifying input files</a> <code>[options]</code> :</h3>
 <p><code>[-r &lt;read_file&gt;|--read_file=&lt;read_file&gt;]...</code> <code>[--rev_read_file=&lt;read_file&gt;]...</code> <code>[--old_bwa_samse]</code> <code>[-c &lt;catalog_file&gt;|--catalog=&lt;catalog_file&gt;]</code> <code>[--rev_align=&lt;sam_file&gt;]...</code> </p>
 <p><b><code>-r &lt;read_file&gt;</code> / <code>--read_file=&lt;read_file&gt;</code></b></p>
 <p>Input filename(s) for FASTQ read files used for sequence reconstruction and/or read filtering.</p>
 <p><b><code>--rev_read_file=&lt;read_file&gt;</code></b></p>
-<p>Same as --read_file above, but used for paired reads that are on the opposite strand from each other. By default, <code>ref_select</code> assumes that paired reads are from the same DNA strand.  When this is not true, then one of the two readsets must be specified using <code>--rev_read_file</code>.  Note, this must be done consistently with the use of <code>--rev_align</code>.</p>
+<p>Same as --read_file above, but used for paired reads that are on the opposite strand from each other. By default, <code>ref_select</code> assumes that paired reads are from the same DNA strand.  When this is not true, then one of the two readsets (read1/read2) must be specified using <code>--rev_read_file</code>.  Note, this must be done consistently with the use of <code>--rev_align</code>.</p>
 <p><b><code>--old_bwa_samse</code></b></p>
-<p>Use the old BWA-style &quot;samse&quot; alignment format instead of SAM. This format was used by the BWA <code>samse -n</code> command until BWA version (TBD, look this up!)</p>
+<p>Use the old BWA-style &quot;samse&quot; alignment format instead of SAM. This format was used by the BWA <code>samse -n</code> command until BWA version 0.5.6.</p>
 <p><b><code>-c &lt;catalog_file&gt;</code> / <code>--catalog=&lt;catalog_file&gt;</code></b></p>
 <p>Filename of a reference catalog file. Required for use <code>--old_bwa_samse</code>. This is optional otherwise, although it is required to associate sequence descriptions with reference sequences in the JSON output, or for use of the <code>--rollup</code> functionality when reference sequences are actually subsequences of parent sequences (e.g. scaffolds or chromosomes of a whole genome). A catalog is a tab separated (TSV) plain text file with the following columns:</p>
 <pre><code>  seq_id     seq_len     parent_id   seq_description </code></pre>
@@ -626,7 +636,7 @@ TGTTGTGCGCGCCATAGCGAGGGGCTCAGCACGCGTC
 <li><p><code>header : true</code></p>
 <p> Write a header row in the output table with labels for each column.</p>
 <p> Example:</p>
-<pre><code>  # Write a header row.
+<pre><code>  # Write a header row (false is default).
   TABLE {&quot;header&quot;:true}</code></pre>
 </li>
 </ul>
@@ -669,7 +679,7 @@ TGTTGTGCGCGCCATAGCGAGGGGCTCAGCACGCGTC
 </li>
 </ul>
 <h3><a name="DOT"><code>DOT</code></a></h3>
-<p>Write the current graph data to a <a href="http://www.graphviz.org/">graphviz</a> format <a href="http://www.graphviz.org/content/dot-language">DOT</a> file for visualization or other processing. Some of the parameters listed below allow your to change node and edge parameters that will affect the output style of graphs rendered using the <a href="http://www.graphviz.org/pdf/dotguide.pdf"><code>dot</code></a> or <a href="http://www.graphviz.org/pdf/neatoguide.pdf"><code>neato</code></a> layout tools that are part of the graphviz package. The parameters provided here give only very limited control of the most common style choices available. The <a href="http://www.graphviz.org/pdf/gvpr.1.pdf"><code>gvpr</code></a> language supplied by graphviz is much better suited for more detailed manipulation of the myriad of rendering options available.</p>
+<p>Write the current graph data to a <a href="http://www.graphviz.org/">graphviz</a> format <a href="http://www.graphviz.org/content/dot-language">DOT</a> file for visualization or other processing. Some of the parameters listed below allow you to change node and edge parameters that will affect the output style of graphs rendered using the <a href="http://www.graphviz.org/pdf/dotguide.pdf"><code>dot</code></a> or <a href="http://www.graphviz.org/pdf/neatoguide.pdf"><code>neato</code></a> layout tools that are part of the graphviz package. The parameters provided here give only very limited control of the most common style choices available. The <a href="http://www.graphviz.org/pdf/gvpr.1.pdf"><code>gvpr</code></a> language supplied by graphviz is much better suited for more detailed manipulation of the myriad of rendering options available.</p>
 <p><strong>Parameters:</strong></p>
 <ul>
 <li><p><code>file : &quot;filename.dot[.gz]&quot;</code> </p>

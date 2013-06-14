@@ -2415,6 +2415,8 @@ int main(const int argc, char *argv[]) {
                 
 #pragma omp section 
                 {   // FASTQ Read handler
+                    char *space = NULL;
+                    int space_index = -1;
                     
                     FILE *R_in = fdopen(pipe1[0], "r");
                     
@@ -2446,6 +2448,14 @@ int main(const int argc, char *argv[]) {
                             ss_strcat_utstring(name_str, utstring_body(str4)+4);
                         } else {  // Else, only skip @
                             ss_strcat_utstring(name_str, utstring_body(str4)+1);
+                        }
+                        
+                        // Some fastq header lines may have description text after first space.
+                        // Remove everything after space here.
+                        space = strchr(utstring_body(name_str), ' ');
+                        if (space) {
+                            space_index =  space - utstring_body(name_str);
+                            ss_trunc_utstring(name_str, utstring_len(name_str) - space_index - 1);
                         }
                         
                         if (utstring_body(name_str)[utstring_len(name_str) - 3] == '/') {

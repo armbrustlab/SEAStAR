@@ -1,6 +1,6 @@
 <link href="style.css" media="screen" rel="stylesheet" type="text/css" />
 
-SEAStAR User Guide, version 0.4.9
+SEAStAR User Guide, version 0.4.10
 ==============================
 ####Vaughn Iverson and Chris Berthiaume
 
@@ -192,7 +192,7 @@ This will produce the same scaffolded assembly as the previous example, but in a
     
     for i in lambda_asm?.dot; do neato -Tpdf $i > ${i##.*}.pdf; done
 
-You should now be able to load the PDF files with your favorite PDF viewer in order from `lambda_asm0.pdf` through `lambda_asm6.pdf` to see the effect of each `graph_ops` command in the script above. Each graph represents the state of the assembly before/after each successive step, showing the operation of graph_ops as it run on this example dataset.  
+You should now be able to load the PDF files with your favorite PDF viewer in order from `lambda_asm0.pdf` through `lambda_asm6.pdf` to see the effect of each `graph_ops` command in the script above. Each graph represents the state of the assembly before/after each successive step, showing the operation of graph_ops as it operated on this example dataset.  
 
 ###Estimating 16S sequence abundance
 
@@ -625,9 +625,19 @@ Because `ref_select` has many options, and produces many different kinds of outp
 
 The approaches used by `ref_select` to accomplish these tasks are described in more detail in the methods section of ([Iverson, *et al.* 2012](http://www.sciencemag.org/content/335/6068/587.abstract)).  
 
-The `[options]` reference below splits the various parameters into general categories related to the above tasks. 
+###The `[options]` reference below organizes the various parameters into general categories related to the above tasks: 
 
-###`ref_select` basic parameters `[options]` : 
++ [Basic parameters][ref_select_basic]
++ [Bitscore calculation and reference selection parameters][ref_select_bitscore]
++ [Coverage calculation parameters][ref_select_coverage]
++ [Sequence reconstruction and read filtering parameters][ref_select_recon]
++ [Read pairing statistical parameters][ref_select_pairing]
++ [Input file parameters][ref_select_inputs]
+<br>
+<br>
+
+[ref_select_basic]: #ref_select_basic
+###<a name="ref_select_basic">`ref_select` basic parameters</a> `[options]` : 
 `[-h|--help]` `[-v|--version]` `[--verbose]` `[-d <seq_id>|--detail=<seq_id>]...` `[--detail_file=<detail_file>]` `[-q|--recon_seq]` `[--ref=<ref_file>]` `[-m|--mate_pair]` `[--split=<n>]` `[--separate_strands]`  `[--rollup]` `[--seed=<n>]` `[--num_threads=<n>]` 
 
 <b>`-h` / `--help`</b>
@@ -682,7 +692,8 @@ SEAStAR uses its own random number generator (for reproducibility among differen
 
 `ref_select` is highly multithreaded to support modern multi-core processors. Sometimes you will want to restrict the number of cores it uses (e.g. to prevent resource competition on clusters or shared computers, or when you are running more than one instance of `ref_select` at a time on a given computer.)  By default `--num_threads` is the number of cores on the machine (including "hyper-threads").
 
-###`ref_select` parameters for bitscore calculation and reference selection `[options]` : 
+[ref_select_bitscore]: #ref_select_bitscore
+###<a name="ref_select_bitscore">`ref_select` parameters for bitscore calculation and reference selection</a> `[options]` : 
 `[-t <n>|--bit_thresh=<n>]` `[-f <n>|--bit_fraction=<n>]` `[-l <n>|--read_map_limit=<n>]` `[-s|--second_chance_reads]` `[--relax_read_sharing]` `[--all_taxa]` `[-a|--absolute_bitscores]` `[--no_rand]` `[--sim_frac=<n>]` `[-e <seq_id>|--exclude=<seq_id>]...` `[--exclude_file=<exclude_file>]` `[--invert_exclude]` 
 
 <b>`-t <n>` / `--bit_thresh=<n>`</b>
@@ -733,8 +744,8 @@ Filename of file containing sequence ids to treat as in `--exclude`. Format is a
 
 `--exclude` or `--exclude_file` sequences are inverted; that is, exclude all sequences except those specified. 
 
-
-###`ref_select` parameters for coverage calculations `[options]` : 
+[ref_select_coverage]: #ref_select_coverage
+###<a name="ref_select_coverage">`ref_select` parameters for coverage calculations</a> `[options]` : 
 `[--per_base]` `[-w <n>|--cov_window=<n>]` `[--detect_dups]`  
 
 <b>`--per_base`</b>
@@ -750,7 +761,8 @@ Fixed read length for use in calculating per position coverage. By default the a
 Perform additional analysis to detect likely collapsed duplications. Assumes relatively uniform coverage (i.e. a single isolate genome). Results are reported in the `contig_problems` section of the [JSON sequence graph][JSON]. 
 
 
-####`ref_select` parameters for sequence reconstruction and read filtering `[options]` : 
+[ref_select_recon]: #ref_select_recon
+####<a name="ref_select_recon">`ref_select` parameters for sequence reconstruction and read filtering</a> `[options]` : 
 `[--ambig_tol=<n>]` `[--read_output=<prefix>]` `[--output_nomatch]` `[--read_output_gzip]` 
 
 <b>`--ambig_tol=<n>`</b>
@@ -769,8 +781,8 @@ Inverse the meaning `--read_output` to write only reads that do not align with a
 
 Modifies `--read_output` to write gzip compressed output files.
 
-
-###`ref_select` parameters for generating read pairing statistics `[options]` : 
+[ref_select_pairing]: #ref_select_pairing
+###,a name="ref_select_pairing">`ref_select` parameters for generating read pairing statistics</a> `[options]` : 
 `[--mp_mate_lim=<n>]` `[--mp_share_lim=<n>]` `[--mp_strict]` `[--mp_inserts]` `[--mp_circular]` `[--mp_cutoff=<n>]`
 
 <b>`--mp_mate_cnt=<n>`</b>
@@ -801,8 +813,8 @@ Allow circular self-linking mate-pairs to join the opposite ends of a single seq
 
 Insert size cutoff for inclusion of an individual mate-pair in per base statistics. Setting this option for some reasonable upper limit of the length of a valid insert will prevent sequence duplications from improperly skewing estimation of the true mean insert size. 
 
-
-###`ref_select` parameters for specifying additional input files `[options]` : 
+[ref_select_inputs]: #ref_select_inputs
+###<a name="ref_select_inputs">`ref_select` parameters for specifying input files</a> `[options]` : 
 `[-r <read_file>|--read_file=<read_file>]...` `[--rev_read_file=<read_file>]...` `[--old_bwa_samse]` `[-c <catalog_file>|--catalog=<catalog_file>]` `[--rev_align=<sam_file>]...` 
 
 <b>`-r <read_file>` / `--read_file=<read_file>`</b>
@@ -811,11 +823,11 @@ Input filename(s) for FASTQ read files used for sequence reconstruction and/or r
 
 <b>`--rev_read_file=<read_file>`</b>
 
-Same as --read_file above, but used for paired reads that are on the opposite strand from each other. By default, `ref_select` assumes that paired reads are from the same DNA strand.  When this is not true, then one of the two readsets must be specified using `--rev_read_file`.  Note, this must be done consistently with the use of `--rev_align`.
+Same as --read_file above, but used for paired reads that are on the opposite strand from each other. By default, `ref_select` assumes that paired reads are from the same DNA strand.  When this is not true, then one of the two readsets (read1/read2) must be specified using `--rev_read_file`.  Note, this must be done consistently with the use of `--rev_align`.
 
 <b>`--old_bwa_samse`</b>
 
-Use the old BWA-style "samse" alignment format instead of SAM. This format was used by the BWA `samse -n` command until BWA version (TBD, look this up!)
+Use the old BWA-style "samse" alignment format instead of SAM. This format was used by the BWA `samse -n` command until BWA version 0.5.6.
 
 <b>`-c <catalog_file>` / `--catalog=<catalog_file>`</b>
 
@@ -1024,7 +1036,7 @@ Write `ref_select` statistics for selected reference sequences to a TSV file. Th
    
    Example:
 
-        # Write a header row.
+        # Write a header row (false is default).
         TABLE {"header":true}
 
 [`FASTA`]: #FASTA
@@ -1082,7 +1094,7 @@ Write sequences contained in the current graph data to a FASTA format file
 [`DOT`]: #DOT
 ###<a name="DOT">`DOT`</a>
 
-Write the current graph data to a [graphviz](http://www.graphviz.org/) format [DOT](http://www.graphviz.org/content/dot-language) file for visualization or other processing. Some of the parameters listed below allow your to change node and edge parameters that will affect the output style of graphs rendered using the [`dot`](http://www.graphviz.org/pdf/dotguide.pdf) or [`neato`](http://www.graphviz.org/pdf/neatoguide.pdf) layout tools that are part of the graphviz package. The parameters provided here give only very limited control of the most common style choices available. The [`gvpr`](http://www.graphviz.org/pdf/gvpr.1.pdf) language supplied by graphviz is much better suited for more detailed manipulation of the myriad of rendering options available.
+Write the current graph data to a [graphviz](http://www.graphviz.org/) format [DOT](http://www.graphviz.org/content/dot-language) file for visualization or other processing. Some of the parameters listed below allow you to change node and edge parameters that will affect the output style of graphs rendered using the [`dot`](http://www.graphviz.org/pdf/dotguide.pdf) or [`neato`](http://www.graphviz.org/pdf/neatoguide.pdf) layout tools that are part of the graphviz package. The parameters provided here give only very limited control of the most common style choices available. The [`gvpr`](http://www.graphviz.org/pdf/gvpr.1.pdf) language supplied by graphviz is much better suited for more detailed manipulation of the myriad of rendering options available.
 
 **Parameters:**
 
