@@ -1,6 +1,6 @@
 <link href="style.css" media="screen" rel="stylesheet" type="text/css" />
 
-<h1>SEAStAR User Guide, version 0.4.10</h1>
+<h1>SEAStAR User Guide, version 0.4.11</h1>
 <h4>Vaughn Iverson and Chris Berthiaume</h4>
 <h5><a href="http://armbrustlab.ocean.washington.edu">Armbrust Lab</a>, School of Oceanography, University of Washington</h5>
 <h2>Table of Contents</h2>
@@ -93,7 +93,7 @@ bwa samse -n 1000000 lambda_contigs.fna lambda_trim.single.sai lambda_trim.singl
 <p>The resulting alignment files are in SAM format, which is what the next operation requires.</p>
 <h3>Constructing an assembly graph</h3>
 <p>Now we will use the <code>ref_select</code> tool to convert the colorspace contig sequences to nucleotides and output the matepair assembly graph JSON file.</p>
-<pre><code>ref_select -q -m -r lambda_trim.read1.fastq.gz -r lambda_trim.read2.fastq.gz -r lambda_trim.single.fastq.gz lambda_trim.read1.sam lambda_trim.read2.sam lambda_trim.single.sam &gt; lambda_asm.json</code></pre>
+<pre><code>ref_select -q -m --mp_mate_cnt=10 -r lambda_trim.read1.fastq.gz -r lambda_trim.read2.fastq.gz -r lambda_trim.single.fastq.gz lambda_trim.read1.sam lambda_trim.read2.sam lambda_trim.single.sam &gt; lambda_asm.json</code></pre>
 <h3>Producing scaffolded sequence</h3>
 <pre><code># The following chain of graph_ops commands accomplish the following steps:
 # MST - Convert the assembly graph into a directed spanning tree
@@ -450,7 +450,7 @@ TGTTGTGCGCGCCATAGCGAGGGGCTCAGCACGCGTC
 <p>Inverse the meaning <code>--read_output</code> to write only reads that do not align with any reference sequence (whose mates also do not align).</p>
 <p><b><code>--read_output_gzip</code></b></p>
 <p>Modifies <code>--read_output</code> to write gzip compressed output files.</p>
-<h3>,a name=&quot;ref_select_pairing&quot;&gt;<code>ref_select</code> parameters for generating read pairing statistics</a> <code>[options]</code> :</h3>
+<h3><a name="ref_select_pairing"><code>ref_select</code> parameters for generating read pairing statistics</a> <code>[options]</code> :</h3>
 <p><code>[--mp_mate_lim=&lt;n&gt;]</code> <code>[--mp_share_lim=&lt;n&gt;]</code> <code>[--mp_strict]</code> <code>[--mp_inserts]</code> <code>[--mp_circular]</code> <code>[--mp_cutoff=&lt;n&gt;]</code></p>
 <p><b><code>--mp_mate_cnt=&lt;n&gt;</code></b></p>
 <p>Minimum count of mapping read-pairs for generation of a mate-pair linking edge in the output graph (normal or internal). Default is 2, meaning that no edges consisting of a single read-pair will be output.</p>
@@ -854,6 +854,24 @@ TGTTGTGCGCGCCATAGCGAGGGGCTCAGCACGCGTC
   # ordering of the candidate contigs
   INSERT {&quot;min_pos_diff&quot;:75}</code></pre>
 </li>
+<li><p><code>dup_kmer : &lt;int&gt;</code></p>
+<p> Length of k-mers to use for detecting variant duplicate contigs</p>
+<p> Examples:</p>
+<pre><code>  # Default. Use 14-mers to detect duplicate variant contigs before inserting 
+  # them between scaffold backbone contigs.
+  INSERT {&quot;dup_kmer&quot;:14}
+
+  # Disable duplicate variant contig checks.
+  INSERT {&quot;dup_kmer&quot;:0} </code></pre>
+</li>
+</ul>
+<p><code>dup_thresh : &lt;float&gt;</code></p>
+<p>   Fraction of kmers from a contig with hits to scaffold backbone.</p>
+<p>   Example: </p>
+<pre><code>    # Default. If more than 15% of kmers for a contig hit kmers from the scaffold 
+    # backbone contigs, then do not insert that contig. 
+    INSERT {&quot;dup_thresh&quot;:0.15} </code></pre>
+<ul>
 <li><p><code>verbose : true</code></p>
 <p> Output diagnostics on STDERR</p>
 <p> Example:</p>
@@ -1020,6 +1038,13 @@ TGTTGTGCGCGCCATAGCGAGGGGCTCAGCACGCGTC
 
   # Default. Select only the named contig(s)
   SELND {&quot;radius&quot;:0} </code></pre>
+</li>
+<li><p><code>sequence : &lt;string&gt;</code></p>
+<p> Select contig(s) found to contain the provided DNA sequence.</p>
+<p> NOTE! This isn&#39;t BLAST, the sequence must match exactly. Any differences, including ambiguity codes, etc. will prevent matching. The only extra thing that is done is the reverse complement of the provided sequence is also searched.</p>
+<p> Example:</p>
+<pre><code>  # Select contig(s) containing the provided sequence (or its reverse complement).
+  SELND {&quot;sequence&quot;:&quot;AGACTAGCAGATATACGATAACGATACGATACGAT&quot;}</code></pre>
 </li>
 </ul>
 <h3><a name="SCAFLNK"><code>SCAFLNK</code></a></h3>

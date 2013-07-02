@@ -1,6 +1,6 @@
 <link href="style.css" media="screen" rel="stylesheet" type="text/css" />
 
-SEAStAR User Guide, version 0.4.10
+SEAStAR User Guide, version 0.4.11
 ==============================
 ####Vaughn Iverson and Chris Berthiaume
 
@@ -142,7 +142,7 @@ The resulting alignment files are in SAM format, which is what the next operatio
 
 Now we will use the `ref_select` tool to convert the colorspace contig sequences to nucleotides and output the matepair assembly graph JSON file.
 
-    ref_select -q -m -r lambda_trim.read1.fastq.gz -r lambda_trim.read2.fastq.gz -r lambda_trim.single.fastq.gz lambda_trim.read1.sam lambda_trim.read2.sam lambda_trim.single.sam > lambda_asm.json
+    ref_select -q -m --mp_mate_cnt=10 -r lambda_trim.read1.fastq.gz -r lambda_trim.read2.fastq.gz -r lambda_trim.single.fastq.gz lambda_trim.read1.sam lambda_trim.read2.sam lambda_trim.single.sam > lambda_asm.json
 
 ###Producing scaffolded sequence
 
@@ -782,7 +782,7 @@ Inverse the meaning `--read_output` to write only reads that do not align with a
 Modifies `--read_output` to write gzip compressed output files.
 
 [ref_select_pairing]: #ref_select_pairing
-###,a name="ref_select_pairing">`ref_select` parameters for generating read pairing statistics</a> `[options]` : 
+###<a name="ref_select_pairing">`ref_select` parameters for generating read pairing statistics</a> `[options]` : 
 `[--mp_mate_lim=<n>]` `[--mp_share_lim=<n>]` `[--mp_strict]` `[--mp_inserts]` `[--mp_circular]` `[--mp_cutoff=<n>]`
 
 <b>`--mp_mate_cnt=<n>`</b>
@@ -1337,6 +1337,29 @@ Reconnect contigs with ambiguous placement within a scaffold using relative mean
         # will be considered significant enough to use in determining the relative 
         # ordering of the candidate contigs
         INSERT {"min_pos_diff":75}
+
++ `dup_kmer : <int>`
+
+   Length of k-mers to use for detecting variant duplicate contigs
+
+   Examples:
+   
+        # Default. Use 14-mers to detect duplicate variant contigs before inserting 
+        # them between scaffold backbone contigs.
+        INSERT {"dup_kmer":14}
+
+        # Disable duplicate variant contig checks.
+        INSERT {"dup_kmer":0} 
+
+`dup_thresh : <float>`
+
+   Fraction of kmers from a contig with hits to scaffold backbone.
+
+   Example: 
+   
+        # Default. If more than 15% of kmers for a contig hit kmers from the scaffold 
+        # backbone contigs, then do not insert that contig. 
+        INSERT {"dup_thresh":0.15} 
         
 + `verbose : true`
    
@@ -1577,6 +1600,17 @@ Select contigs from the connected neighborhood(s) of the given contig(s)
 
         # Default. Select only the named contig(s)
         SELND {"radius":0} 
+
++ `sequence : <string>`
+
+   Select contig(s) found to contain the provided DNA sequence.
+   
+   NOTE! This isn't BLAST, the sequence must match exactly. Any differences, including ambiguity codes, etc. will prevent matching. The only extra thing that is done is the reverse complement of the provided sequence is also searched.
+
+   Example:
+   
+        # Select contig(s) containing the provided sequence (or its reverse complement).
+        SELND {"sequence":"AGACTAGCAGATATACGATAACGATACGATACGAT"}
 
 [`SCAFLNK`]: #SCAFLNK
 ###<a name="SCAFLNK">`SCAFLNK`</a> 

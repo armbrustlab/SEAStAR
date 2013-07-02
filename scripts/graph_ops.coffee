@@ -444,8 +444,22 @@ build_removed_graph_refs = (j, nf = null, ef = null) ->
       e.tar.rem_links.push(l_in)
       ef? e
 
-   # return the removed node and edge lists (side effects also accessable in j)
-   [n_out, e_out]  
+   s_out = (for e, i in j.shared_seq_edges    # Walk through all of the shared edges
+      # Check to make sure that this edge is consistent with the current nodeset(s)
+      # If not, there is a bug somewhere else and this error is fatal.
+      unless e.src = j.nodes[e.n1] or j.removed_nodes[e.n1]
+         throw "build_removed_graph_refs: Missing node #{e.n1} in shared edge with #{e.n2}."
+      unless e.tar = j.nodes[e.n2] or j.removed_nodes[e.n2]
+         throw "build_removed_graph_refs: Missing node #{e.n2} in shared edge with #{e.n1}."
+      # Build a shared edges object in each node with a member for each other node sharing sequence
+      e.src.shared_links ?= {}
+      e.src.shared_links[e.tar.id] = e
+      e.tar.shared_links ?= {}
+      e.tar.shared_links[e.src.id] = e
+      e)
+
+   # return the removed nodes, and removed / shared edge lists (side effects also accessable in j)
+   [n_out, e_out, s_out]  
 
 ###   
 # Remove the internal references between nodes and edges in the graph 
@@ -460,6 +474,7 @@ remove_graph_refs = (j, nf = null, ef = null) ->
       delete n.links
       delete n.inlinks
       delete n.outlinks
+      delete n.shared_links
       delete n.rem_links
       delete n.rem_inlinks
       delete n.rem_outlinks      
@@ -472,12 +487,18 @@ remove_graph_refs = (j, nf = null, ef = null) ->
       ef? e
       e)
 
+   j.shared_seq_edges = (for e in j.shared_seq_edges when e?
+      delete e.src
+      delete e.tar
+      e)
+
    if j.removed_nodes?
       for name, n of j.removed_nodes
          delete n.id
          delete n.links
          delete n.inlinks
          delete n.outlinks
+         delete n.shared_links
          delete n.rem_links
          delete n.rem_inlinks
          delete n.rem_outlinks      
@@ -2082,6 +2103,7 @@ min_seqlen : <int> -- Select connected components with <int> or more sequence wi
         at least 1000 bases of sequence.\n
 \n
 sequence : <string> -- Select connected components containing the provided DNA sequence.\n
+\n
         NOTE! This isn't BLAST, the sequence must match exactly. Any differences, including\n
         ambiguity codes, etc. will prevent matching. The only extra thing that is done is the\n
         reverse complement of the provided sequence is also searched.\n
@@ -2191,6 +2213,7 @@ find_neighbors = (nd, r) ->
 #     name = string id of a node to find in a cc
 #     names = list of strings of names to find in multiple
 #     radius = number of hops to take searching for neighoring nodes
+#     sequence = DNA sequence to search for.
 ###
 grab_neighbors = (j, args={}, callback) ->
 # j = json graph object, args = arguments from command, callback = function to call when done
@@ -2219,7 +2242,17 @@ radius : <int> -- Size of the neighborhood of contigs to select\n
         Example: #{args.help} {\"radius\":2} -- Select all neighbors and neighbors of\n        
         neighbors\n
 \n
-        Example: #{args.help} {\"radius\":0} -- Default. Select only the named contig(s)\n        
+        Example: #{args.help} {\"radius\":0} -- Default. Select only the named contig(s)\n
+\n
+sequence : <string> -- Select contig(s) found to contain the provided DNA sequence.\n
+\n
+        NOTE! This isn't BLAST, the sequence must match exactly. Any differences, including\n
+        ambiguity codes, etc. will prevent matching. The only extra thing that is done is the\n
+        reverse complement of the provided sequence is also searched.\n
+\n
+        Example: #{args.help} {\"sequence\":\"AGACTAGCAGATATACGATAACGATACGATACGAT\"}\n
+        Select contig(s) containing the provided sequence (or its reverse complement).\n        
+\n
 ")
       callback?(null, j)
       return
@@ -2231,6 +2264,13 @@ radius : <int> -- Size of the neighborhood of contigs to select\n
       return
 
    args.names = [args.name] if args.name? 
+
+   if args.sequence
+      args.names = []
+      revseq = reverse_comp(args.sequence)
+      for nid, n of j.nodes when seq = n.recon_seq
+         if seq.indexOf(args.sequence) isnt -1 or seq.indexOf(revseq) isnt -1
+            args.names.push(nid)
 
    args.radius ?= 0
 
@@ -2737,6 +2777,19 @@ min_pos_diff : <int> -- Minimum mapping position difference (within a neighborin
         contigs and a neighboring existing contig) will be considered significant enough\n
         to use in determining the relative ordering of the candidate contigs\n
 \n
+dup_kmer : <int> -- Length of k-mers to use for detecting variant duplicate contigs\n
+\n
+        Example: #{args.help} {\"dup_kmer\":14} -- Default. Use 14-mers to detect\n
+        duplicate variant contigs before inserting them between scaffold backbone contigs.\n
+
+        Example: #{args.help} {\"dup_kmer\":0} -- Disable duplicate variant contig checks.\n
+\n
+dup_thresh : <float> -- Fraction of kmers from a contig with hits to scaffold backbone.\n
+\n
+        Example: #{args.help} {\"dup_thresh\":0.15} -- Default. If more than 15% of kmers\n
+        for a contig hit kmers from the scaffold backbone contigs, then do not insert\n
+        that contig.\n
+\n
 verbose : true -- output diagnostics on STDERR\n
 \n
         Example: #{args.help} {\"verbose\":true} -- Generate extra output information\n
@@ -2757,6 +2810,9 @@ verbose : true -- output diagnostics on STDERR\n
 
    args.thresh ?= 250.0
    args.min_pos_diff ?= 75
+
+   args.dup_kmer ?= 14
+   args.dup_thresh ?= 0.15
 
    if args.ccname?
       args.ccnames = [args.ccname]
@@ -2780,6 +2836,7 @@ verbose : true -- output diagnostics on STDERR\n
 
       in_nodes_added = {}
       out_nodes_added = {}
+      shared_seq_nodes = {}
       in_idx = {}
       out_idx = {}
    
@@ -2806,20 +2863,58 @@ verbose : true -- output diagnostics on STDERR\n
       
       cc_chain_levels.push(chain_levels)
       
+      calc_mers = (k, seq, mers = {}) ->
+         for c in [0..seq.length-k]
+            mers[seq[c...c+k]] = true
+         mers 
+
+      shared_mers = (ref_mers, query_mers) ->
+         q_mers = Object.keys(query_mers)
+         total = 0
+         total++ for q in q_mers when ref_mers[q]?
+         total / q_mers.length             
+
+      mers_shared = 0.0
+      all_mers_shared = 0.0
+
+      if args.dup_kmer
+         all_mers = {}
+         for n, l in chain_levels
+            all_mers = calc_mers(args.dup_kmer, n.recon_seq, all_mers)
+      
       for n, l in chain_levels
-          
          for e in n.rem_links when j.removed_nodes[e[1].id]? and edge = edge_director(n, e[1], e[0])
-         
-            if n.id is edge.n1
-               out_nodes_added[e[1].id] ?= [] 
-               out_nodes_added[e[1].id].push(e[0])
-               out_idx[e[1].id] ?= []
-               out_idx[e[1].id].push(n.chain_idx)
+
+            other = if n.id is edge.n1 then edge.n2 else edge.n1
+
+            if args.dup_kmer
+               contig_mers = calc_mers(args.dup_kmer, e[1].recon_seq)
+               all_mers_shared = shared_mers(all_mers, contig_mers)
+            
+            if all_mers_shared > args.dup_thresh 
+               shared_seq_nodes[other] ?= []
+               shared_seq_nodes[other].push(n.id)
+               console.warn("Shared sequence variant node #{other} rejected from #{n.id} #{args.dup_kmer}_mers shared: #{all_mers_shared}") if args.verbose
             else 
-               in_nodes_added[e[1].id] ?= [] 
-               in_nodes_added[e[1].id].push(e[0])
-               in_idx[e[1].id] ?= []
-               in_idx[e[1].id].push(n.chain_idx)
+               if n.id is edge.n1 
+                  out_nodes_added[e[1].id] ?= [] 
+                  out_nodes_added[e[1].id].push(e[0])
+                  out_idx[e[1].id] ?= []
+                  out_idx[e[1].id].push(n.chain_idx)
+               else 
+                  in_nodes_added[e[1].id] ?= [] 
+                  in_nodes_added[e[1].id].push(e[0])
+                  in_idx[e[1].id] ?= []
+                  in_idx[e[1].id].push(n.chain_idx)
+            
+      # Completely remove candidate nodes/edges that are shared sequence variants with 
+      # nodes of the existing scaffold backbone, as they cannot be properly inserted in
+      # any gap without causing artifactual repeats.
+      for id of shared_seq_nodes  
+         delete in_nodes_added[id]
+         delete in_idx[id]
+         delete out_nodes_added[id]
+         delete out_idx[id]
          
       # Remove candidate nodes / edges that don't have both in and out edges from the existing scaffold
       # Only consider nodes with both in and out edges to the scaffold nodes

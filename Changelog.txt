@@ -1,3 +1,43 @@
+### 0.4.11 ###
+
+- The graph_ops INSERT command now has two new parameters which are enabled by 
+default. dup_kmer and dup_thresh control the k-mer length and a fractional
+threshold used to determine if a contig about to be inserted between to 
+pre-existing scaffold contigs contains any substantial duplications (e.g. it is
+a variant assembly) of contigs already in the scaffold.  This can be a problem
+for metagenomic assemblies where a few variant SNPs occurring near the end of a 
+contig can cause the contig assembler to produce an alternate assembly for that
+region. In this case, the mate pairing information may incorrectly direct that 
+sequence into the gap nearest to where the other variant is already integrated
+in an existing contig. These changes to INSERT detect and avoid most such 
+situations.
+
+- The graph_ops SELND command now has the same "sequence" selection parameter
+that was previously added to the SELCC command.
+
+- seq_scaffold now attempts to find direct sequence overlaps to fill the gap
+between neighboring contigs before attempting to heal the gap using contigs 
+from an alternate assembly. This change causes seq_scaffold to avoid some 
+situations where an erroneous alternate assembly can cause sequence 
+duplication into a gap that could be filled via a simple end-overlap.
+
+- Improved the diagnostic (--verbose) output of seq_scaffold for gaps "healed" 
+with sequence from alternate assembly contigs.
+
+- Fixed a bug that caused seq_scaffold to crash when all input scaffold
+sequences are largely ambiguous.
+
+- In ref_select, combination of --per_base and --mate_pair now implicitly 
+turn on --mp_inserts functionality; previously this needed to be done
+manually, even though the above combination depends on enabling --mp_inserts 
+to work correctly.
+
+- Improved the test_data set and included a script to regenerate the lambda
+phage contigs and SAM format alignment files used to validate a SEAStAR build
+via the "make test" CTest cases.
+
+- Documentation improvements
+
 ### 0.4.10 ###
 
 - Fixed a bug in ref_select where text in FASTQ read headers after the first

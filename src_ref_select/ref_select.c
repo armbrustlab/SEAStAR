@@ -2036,7 +2036,7 @@ int main(const int argc, char *argv[]) {
 
         recon_array_size = 1;
         
-        if (mp_inserts->count) {
+        if (mp_inserts->count || (detailed->count && mp_analysis->count)) {
             // MP Insert stats are always in the last two arrays (recon_array_size - 1 and recon_array_size - 2)
             recon_array_size = 3;
         }
@@ -2157,7 +2157,7 @@ int main(const int argc, char *argv[]) {
     ////////////////////////////////////////////////////////////////////////////////////
     // This code estimates the mate-pair insertion size for all reference sequences
     
-    if (mp_inserts->count) {
+    if (mp_inserts->count || (detailed->count && mp_analysis->count)) {
         
         if (v->count) {    
             fprintf(stderr, "INFO: Mate-pair insert estimation\n");
@@ -2991,7 +2991,7 @@ int main(const int argc, char *argv[]) {
     
     if (selected && selected->bit_score >= bit_thresh) {
         
-#pragma omp parallel for default(none) private(seq) shared(num_sel,sel_list,total_abund,cov_window,mp_inserts,recon_array_size) reduction(+ : num_selected, total_fractional_abundance) 
+#pragma omp parallel for default(none) private(seq) shared(num_sel,sel_list,total_abund,cov_window,mp_inserts,recon_array_size,detailed,mp_analysis) reduction(+ : num_selected, total_fractional_abundance) 
         for (int z = 0; z < num_sel; z++) {    // Walk through all sequences
             
             if (!(seq = sel_list[z])) continue;
@@ -3023,7 +3023,7 @@ int main(const int argc, char *argv[]) {
                         uncovered += (val == 0);
                     }
                     
-                    if (mp_inserts->count) {
+                    if (mp_inserts->count || (detailed->count && mp_analysis->count)) {
                         
                         for (int x = 1; x <= seq->seq_len; x++) {
                             double val = seq->recon_array[recon_array_size-1][x];
@@ -3092,7 +3092,7 @@ int main(const int argc, char *argv[]) {
                 }
             }
 
-#pragma omp parallel for default(none) private(seq) shared(cov_threshold,num_sel,sel_list,detect_dups,mean_coverage,stderr,mp_inserts,recon_array_size)
+#pragma omp parallel for default(none) private(seq) shared(cov_threshold,num_sel,sel_list,detect_dups,mean_coverage,stderr,mp_inserts,recon_array_size,detailed,mp_analysis)
             for (int i = 0; i < num_sel; i++) {
                 seq = sel_list[i];
                 if (seq->recon_array) {
@@ -3164,7 +3164,7 @@ int main(const int argc, char *argv[]) {
                     
                     // Look for misassemblies by inspecting the mate-pair analysis, if used
                     
-                    if (mp_inserts->count && seq->mp_good_pairs) {
+                    if ((mp_inserts->count || (detailed->count && mp_analysis->count)) && seq->mp_good_pairs) {
                         
                         float *physical_cov = seq->recon_array[recon_array_size-1];
                         
@@ -3559,7 +3559,7 @@ int main(const int argc, char *argv[]) {
                     JSON_END_ARR;  JSON_COMMA;    
                 }
                 if (seq->seq_len > 2*cov_window) {
-                    if (mp_inserts->count) {
+                    if (mp_inserts->count || (detailed->count && mp_analysis->count)) {
                         JSON_FLT_PROP("mp_ins_mean", seq->mp_insert_mean);  JSON_COMMA;
                         JSON_FLT_PROP("mp_ins_stdev", seq->mp_insert_stdev);  JSON_COMMA;
                     }
@@ -3575,7 +3575,7 @@ int main(const int argc, char *argv[]) {
             }
             if (seq->recon_array && (detailed->count || seq->mp_issues)) {
                 JSON_N_FLT_ARRAY_OBJ("per_nt_cov",seq->recon_array[0],seq->seq_len);  
-                if (mp_inserts->count) {        
+                if (mp_inserts->count || (detailed->count && mp_analysis->count)) {        
                     JSON_N_FLT_ARRAY_OBJ("per_nt_phys_cov",seq->recon_array[recon_array_size-1],seq->seq_len);  
                     JSON_N_FLT_ARRAY_OBJ("per_nt_mp_ins",seq->recon_array[recon_array_size-2],seq->seq_len);  
                 }

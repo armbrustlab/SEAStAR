@@ -1,6 +1,6 @@
 # -------------------------------------------------------------------------- #
 # Center for Environmental Genomics
-# Copyright (C) 2009-2012 University of Washington.
+# Copyright (C) 2009-2013 University of Washington.
 #
 # Authors:
 # Vaughn Iverson
@@ -48,10 +48,10 @@ add_test(NAME ref_select_runs COMMAND ref_select --version)
 
 set_tests_properties(ref_select_runs PROPERTIES PASS_REGULAR_EXPRESSION "version: ${GIT_VERSION}" TIMEOUT 3)
 
-add_test(NAME ref_select_test_data COMMAND bash -c "$<TARGET_FILE:ref_select> --per_base --mp_inserts -m --mp_mate_lim=250.0 -r ${CMAKE_BINARY_DIR}/output_test_data/lambda_reads_d50.single.fastq.gz -r ${CMAKE_BINARY_DIR}/output_test_data/lambda_reads_d50.read2.fastq.gz -r ${CMAKE_BINARY_DIR}/output_test_data/lambda_reads_d50.read1.fastq.gz -q -c ${CMAKE_SOURCE_DIR}/test_data/lambda_asm_catalog.txt.gz ${CMAKE_SOURCE_DIR}/test_data/lambda_reads.read2.fastq.gz_lambda_asm.fasta.sam.gz ${CMAKE_SOURCE_DIR}/test_data/lambda_reads.read1.fastq.gz_lambda_asm.fasta.sam.gz ${CMAKE_SOURCE_DIR}/test_data/lambda_reads.single.fastq.gz_lambda_asm.fasta.sam.gz | tee ${CMAKE_BINARY_DIR}/output_test_data/lambda_asm.json | sed 's/\"SEASTAR_tool\":[^}]*},//' | openssl md5")
+add_test(NAME ref_select_test_data COMMAND bash -c "$<TARGET_FILE:ref_select> --per_base --mp_inserts -m --mp_mate_cnt=10 -r ${CMAKE_BINARY_DIR}/output_test_data/lambda_reads_d90.single.fastq.gz -r ${CMAKE_BINARY_DIR}/output_test_data/lambda_reads_d90.read2.fastq.gz -r ${CMAKE_BINARY_DIR}/output_test_data/lambda_reads_d90.read1.fastq.gz -q -c ${CMAKE_SOURCE_DIR}/test_data/lambda_asm_catalog.txt.gz ${CMAKE_SOURCE_DIR}/test_data/lambda_reads.read2.fastq.gz_lambda_asm.fasta.sam.gz ${CMAKE_SOURCE_DIR}/test_data/lambda_reads.read1.fastq.gz_lambda_asm.fasta.sam.gz ${CMAKE_SOURCE_DIR}/test_data/lambda_reads.single.fastq.gz_lambda_asm.fasta.sam.gz | tee ${CMAKE_BINARY_DIR}/output_test_data/lambda_asm.json | sed 's/\"SEASTAR_tool\":[^}]*},//' | openssl md5")
 
-add_test(NAME ref_select_test_data_no_cat COMMAND bash -c "$<TARGET_FILE:ref_select> --per_base --mp_inserts -m --mp_mate_lim=250.0 -r ${CMAKE_BINARY_DIR}/output_test_data/lambda_reads_d50.single.fastq.gz -r ${CMAKE_BINARY_DIR}/output_test_data/lambda_reads_d50.read2.fastq.gz -r ${CMAKE_BINARY_DIR}/output_test_data/lambda_reads_d50.read1.fastq.gz -q ${CMAKE_SOURCE_DIR}/test_data/lambda_reads.read2.fastq.gz_lambda_asm.fasta.sam.gz ${CMAKE_SOURCE_DIR}/test_data/lambda_reads.read1.fastq.gz_lambda_asm.fasta.sam.gz ${CMAKE_SOURCE_DIR}/test_data/lambda_reads.single.fastq.gz_lambda_asm.fasta.sam.gz | tee ${CMAKE_BINARY_DIR}/output_test_data/lambda_asm.json | sed 's/\"SEASTAR_tool\":[^}]*},//' | openssl md5")
+add_test(NAME ref_select_test_data_no_cat COMMAND bash -c "$<TARGET_FILE:ref_select> --per_base --mp_inserts -m --mp_mate_cnt=10 -r ${CMAKE_BINARY_DIR}/output_test_data/lambda_reads_d90.single.fastq.gz -r ${CMAKE_BINARY_DIR}/output_test_data/lambda_reads_d90.read2.fastq.gz -r ${CMAKE_BINARY_DIR}/output_test_data/lambda_reads_d90.read1.fastq.gz -q ${CMAKE_SOURCE_DIR}/test_data/lambda_reads.read2.fastq.gz_lambda_asm.fasta.sam.gz ${CMAKE_SOURCE_DIR}/test_data/lambda_reads.read1.fastq.gz_lambda_asm.fasta.sam.gz ${CMAKE_SOURCE_DIR}/test_data/lambda_reads.single.fastq.gz_lambda_asm.fasta.sam.gz | tee ${CMAKE_BINARY_DIR}/output_test_data/lambda_asm_no_cat.json | sed 's/\"SEASTAR_tool\":[^}]*},//' | openssl md5")
 
-set_tests_properties(ref_select_test_data PROPERTIES PASS_REGULAR_EXPRESSION "1342bc327352c3a0eb083469e17bbc9e" TIMEOUT 30)
-set_tests_properties(ref_select_test_data_no_cat PROPERTIES PASS_REGULAR_EXPRESSION "1342bc327352c3a0eb083469e17bbc9e" TIMEOUT 30)
+set_tests_properties(ref_select_test_data PROPERTIES PASS_REGULAR_EXPRESSION "f35720f6e67c051c1f2f533adc824388" TIMEOUT 30)
+set_tests_properties(ref_select_test_data_no_cat PROPERTIES PASS_REGULAR_EXPRESSION "1f4137989f6a6bf68ac1968be058ae7e" TIMEOUT 30)
 

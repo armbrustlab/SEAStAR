@@ -108,48 +108,7 @@ process_scaffs = (fasta) ->
          scaffs[scaff_num].push(trim_match[0])
          num_contigs[scaff_num]++
 
-   # Try to heal gaps between contigs using the alternate assembly sequence
-
-   if heal_seq
-   
-      n = heal_n       # n = required bases of overlap
-      m = heal_m       # m = number of bases to back away from each contig end
-      max = heal_max   # max = maximum overlap to look for
-      
-      for scaf, scaf_ind in scaffs when scaf
-         for contig, y in scaf when y
-         
-            prev_contig = scaf[y-1]   
-            l = prev_contig.length
-
-            # Build a regex string to use to find sequence in the alt assembly string
-            r = "#{prev_contig.substr(-(n+m),n)}([^\n]{1,#{max}})#{contig.substr(m,n)}"
-            
-            if match = heal_seq.match(r)
-               # Determine the overlap bases, set to lowercase
-               overlap = match[1].toLowerCase()
-               # Merge the previous scaffold and current contig around the aligned overlap
-               scaf[y] = prev_contig.substr(0,l-m) + overlap + contig.substr(m)
-               delete scaf[y-1]
-
-               if verbose
-                  console.warn("**** Found match! %d %d", scaf_ind, y)
-                  console.warn("%s", prev_contig.substr(-(n+m)))
-                  # Print the alignment to stderr
-                  pad = ''
-                  for x in [1..n]
-                     pad = pad + " "
-                  console.warn("%s%s", pad, overlap)
-                  pad = ''
-                  for x in [1..n+overlap.length-m]
-                     pad = pad + " "
-                  console.warn("%s%s", pad, contig.substr(0, m+n))
-
-   # Remove "empty contig slots" in the scaffold arrays
-   for scaf, x in scaffs when scaf
-      scaffs[x] = (contig for contig in scaf when contig?)
-
-   # Try to merge ends of remaining adjacent contigs
+   # Try to merge ends of adjacent contigs
    n = overlap_n          # n = required bases of overlap
    m = overlap_m          # m = number of non-ambiguous bases allowed to be trimmed off each contig end
    max = overlap_max      # max = maximum overlap to look for
@@ -202,6 +161,44 @@ process_scaffs = (fasta) ->
    # Remove "empty contig slots" in the scaffold arrays
    for scaf, x in scaffs when scaf
       scaffs[x] = (contig for contig in scaf when contig?)
+
+   # Try to heal gaps between remaining contigs using the alternate assembly sequence
+
+   if heal_seq
+   
+      n = heal_n       # n = required bases of overlap
+      m = heal_m       # m = number of bases to back away from each contig end
+      max = heal_max   # max = maximum overlap to look for
+      
+      for scaf, scaf_ind in scaffs when scaf
+         for contig, y in scaf when y
+         
+            prev_contig = scaf[y-1]   
+            l = prev_contig.length
+
+            # Build a regex string to use to find sequence in the alt assembly string
+            r = "#{prev_contig.substr(-(n+m),n)}([^\n]{1,#{max}})#{contig.substr(m,n)}"
+            
+            if match = heal_seq.match(r)
+               # Determine the overlap bases, set to lowercase
+               overlap = match[1].toLowerCase()
+               # Merge the previous scaffold and current contig around the aligned overlap
+               scaf[y] = prev_contig.substr(0,l-m) + overlap + contig.substr(m)
+               delete scaf[y-1]
+
+               if verbose
+                  console.warn("**** Found match! %d %d", scaf_ind, y)
+                  console.warn("%s", prev_contig.substr(-(n+m)))
+                  # Print the alignment to stderr
+                  pad = ''
+                  console.warn("%s%s%s", prev_contig.substr(-(n+m),n), overlap,contig.substr(m, n))
+                  for x in [1..n+overlap.length-m]
+                     pad = pad + " "
+                  console.warn("%s%s", pad, contig.substr(0, m+n))
+
+   # Remove "empty contig slots" in the scaffold arrays
+   for scaf, x in scaffs when scaf
+      scaffs[x] = (contig for contig in scaf when contig?)
             
    # Optimize ORFs across remaining gaps
    # These regexes match ORFs at the end and beginning of a config, respectively
@@ -209,7 +206,7 @@ process_scaffs = (fasta) ->
    rc = /^(?:(?:[^T]..)|(?:T(?:(?:[^AG].)|(?:G[^A])|(?:A[^GA]))))+/
    ns = ['','N','NN']  # Used for shifting frames in the loop below
 
-   for scaf, x in scaffs when scaf
+   for scaf, x in scaffs when scaf?[0]?
       scafout = scaf[0]
       prev_contig = scaf[0]
       rev_prev_contig = rev_comp(prev_contig)

@@ -1,6 +1,6 @@
 # -------------------------------------------------------------------------- #
 # Center for Environmental Genomics
-# Copyright (C) 2009-2012 University of Washington.
+# Copyright (C) 2009-2013 University of Washington.
 #
 # Authors:
 # Vaughn Iverson
@@ -48,7 +48,7 @@ add_test(NAME samplefastq_runs COMMAND samplefastq --version)
 
 set_tests_properties(samplefastq_runs PROPERTIES PASS_REGULAR_EXPRESSION "version: ${GIT_VERSION}" TIMEOUT 3)
 
-add_test(NAME samplefastq_test_data COMMAND bash -c "$<TARGET_FILE:samplefastq> -f 0.1 -z ${CMAKE_BINARY_DIR}/output_test_data/lambda_reads_d50 ${CMAKE_BINARY_DIR}/output_test_data/lambda_reads_samp; gunzip -c ${CMAKE_BINARY_DIR}/output_test_data/lambda_reads_samp.{read1,read2,single}.fastq.gz | openssl md5")
+add_test(NAME samplefastq_test_data COMMAND bash -c "$<TARGET_FILE:samplefastq> -f 0.1 -z ${CMAKE_BINARY_DIR}/output_test_data/lambda_reads_d90 ${CMAKE_BINARY_DIR}/output_test_data/lambda_reads_samp; gunzip -c ${CMAKE_BINARY_DIR}/output_test_data/lambda_reads_samp.{read1,read2,single}.fastq.gz | openssl md5")
 
-set_tests_properties(samplefastq_test_data PROPERTIES PASS_REGULAR_EXPRESSION "64364db829fdb2189fcb622596e3f46f" TIMEOUT 30)
+set_tests_properties(samplefastq_test_data PROPERTIES PASS_REGULAR_EXPRESSION "e1a7c29691a8542449dcf06c575c3e02" TIMEOUT 30)
 
