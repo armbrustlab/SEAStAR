@@ -1,6 +1,6 @@
 <link href="style.css" media="screen" rel="stylesheet" type="text/css" />
 
-<h1>SEAStAR User Guide, version 0.4.11</h1>
+<h1>SEAStAR User Guide, version 0.4.12</h1>
 <h4>Vaughn Iverson and Chris Berthiaume</h4>
 <h5><a href="http://armbrustlab.ocean.washington.edu">Armbrust Lab</a>, School of Oceanography, University of Washington</h5>
 <h2>Table of Contents</h2>
@@ -330,23 +330,27 @@ TGTTGTGCGCGCCATAGCGAGGGGCTCAGCACGCGTC
 <p><code>ref_select</code> processes <a href="http://samtools.sourceforge.net">SAM</a> format alignment files into a <a href="#JSON">JSON format &quot;sequence graph&quot;</a> file ready to be processed by the <code>graph_ops</code> tool. Optionally, <code>ref_select</code> will also read FASTQ files and filter out reads (and mates) which are or aren&#39;t present in the provided SAM alignment. The JSON output file is structured as a graph of &quot;nodes&quot; (selected sequences) and &quot;edges&quot; (connections between nodes based on read-pairing) A variety of useful information for the nodes and edges is included in the output JSON file, which can be accessed using the <code>graph_ops</code> tool or custom code written in any language with a JSON library.</p>
 <h4>Usage: <code>ref_select [options] &lt;sam_file1&gt; [&lt;sam_file2&gt;]... &gt; &lt;outfile.json&gt;</code></h4>
 <p><code>ref_select</code> has a lot of options, and depending on what type of analysis you are doing, you may use quite a few of them. However, at its simplest, <code>ref_select</code> reads one or more SAM alignment files and writes a JSON &quot;sequence graph&quot; to STDOUT:</p>
-<pre><code>ref_select alignment.sam &gt; seq_graph.json</code></pre>
+<pre><code>ref_select alignment.single.sam &gt; seq_graph.json</code></pre>
+<p><code>ref_select</code> requires any SAM (or FASTQ) format input files to be named using the <a href="#FASTQ">SEAStAR naming convention used for FASTQ files</a>. Crucially, individual SAM alignment files must not mix alignments for reads from different categories (<code>read1</code>, <code>read2</code>, <code>single</code>), and the corresponding filename suffixes of the SAM files must match those of the FASTQ files used to generate them:</p>
+<p><code>sample.read1.fq</code> &rarr; <code>alignment.read1.sam</code>
+<code>sample.read2.fq</code> &rarr; <code>alignment.read2.sam</code>
+<code>sample.single.fq</code> &rarr; <code>alignment.single.sam</code></p>
 <p>Note that <code>ref_select</code> may also write warnings, errors and diagnostic information to STDERR, so it is important to keep STDOUT and STDERR separate when saving the output to a file, or the resulting saved JSON data file syntax may be corrupted by messages written to STDERR.</p>
 <p>Of course, since these types of files may be very large, you may prefer to keep everything compressed:</p>
-<pre><code>ref_select alignment.sam.gz | gzip -c &gt; seq_graph.json.gz</code></pre>
+<pre><code>ref_select alignment.single.sam.gz | gzip -c &gt; seq_graph.json.gz</code></pre>
 <p>Because <code>ref_select</code> has many options, and produces many different kinds of outputs, we made the decision to organise all of the output data into a single output stream in a standard text-based format (<a href="http://www.json.org">JSON</a>), that is flexible and straightforward to process in any language. The JSON formatted output produced by <code>ref_select</code> is documented in the appendix: <a href="#JSON">JSON Sequence Graph File Format Reference</a>. However, for most tasks you will not need to look directly into theses files because the <code>graph_ops</code> tool will handle that work for you (including the work of extracting data into other standard file formats). </p>
 <p><code>ref_select</code> has four main pieces of functionality:</p>
 <ol>
 <li><p>Quantitatively analyzing reads aligned to a known reference database (e.g. metagenomic reads to a 16S rDNA database, or reads from mRNA transcripts to the gene models of one or more genomes):</p>
 <pre><code> # Select only reference sequences with reads aligned scoring 100 or more bits
- ref_select -t 100.0 alignment_single.sam &gt; ref_stats.json 
+ ref_select -t 100.0 alignment.single.sam &gt; ref_stats.json 
 
  # Convert ref_select output to a tab separated (TSV) table for use downstream
  graph_ops ref_stats.json TABLE &gt; ref_stats.tsv   </code></pre>
 </li>
 <li><p>Analyzing reads mapped back to <em>de novo</em> assembled contigs, to build a &quot;sequence graph&quot; for downstream quality checking, scaffolding, binning, visualization, etc.  </p>
 <pre><code> # Construct a sequence graph from the alignment, inserting the assembled contig seqs into the graph 
- ref_select --ref=contigs.fna --m alignment_read1.sam alignment_read2.sam &gt; seq_graph.json
+ ref_select --ref=contigs.fna -m alignment.read1.sam alignment.read2.sam &gt; seq_graph.json
 
  # Produce scaffolded sequence (where .go file is graph_ops SCRIPT)...
  graph_ops seq_graph.json run_scaffold_pipeline.go &gt; scaffolds.fna</code></pre>
@@ -354,7 +358,7 @@ TGTTGTGCGCGCCATAGCGAGGGGCTCAGCACGCGTC
 <li><p>Converting SOLiD colorspace contigs into nucleotide contigs based on aligned reads</p>
 <pre><code> # Rather than inserting contigs as above, they are reconstructed from the alignment
  # and the provided read FASTQ files
- ref_select -q -m -r mates.read1.fastq -r mates.read2.fastq alignment_read1.sam alignment_read2.sam &gt; seq_graph.json
+ ref_select -q -m -r mates.read1.fastq -r mates.read2.fastq alignment.read1.sam alignment.read2.sam &gt; seq_graph.json
 
  # Produce scaffolded sequence (where .go file is graph_ops SCRIPT)...
  graph_ops seq_graph.json run_scaffold_pipeline.go &gt; scaffolds.fna</code></pre>
@@ -363,7 +367,7 @@ TGTTGTGCGCGCCATAGCGAGGGGCTCAGCACGCGTC
 <pre><code> # Write two new read files for all reads (and their mates) that did not map in the alignment
  # NOTE: this is the one exception to the &quot;all data goes into the JSON stream&quot; principle described above. 
  # Filtered read output data is written to `FASTQ` format files, with a prefix specified using --read_output
- ref_select --read_output=filtered_ --output_nomatch -r mates.read1.fastq -r mates.read2.fastq alignment_read1.sam alignment_read2.sam</code></pre>
+ ref_select --read_output=filtered_ --output_nomatch -r mates.read1.fastq -r mates.read2.fastq alignment.read1.sam alignment.read2.sam</code></pre>
 </li>
 </ol>
 <p>The approaches used by <code>ref_select</code> to accomplish these tasks are described in more detail in the methods section of (<a href="http://www.sciencemag.org/content/335/6068/587.abstract">Iverson, <em>et al.</em> 2012</a>).  </p>
@@ -468,6 +472,7 @@ TGTTGTGCGCGCCATAGCGAGGGGCTCAGCACGCGTC
 <p>Insert size cutoff for inclusion of an individual mate-pair in per base statistics. Setting this option for some reasonable upper limit of the length of a valid insert will prevent sequence duplications from improperly skewing estimation of the true mean insert size. </p>
 <h3><a name="ref_select_inputs"><code>ref_select</code> parameters for specifying input files</a> <code>[options]</code> :</h3>
 <p><code>[-r &lt;read_file&gt;|--read_file=&lt;read_file&gt;]...</code> <code>[--rev_read_file=&lt;read_file&gt;]...</code> <code>[--old_bwa_samse]</code> <code>[-c &lt;catalog_file&gt;|--catalog=&lt;catalog_file&gt;]</code> <code>[--rev_align=&lt;sam_file&gt;]...</code> </p>
+<p><strong>NOTE!</strong> all inputs to <code>ref_select</code> involving per read data (FASTQ and SAM files) must be named using the SEAStAR <a href="#FASTQ">FASTQ naming conventions</a>, also see the [introductory description of ref_select][ref_select] for an example.</p>
 <p><b><code>-r &lt;read_file&gt;</code> / <code>--read_file=&lt;read_file&gt;</code></b></p>
 <p>Input filename(s) for FASTQ read files used for sequence reconstruction and/or read filtering.</p>
 <p><b><code>--rev_read_file=&lt;read_file&gt;</code></b></p>
@@ -746,7 +751,9 @@ TGTTGTGCGCGCCATAGCGAGGGGCTCAGCACGCGTC
 </li>
 </ul>
 <h3><a name="PLUCK"><code>PLUCK</code></a></h3>
-<p>Remove all leaf contig nodes (in- or out-degree == 0) from the (tree-structured) graph.  Two (or sometimes three) iterations are usually sufficient to achieve the goal of removing all non-terminal short branches from the tree. These contigs will be added back to the assembly in later operations once the &quot;backbone&quot; scaffolds have been determined. </p>
+<p>Remove all leaf contig nodes (in- or out-degree == 0) from the (tree-structured) graph.  Two (or sometimes three) iterations are usually sufficient to achieve the goal of removing all non-terminal short branches from the tree. These contigs will be added back to the assembly in later operations once the &quot;backbone&quot; scaffolds have been determined.  NOTE: <code>PLUCK</code> does not remove two &quot;leaf&quot; contig nodes that form a connected pair; that 
+is, multiple iterations of <code>PLUCK</code> will not completely remove contigs that happen to form short chains. Also,
+<code>PLUCK</code> preserves entirely unconnected contigs with more than 20000 bases of sequence by default. See the <code>min_len</code> parameter below.</p>
 <p><strong>Parameters:</strong></p>
 <ul>
 <li><p><code>iterate : &lt;int&gt;</code></p>
@@ -758,6 +765,12 @@ TGTTGTGCGCGCCATAGCGAGGGGCTCAGCACGCGTC
   # This is the equivalent of the above command
   PLUCK {&quot;iterate&quot;:1}
   PLUCK {&quot;iterate&quot;:1}</code></pre>
+</li>
+<li><p><code>min_len : &lt;int&gt;</code></p>
+<p> Minimum length of isolated nodes to keep.  Default <code>&lt;int&gt;</code>= 20000 bases.</p>
+<p> Example:</p>
+<pre><code>  # Do not &quot;pluck away&quot; an unconnected contig containing 20000 or more bases of sequence.
+  PLUCK  {&quot;min_len&quot;:20000}         </code></pre>
 </li>
 </ul>
 <h3><a name="PRUNE"><code>PRUNE</code></a></h3>
@@ -972,6 +985,13 @@ TGTTGTGCGCGCCATAGCGAGGGGCTCAGCACGCGTC
   # (or its reverse complement).        
   SELCC {&quot;sequence&quot;:&quot;AGACTAGCAGATATACGATAACGATACGATACGAT&quot;}</code></pre>
 </li>
+<li><p><code>sequences : [&lt;string&gt;,...]</code> </p>
+<p> Like <code>sequence</code> parameter above, but using a list of sequences</p>
+<p> Example:</p>
+<pre><code>  # Select connected components containing the provided sequences 
+  # (or their reverse complements).        
+  SELCC {&quot;sequences&quot;:[&quot;AGACTAGCAGATATACG&quot;,&quot;ATAACGATACGATACGAT&quot;]}</code></pre>
+</li>
 </ul>
 <h3><a name="SELCLUST"><code>SELCLUST</code></a></h3>
 <p>Select clusters of scaffolds for further processing</p>
@@ -1045,6 +1065,12 @@ TGTTGTGCGCGCCATAGCGAGGGGCTCAGCACGCGTC
 <p> Example:</p>
 <pre><code>  # Select contig(s) containing the provided sequence (or its reverse complement).
   SELND {&quot;sequence&quot;:&quot;AGACTAGCAGATATACGATAACGATACGATACGAT&quot;}</code></pre>
+</li>
+<li><p><code>sequences : [&lt;string&gt;,...]</code> </p>
+<p> Like <code>sequence</code> parameter above, but using a list of sequences</p>
+<p> Example:</p>
+<pre><code>  # Select contigs containing the provided sequences (or their reverse complements).        
+  SELCC {&quot;sequences&quot;:[&quot;AGACTAGCAGATATACG&quot;,&quot;ATAACGATACGATACGAT&quot;]}</code></pre>
 </li>
 </ul>
 <h3><a name="SCAFLNK"><code>SCAFLNK</code></a></h3>
@@ -1194,16 +1220,28 @@ EDIT {&quot;add_edges&quot;:[&quot;NODE_1234&quot;,&quot;NODE_9&quot;]}</code></
 <pre><code>  # New node will be named NODE_1234a
   CUTND {&quot;new_name&quot;:&quot;NODE_1234a&quot;}</code></pre>
 </li>
+<li><p><code>include : [&quot;contig_name1&quot;,&quot;contig_name2&quot;,...]</code></p>
+<p> Move mate-pair edges from the listed contig(s) to the newly created &quot;cut&quot; version of the named contig.</p>
+<p> Example: </p>
+<pre><code>  # Edges between NODE_1234 and the &quot;included&quot; contigs will be moved to NEW_1234.
+  CUTND {&quot;name&quot;:&quot;NODE_1234&quot;,&quot;new_name&quot;:&quot;NEW_1234&quot;,&quot;include&quot;:[&quot;NODE_567&quot;,&quot;NODE_234&quot;]}</code></pre>
+</li>
 <li><p><code>start : &lt;int&gt;</code> and <code>end : &lt;int&gt;</code></p>
 <p> <code>start</code> is the beginning sequence coordinate for the new node (from within the original). 
  <code>end</code> is the ending sequence coordinate for the new node (from within the original).</p>
+<p> NOTE: To facilitate trimming sequences to a fixed maximum length, it is allowable for negative &#39;start&#39; values and positive &#39;end&#39; values to be longer than a sequence. In such cases, the values are set to the start and end of the sequence, respectively. Positive start and negative end positions must fall within the sequence, because otherwise the start position will be after the end position.</p>
 <p> Examples: </p>
 <pre><code>  # The new node will include sequence from positions 123 to 456
   CUTND {&quot;start&quot;:123,&quot;end&quot;:456}
 
   # The new node will include sequence from position 0 (implied) to 456. 
   # end may also be omitted, implying the last position
-  CUTND {&quot;end&quot;:456}</code></pre>
+  CUTND {&quot;end&quot;:456}
+
+  # The new node will include at most the last 1000 bases of sequence.
+  # If the sequence is shorter than 1000 bases, it will be copied without
+  # modification.
+  CUTND {&quot;start&quot;:-1000}         </code></pre>
 </li>
 </ul>
 <h3><a name="GC"><code>GC</code></a></h3>
@@ -1402,6 +1440,8 @@ CGAGCAAC....TTAGCGAC....</code></pre>
 <p><code>&lt;n&gt;</code> is the maximum number of bases of gap to try to heal.</p>
 <p><b><code>--heal_trim=&lt;n&gt;</code></b> </p>
 <p><code>&lt;n&gt;</code> is the maximum number of non-ambiguous bases to try trimming from contig ends during healing.</p>
+<p><b><code>--gap=&lt;n&gt;</code></b> </p>
+<p><code>&lt;n&gt;</code> is the bases number of ambiguous &#39;n&#39; bases to insert between contigs in the scaffold when a gap remains. Note that this base value may be adjusted by +1 or +2 to avoid introducing frame-shifts into long open reading frames that span a particular gap.</p>
 <p><b><code>--verbose</code></b> </p>
 <p>Output extra diagnostic information to STDERR.</p>
 <hr>

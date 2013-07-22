@@ -235,7 +235,7 @@ process_scaffs = (fasta) ->
             frame = (prmax[0]+crmax[0])%3
 
          # Add this contig to the scaffold output with a frame adjusted gap
-         scafout = scafout + "nnnnnnnnnnnnnnn" + ns[frame] + contig
+         scafout = scafout + gap_pad + ns[frame] + contig
          
          prev_contig = contig
          rev_prev_contig = rev_contig
@@ -264,6 +264,8 @@ overlap_n = 6     # n = required bases of overlap
 overlap_m = 0     # m = number of non-ambiguous bases allowed to be trimmed off each contig end
 overlap_max = 35  # max = maximum overlap to look for
 
+gap_pad = "nnnnnnnnnnnnnnn"
+
 # Handle reading possible modifications to the above defaults
 
 if process.argv.length < 3
@@ -285,7 +287,8 @@ while process.argv[0][0..1] is '--' or process.argv[0] is '-h'
    switch parm[0]
       when '--help', '-h'
          console.warn("\nUsage: seq_scaffold [options] input.fna")
-         console.warn('[options] : [--overlap=<n>] [--trim=<n>] [--max=<n>] [--heal=<heafile.fna>] [--heal_overlap=<n>] [--heal_trim=<n>] [--heal_max=<n>]\n')
+         console.warn('[options] : [-h|--help] [--overlap=<n>] [--max=<n>] [--trim=<n>] [--heal=<heafile.fna>] [--heal_overlap=<n>] [--heal_max=<n>] [--heal_trim=<n>] [--verbose]\n')
+         console.warn("-h | --help  : Print this help text.")
          console.warn("--overlap=<n> : Minimum number of bases of overlap required to join contigs. Default: #{overlap_n}")
          console.warn("--max=<n> : Maximum number of bases of overlap to look for. Default: #{overlap_max}")
          console.warn("--trim=<n> : Maximum number of non-ambiguous bases to try trimming from contig ends when looking for overlap. Default: #{overlap_m}")
@@ -293,9 +296,9 @@ while process.argv[0][0..1] is '--' or process.argv[0] is '-h'
          console.warn("--heal_overlap=<n> : Minimum number of bases of overlap required to join contigs. Default: #{heal_n}")
          console.warn("--heal_max=<n> : Maximum number of bases of gap to try to heal. Default: #{heal_max}")
          console.warn("--heal_trim=<n> : Maximum number of non-ambiguous bases to try trimming from contig ends during healing. Default: #{heal_m}")
+         console.warn("--gap=<n> : Base number of 'n's (ambiguous bases) to insert in remaining gaps. Default: #{gap_pad.length}")
          console.warn("--verbose : Output diagnostic messages to stderr. Default: #{verbose}\n")
          console.warn("SEASTAR Version: #{ss_version}\n")
-         
          process.exit(1)
       when '--heal' then heal_fn = parm[1]   
       when '--heal_overlap' then heal_n = Number(parm[1])
@@ -304,6 +307,7 @@ while process.argv[0][0..1] is '--' or process.argv[0] is '-h'
       when '--overlap' then overlap_n = Number(parm[1])
       when '--trim' then overlap_m = Number(parm[1])
       when '--max' then overlap_max = Number(parm[1])
+      when '--gap' then gap_pad = Array(Number(parm[1])+1).join("n")
       when '--verbose' then verbose = true
       else
          console.error("Unknown parameter: #{p}")

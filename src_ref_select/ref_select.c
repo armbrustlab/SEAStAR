@@ -2558,11 +2558,11 @@ int main(const int argc, char *argv[]) {
                                 if (seq->recon_array) {
                                     
                                     int inc = ((read_rev * read->seq_pos) < 0) ? -1 : 1;    // Negative pos = - strand
-                                    int pos = abs(read->seq_pos);
+                                    int pos = abs(read->seq_pos) - 1;
                                     int z = 0;
                                     
                                     // Sometimes reads map at/off the ends, don't use those...
-                                    if ((pos >= 0) && (pos + len - 1 < seq->seq_len)) {
+                                    if ((pos >= 0) && (pos + len - 1 <= seq->seq_len)) {
                                         
                                         // Working pointer into sequence string
                                         ptr = (inc == 1) ? utstring_body(str) : utstring_body(str) + len - 1;
@@ -2950,10 +2950,10 @@ int main(const int argc, char *argv[]) {
                     }
                     
                     // Loop through all of the bases
-                    for (int x = 1; x < seq->seq_len; x++) {
+                    for (int x = 2; x <= seq->seq_len; x++) {
                         
                         // The next base is looked up based on the current base and position
-                        best = bases[best][x];
+                        best = bases[best][x-1];
                         
                         // If not zero coverage, output the nucleotide base
                         if ((seq->recon_array[0][x] != 0.0) && (seq->recon_array[15+(colorspace_recon*15)][x] != 0.0)) {

@@ -1,6 +1,6 @@
 <link href="style.css" media="screen" rel="stylesheet" type="text/css" />
 
-SEAStAR User Guide, version 0.4.11
+SEAStAR User Guide, version 0.4.12
 ==============================
 ####Vaughn Iverson and Chris Berthiaume
 
@@ -579,14 +579,20 @@ Write FASTA format files instead of FASTQ files for all outputs. FASTA files are
 
 `ref_select` has a lot of options, and depending on what type of analysis you are doing, you may use quite a few of them. However, at its simplest, `ref_select` reads one or more SAM alignment files and writes a JSON "sequence graph" to STDOUT:
 
-    ref_select alignment.sam > seq_graph.json
+    ref_select alignment.single.sam > seq_graph.json
+
+`ref_select` requires any SAM (or FASTQ) format input files to be named using the [SEAStAR naming convention used for FASTQ files][FASTQ]. Crucially, individual SAM alignment files must not mix alignments for reads from different categories (`read1`, `read2`, `single`), and the corresponding filename suffixes of the SAM files must match those of the FASTQ files used to generate them:
+
+`sample.read1.fq` &rarr; `alignment.read1.sam`
+`sample.read2.fq` &rarr; `alignment.read2.sam`
+`sample.single.fq` &rarr; `alignment.single.sam`
 
 Note that `ref_select` may also write warnings, errors and diagnostic information to STDERR, so it is important to keep STDOUT and STDERR separate when saving the output to a file, or the resulting saved JSON data file syntax may be corrupted by messages written to STDERR.
     
 Of course, since these types of files may be very large, you may prefer to keep everything compressed:
 
-    ref_select alignment.sam.gz | gzip -c > seq_graph.json.gz
-    
+    ref_select alignment.single.sam.gz | gzip -c > seq_graph.json.gz
+
 Because `ref_select` has many options, and produces many different kinds of outputs, we made the decision to organise all of the output data into a single output stream in a standard text-based format ([JSON][JSON_ref]), that is flexible and straightforward to process in any language. The JSON formatted output produced by `ref_select` is documented in the appendix: [JSON Sequence Graph File Format Reference][JSON]. However, for most tasks you will not need to look directly into theses files because the `graph_ops` tool will handle that work for you (including the work of extracting data into other standard file formats). 
 
 `ref_select` has four main pieces of functionality:
@@ -594,7 +600,7 @@ Because `ref_select` has many options, and produces many different kinds of outp
 1. Quantitatively analyzing reads aligned to a known reference database (e.g. metagenomic reads to a 16S rDNA database, or reads from mRNA transcripts to the gene models of one or more genomes):
 
         # Select only reference sequences with reads aligned scoring 100 or more bits
-        ref_select -t 100.0 alignment_single.sam > ref_stats.json 
+        ref_select -t 100.0 alignment.single.sam > ref_stats.json 
         
         # Convert ref_select output to a tab separated (TSV) table for use downstream
         graph_ops ref_stats.json TABLE > ref_stats.tsv   
@@ -602,7 +608,7 @@ Because `ref_select` has many options, and produces many different kinds of outp
 2. Analyzing reads mapped back to *de novo* assembled contigs, to build a "sequence graph" for downstream quality checking, scaffolding, binning, visualization, etc.  
 
         # Construct a sequence graph from the alignment, inserting the assembled contig seqs into the graph 
-        ref_select --ref=contigs.fna --m alignment_read1.sam alignment_read2.sam > seq_graph.json
+        ref_select --ref=contigs.fna -m alignment.read1.sam alignment.read2.sam > seq_graph.json
         
         # Produce scaffolded sequence (where .go file is graph_ops SCRIPT)...
         graph_ops seq_graph.json run_scaffold_pipeline.go > scaffolds.fna
@@ -611,7 +617,7 @@ Because `ref_select` has many options, and produces many different kinds of outp
 
         # Rather than inserting contigs as above, they are reconstructed from the alignment
         # and the provided read FASTQ files
-        ref_select -q -m -r mates.read1.fastq -r mates.read2.fastq alignment_read1.sam alignment_read2.sam > seq_graph.json
+        ref_select -q -m -r mates.read1.fastq -r mates.read2.fastq alignment.read1.sam alignment.read2.sam > seq_graph.json
 
         # Produce scaffolded sequence (where .go file is graph_ops SCRIPT)...
         graph_ops seq_graph.json run_scaffold_pipeline.go > scaffolds.fna
@@ -621,7 +627,7 @@ Because `ref_select` has many options, and produces many different kinds of outp
         # Write two new read files for all reads (and their mates) that did not map in the alignment
         # NOTE: this is the one exception to the "all data goes into the JSON stream" principle described above. 
         # Filtered read output data is written to `FASTQ` format files, with a prefix specified using --read_output
-        ref_select --read_output=filtered_ --output_nomatch -r mates.read1.fastq -r mates.read2.fastq alignment_read1.sam alignment_read2.sam
+        ref_select --read_output=filtered_ --output_nomatch -r mates.read1.fastq -r mates.read2.fastq alignment.read1.sam alignment.read2.sam
 
 The approaches used by `ref_select` to accomplish these tasks are described in more detail in the methods section of ([Iverson, *et al.* 2012](http://www.sciencemag.org/content/335/6068/587.abstract)).  
 
@@ -816,6 +822,8 @@ Insert size cutoff for inclusion of an individual mate-pair in per base statisti
 [ref_select_inputs]: #ref_select_inputs
 ###<a name="ref_select_inputs">`ref_select` parameters for specifying input files</a> `[options]` : 
 `[-r <read_file>|--read_file=<read_file>]...` `[--rev_read_file=<read_file>]...` `[--old_bwa_samse]` `[-c <catalog_file>|--catalog=<catalog_file>]` `[--rev_align=<sam_file>]...` 
+
+**NOTE!** all inputs to `ref_select` involving per read data (FASTQ and SAM files) must be named using the SEAStAR [FASTQ naming conventions][FASTQ], also see the [introductory description of ref_select][ref_select] for an example.
 
 <b>`-r <read_file>` / `--read_file=<read_file>`</b>
 
@@ -1191,7 +1199,9 @@ As an alternative to the `MST` command, calculate the **S**caffold **S**panning 
 [`PLUCK`]: #PLUCK
 ###<a name="PLUCK">`PLUCK`</a>
 
-Remove all leaf contig nodes (in- or out-degree == 0) from the (tree-structured) graph.  Two (or sometimes three) iterations are usually sufficient to achieve the goal of removing all non-terminal short branches from the tree. These contigs will be added back to the assembly in later operations once the "backbone" scaffolds have been determined. 
+Remove all leaf contig nodes (in- or out-degree == 0) from the (tree-structured) graph.  Two (or sometimes three) iterations are usually sufficient to achieve the goal of removing all non-terminal short branches from the tree. These contigs will be added back to the assembly in later operations once the "backbone" scaffolds have been determined.  NOTE: `PLUCK` does not remove two "leaf" contig nodes that form a connected pair; that 
+is, multiple iterations of `PLUCK` will not completely remove contigs that happen to form short chains. Also,
+`PLUCK` preserves entirely unconnected contigs with more than 20000 bases of sequence by default. See the `min_len` parameter below.
 
 **Parameters:**
 
@@ -1207,6 +1217,15 @@ Remove all leaf contig nodes (in- or out-degree == 0) from the (tree-structured)
         # This is the equivalent of the above command
         PLUCK {"iterate":1}
         PLUCK {"iterate":1}
+        
++ `min_len : <int>`
+
+   Minimum length of isolated nodes to keep.  Default `<int>`= 20000 bases.
+
+   Example:
+   
+        # Do not "pluck away" an unconnected contig containing 20000 or more bases of sequence.
+        PLUCK  {"min_len":20000}         
         
 [`PRUNE`]: #PRUNE
 ###<a name="PRUNE">`PRUNE`</a>
@@ -1506,6 +1525,16 @@ Select specific connected components for further processing. "Unselected" connec
         # (or its reverse complement).        
         SELCC {"sequence":"AGACTAGCAGATATACGATAACGATACGATACGAT"}
 
++ `sequences : [<string>,...]` 
+
+   Like `sequence` parameter above, but using a list of sequences
+   
+   Example:
+
+        # Select connected components containing the provided sequences 
+        # (or their reverse complements).        
+        SELCC {"sequences":["AGACTAGCAGATATACG","ATAACGATACGATACGAT"]}
+
 [`SELCLUST`]: #SELCLUST
 ###<a name="SELCLUST">`SELCLUST`</a>
 
@@ -1611,6 +1640,15 @@ Select contigs from the connected neighborhood(s) of the given contig(s)
    
         # Select contig(s) containing the provided sequence (or its reverse complement).
         SELND {"sequence":"AGACTAGCAGATATACGATAACGATACGATACGAT"}
+        
++ `sequences : [<string>,...]` 
+
+   Like `sequence` parameter above, but using a list of sequences
+   
+   Example:
+
+        # Select contigs containing the provided sequences (or their reverse complements).        
+        SELCC {"sequences":["AGACTAGCAGATATACG","ATAACGATACGATACGAT"]}
 
 [`SCAFLNK`]: #SCAFLNK
 ###<a name="SCAFLNK">`SCAFLNK`</a> 
@@ -1829,10 +1867,21 @@ Create a new node from an existing node using the given coordinates. Using this 
         # New node will be named NODE_1234a
         CUTND {"new_name":"NODE_1234a"}
 
++ `include : ["contig_name1","contig_name2",...]`
+
+   Move mate-pair edges from the listed contig(s) to the newly created "cut" version of the named contig.
+   
+   Example: 
+   
+        # Edges between NODE_1234 and the "included" contigs will be moved to NEW_1234.
+        CUTND {"name":"NODE_1234","new_name":"NEW_1234","include":["NODE_567","NODE_234"]}
+
 + `start : <int>` and `end : <int>`
 
    `start` is the beginning sequence coordinate for the new node (from within the original). 
    `end` is the ending sequence coordinate for the new node (from within the original).
+
+   NOTE: To facilitate trimming sequences to a fixed maximum length, it is allowable for negative 'start' values and positive 'end' values to be longer than a sequence. In such cases, the values are set to the start and end of the sequence, respectively. Positive start and negative end positions must fall within the sequence, because otherwise the start position will be after the end position.
 
    Examples: 
    
@@ -1842,6 +1891,11 @@ Create a new node from an existing node using the given coordinates. Using this 
         # The new node will include sequence from position 0 (implied) to 456. 
         # end may also be omitted, implying the last position
         CUTND {"end":456}
+        
+        # The new node will include at most the last 1000 bases of sequence.
+        # If the sequence is shorter than 1000 bases, it will be copied without
+        # modification.
+        CUTND {"start":-1000}         
 
 [`GC`]: #GC
 ###<a name="GC">`GC`</a> 
@@ -2115,6 +2169,10 @@ Use alternatively assembled contigs in the referenced FASTA file to try to "heal
 <b>`--heal_trim=<n>`</b> 
 
 `<n>` is the maximum number of non-ambiguous bases to try trimming from contig ends during healing.
+
+<b>`--gap=<n>`</b> 
+
+`<n>` is the bases number of ambiguous 'n' bases to insert between contigs in the scaffold when a gap remains. Note that this base value may be adjusted by +1 or +2 to avoid introducing frame-shifts into long open reading frames that span a particular gap.
 
 <b>`--verbose`</b> 
 

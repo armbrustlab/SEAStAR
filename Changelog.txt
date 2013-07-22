@@ -1,3 +1,46 @@
+### 0.4.12 ###
+
+- Fixed bug that could cause crashes in graph_ops after use of the SELND 
+command. 
+
+- Fixed bug in graph_ops that caused PLUCK PLUCK PUSH PUSH to produce 
+unintended behavior different from PLUCK {iterate:2} PUSH {iterate:2}. 
+
+- Fixed a bug in ref_select that caused iterative reconstructions of the
+same reference sequence to be shifted in position by one base per iteration.
+
+- Added a new parameter --gap=<n> to the seq_scaffold command that controls
+the base number of 'n's (ambiguous bases) to insert into remaining gaps
+between contigs within a scaffold. The default remains unchanged at 15nt.
+
+- Formerly, the graph_ops PLUCK command would remove both contigs of a two 
+node "scaffold", since each is technically a leaf. PLUCK would also remove
+a single, unconnected contig on multiple PLUCK iterations. It no longer does
+these things because they can lead to valid scaffolds with low contig counts
+being "eroded away" and lost from subsequent analyses. 
+
+- A new parameter was added to graph_ops PLUCK: "min_len" prevents PLUCK from 
+removing unconnected nodes containing more than a minimum amount of sequence,
+even on the first iteration. 
+
+- Added the 'sequences' parameter to the SELND and SELCC graph_ops commands.
+This option is the same as the prior 'sequence' parmeter, except that it 
+accepts a list of sequences to match, (rather than just one).
+
+- The graph_ops CUTND command now accepts negative indices for 'start' and 
+'end' parameters, representing offsets from the end of the sequence, rather
+than the start. It is also more permissive with the provided coordaintes,
+allowing negative start positions before the start of the sequence and end
+positions after the end. This allows for trimming sequences to a maximum
+length from either end without regard for sequence length. 
+
+- The graph_ops SCRIPT command CLI is now more permissive about the formatting 
+of the JSON parameter lists given for commands. They may now be quoted (to 
+permit cut/paste from bash command lines) and they may contain whitespace
+between the JSON elements (which is permitted in quoted bash parameters).
+
+- Documentation improvements.
+
 ### 0.4.11 ###
 
 - The graph_ops INSERT command now has two new parameters which are enabled by 

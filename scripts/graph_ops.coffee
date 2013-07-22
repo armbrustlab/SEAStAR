@@ -444,22 +444,8 @@ build_removed_graph_refs = (j, nf = null, ef = null) ->
       e.tar.rem_links.push(l_in)
       ef? e
 
-   s_out = (for e, i in j.shared_seq_edges    # Walk through all of the shared edges
-      # Check to make sure that this edge is consistent with the current nodeset(s)
-      # If not, there is a bug somewhere else and this error is fatal.
-      unless e.src = j.nodes[e.n1] or j.removed_nodes[e.n1]
-         throw "build_removed_graph_refs: Missing node #{e.n1} in shared edge with #{e.n2}."
-      unless e.tar = j.nodes[e.n2] or j.removed_nodes[e.n2]
-         throw "build_removed_graph_refs: Missing node #{e.n2} in shared edge with #{e.n1}."
-      # Build a shared edges object in each node with a member for each other node sharing sequence
-      e.src.shared_links ?= {}
-      e.src.shared_links[e.tar.id] = e
-      e.tar.shared_links ?= {}
-      e.tar.shared_links[e.src.id] = e
-      e)
-
    # return the removed nodes, and removed / shared edge lists (side effects also accessable in j)
-   [n_out, e_out, s_out]  
+   [n_out, e_out]  
 
 ###   
 # Remove the internal references between nodes and edges in the graph 
@@ -474,7 +460,6 @@ remove_graph_refs = (j, nf = null, ef = null) ->
       delete n.links
       delete n.inlinks
       delete n.outlinks
-      delete n.shared_links
       delete n.rem_links
       delete n.rem_inlinks
       delete n.rem_outlinks      
@@ -487,18 +472,12 @@ remove_graph_refs = (j, nf = null, ef = null) ->
       ef? e
       e)
 
-   j.shared_seq_edges = (for e in j.shared_seq_edges when e?
-      delete e.src
-      delete e.tar
-      e)
-
    if j.removed_nodes?
       for name, n of j.removed_nodes
          delete n.id
          delete n.links
          delete n.inlinks
          delete n.outlinks
-         delete n.shared_links
          delete n.rem_links
          delete n.rem_inlinks
          delete n.rem_outlinks      
@@ -1069,19 +1048,27 @@ iterate : <int> -- number of iterations of #{args.help} to run. Each is equivale
        running #{args.help} again as a separate command.  By Default <int> = 2\n
 \n
         Example: #{args.help} {\"iterate\":2} -- Equivalent of #{args.help} #{args.help}\n
-")
+\n
+min_len : <int> -- Minimum length of isolated nodes to keep.\n
+\n
+        Example: #{args.help} {\"min_len\":20000} -- Default. Do not \"pluck away\" an\n
+        unconnected node containing 20000 or more bases of sequence.
+\n")
       callback?(null, j)
       return
 
    args.iterate ?= 2
+   args.min_len ?= 20000
 
    delete j.connected_comps   # This invalidates the cached ccomps
 
    j.removed_edges ?= []   # initialize a place to keep removed edges in the output
    j.removed_nodes ?= {}
 
+   j.pluck_iterations ?= 1  # Keep track of home many times PLUCK has been run
+
    # Number of times to pluck the tree (removing only the ends at each iteration) 
-   for i in [1..args.iterate]
+   for i in [j.pluck_iterations..args.iterate+j.pluck_iterations-1]
 
       try
          [nodes, edges] = build_graph_refs(j) 
@@ -1091,8 +1078,23 @@ iterate : <int> -- number of iterations of #{args.help} to run. Each is equivale
 
       # Walk all nodes looking for nodes with zero in or out degree
       for n in nodes when (n.inlinks.length == 0 or n.outlinks.length == 0)
-         j.removed_nodes[n.id] = n   # Remove the node itself
-         delete j.nodes[n.id]
+      
+         # This test prohibits plucking the "leaves" of two isolated connected nodes
+         # preventing low node count scaffolds from being "plucked" away.
+         # For the same reason, tt also preserves single nodes after the first pluck 
+         # iteration, or when they contain significant sequence (> args.min_len) 
+         
+         unless ((n.inlinks.length is 1) and 
+                 (n.links[0][1].inlinks.length is 0) and 
+                 (n.links[0][1].outlinks[0][1] is n)) or
+                ((n.outlinks.length is 1) and 
+                 (n.links[0][1].outlinks.length is 0) and 
+                 (n.links[0][1].inlinks[0][1] is n)) or                 
+                ((n.links.length is 0) and 
+                 ((i > 1) or 
+                  (n.seq_len? >= args.min_len)))  
+            j.removed_nodes[n.id] = n   # Remove the node itself
+            delete j.nodes[n.id]
 
       edges_kept = []
 
@@ -1108,6 +1110,86 @@ iterate : <int> -- number of iterations of #{args.help} to run. Each is equivale
             
       remove_graph_refs(j)   
    
+   j.pluck_iterations = args.iterate+j.pluck_iterations-1
+   callback?(null, j)
+
+###
+# Add ends
+###
+add_ends = (j, args = {}, callback) ->
+# j = json graph object, args = arguments from command, callback = function to call when done
+
+   if args.help?
+      console.warn("
+#{args.help} -- Extends scaffold ends (reversing the action of PLUCK at scaffold ends)
+")
+      if args.detailed_help?
+         console.warn("
+\n
+Parameters:\n
+\n
+iterate : <int> -- number of iterations of #{args.help} to run. Each is equivalent to\n
+       running #{args.help} again as a separate command.  By Default <int> = 3\n
+\n
+        Example: #{args.help} {\"iterate\":2} -- Equivalent of #{args.help} #{args.help}\n
+")
+      callback?(null, j)
+      return
+
+   args.iterate ?= 3
+
+   unless j.pluck_iterations?
+      console.warn("WARNING: PUSH called on unPLUCKed graph.")
+      callback?(null, j)
+      return
+   
+   args.iterate = j.pluck_iterations if args.iterate > j.pluck_iterations   
+
+   for i in [j.pluck_iterations..j.pluck_iterations-args.iterate+1]
+
+      calc_ccomps(j) unless j.connected_comps?  # Make sure there are ccomps
+
+      try
+         build_graph_refs(j) 
+         build_removed_graph_refs(j)
+      catch err
+         callback?(err, null)
+         return
+
+      for c in j.connected_comps
+   
+         # Find the "head" and "tail" nodes for this scaffold
+      
+         try 
+            [[head_node], [tail_node]] = find_ends(j, c, true)
+         catch err
+            remove_graph_refs(j, null, ((e) -> delete e.pluck_iteration))
+            callback?(err, null)
+            return
+            
+         unless head_node.no_push
+            for e in head_node.rem_inlinks when e[0].dir is "forward" and e[0].pluck_iteration is i and not j.nodes[e[0].n1]? 
+               j.edges.push(e[0])
+               j.nodes[e[1].id] = e[1]
+               delete j.removed_nodes[e[1].id]
+               delete j.removed_edges[e[0].index]
+               break
+         
+         unless tail_node.no_push
+            for e in tail_node.rem_outlinks when e[0].dir is "forward" and e[0].pluck_iteration is i and not j.nodes[e[0].n2]?
+               j.edges.push(e[0])
+               j.nodes[e[1].id] = e[1]
+               delete j.removed_nodes[e[1].id]
+               delete j.removed_edges[e[0].index]
+               break
+
+      remove_graph_refs(j) unless i is 1
+
+      delete j.connected_comps 
+   
+   remove_graph_refs(j, null, ((e) -> delete e.pluck_iteration))
+   j.pluck_iterations = j.pluck_iterations-args.iterate
+   delete j.pluck_iterations if j.pluck_iterations is 0
    callback?(null, j)
 
 ###
@@ -1728,7 +1810,7 @@ export_fasta = (j, args={"verbose":false}, callback) ->
 
    if args.help?
       console.warn("
-#{args.help} --Write sequences contained in the current graph data to a FASTA format file.
+#{args.help} -- Write sequences contained in the current graph data to a FASTA format file.
 ")
       if args.detailed_help?
          console.warn("
@@ -1745,7 +1827,7 @@ file : \"filename.fasta[.gz]\" -- name of FASTA format file to write sequence to
 scaff : true -- Output fully scaffolded sequences (using seq_scaffold tool)\n
 \n
         Example: #{args.help} {\"scaff\":true} -- Output scaffolded contig sequences\n
-\n        
+\n
         NOTE: Using this option as in the above example will run seq_scaffold with its\n
         default settings.  As an advanced option, this parameter can also accept a string\n
         argument, which will be passed along to the external seq_scaffold tool as its\n
@@ -2112,6 +2194,11 @@ sequence : <string> -- Select connected components containing the provided DNA s
         Select connected components containing the provided sequence (or its reverse\n
         complement).\n
 \n
+sequences : [<string>, ...] -- Like 'sequence' parameter, but takes a list of sequences.\n
+\n
+        Example: #{args.help} {\"sequences\":[\"AGACTAGCAGATATAC\",\"GATAACGATACGATACGAT\"]}\n
+        Select connected components containing any of the provided sequences (or their\n
+        reverse complements).\n
 ")
       callback?(null, j)
       return
@@ -2125,13 +2212,15 @@ sequence : <string> -- Select connected components containing the provided DNA s
       return
 
    if args.sequence
+      args.sequences = [ args.sequence ]
+   if args.sequences
       args.ccnums = []
-      revseq = reverse_comp(args.sequence)
+      all_seqs = args.sequences.map(reverse_comp).concat(args.sequences)
       for c, i in j.connected_comps
-         for nid in c when seq = j.nodes[nid].recon_seq 
-              if seq.indexOf(args.sequence) isnt -1 or seq.indexOf(revseq) isnt -1
-                 args.ccnums.push(i)
-                 break
+         for nid in c when (seq = j.nodes[nid].recon_seq) and not (i in args.ccnums)
+            for s in all_seqs when seq.indexOf(s) isnt -1
+               args.ccnums.push(i)
+               break
    else if args.shift
       args.ccrange=[1,-1]
    else if args.ccname?  # Find the CComp containing node with this name
@@ -2253,6 +2342,11 @@ sequence : <string> -- Select contig(s) found to contain the provided DNA sequen
         Example: #{args.help} {\"sequence\":\"AGACTAGCAGATATACGATAACGATACGATACGAT\"}\n
         Select contig(s) containing the provided sequence (or its reverse complement).\n        
 \n
+sequences : [<string>, ...] -- Like 'sequence' parameter, but takes a list of sequences.\n
+\n
+        Example: #{args.help} {\"sequences\":[\"AGACTAGCAGATATAC\",\"GATAACGATACGATACGAT\"]}\n
+        Select contigs containing any of the provided sequences (or their reverse\n
+        complements).\n
 ")
       callback?(null, j)
       return
@@ -2264,6 +2358,16 @@ sequence : <string> -- Select contig(s) found to contain the provided DNA sequen
       return
 
    args.names = [args.name] if args.name? 
+
+   if args.sequence
+      args.sequences = [ args.sequence ]
+   if args.sequences
+      args.names = []
+      all_seqs = args.sequences.map(reverse_comp).concat(args.sequences)
+      for nid, n of j.nodes when seq = n.recon_seq 
+         for s in all_seqs when seq.indexOf(s) isnt -1
+            args.names.push(nid)
+            break
 
    if args.sequence
       args.names = []
@@ -2284,77 +2388,6 @@ sequence : <string> -- Select contig(s) found to contain the provided DNA sequen
    remove_graph_refs(j, (n)->delete n.seen) 
 
    delete j.connected_comps 
-   
-   callback?(null, j)
-
-###
-# Add ends
-###
-add_ends = (j, args = {}, callback) ->
-# j = json graph object, args = arguments from command, callback = function to call when done
-
-   if args.help?
-      console.warn("
-#{args.help} -- Extends scaffold ends (reversing the action of PLUCK at scaffold ends)
-")
-      if args.detailed_help?
-         console.warn("
-\n
-Parameters:\n
-\n
-iterate : <int> -- number of iterations of #{args.help} to run. Each is equivalent to\n
-       running #{args.help} again as a separate command.  By Default <int> = 3\n
-\n
-        Example: #{args.help} {\"iterate\":2} -- Equivalent of #{args.help} #{args.help}\n
-")
-      callback?(null, j)
-      return
-
-   args.iterate ?= 3
-
-   for i in [args.iterate..1]
-
-      calc_ccomps(j) unless j.connected_comps?  # Make sure there are ccomps
-
-      try
-         build_graph_refs(j) 
-         build_removed_graph_refs(j)
-      catch err
-         callback?(err, null)
-         return
-
-      for c in j.connected_comps
-   
-         # Find the "head" and "tail" nodes for this scaffold
-      
-         try 
-            [[head_node], [tail_node]] = find_ends(j, c, true)
-         catch err
-            remove_graph_refs(j, null, ((e) -> delete e.pluck_iteration))
-            callback?(err, null)
-            return
-            
-         unless head_node.no_push
-            for e in head_node.rem_inlinks when e[0].dir is "forward" and e[0].pluck_iteration is i and not j.nodes[e[0].n1]? 
-               j.edges.push(e[0])
-               j.nodes[e[1].id] = e[1]
-               delete j.removed_nodes[e[1].id]
-               delete j.removed_edges[e[0].index]
-               break
-         
-         unless tail_node.no_push
-            for e in tail_node.rem_outlinks when e[0].dir is "forward" and e[0].pluck_iteration is i and not j.nodes[e[0].n2]?
-               j.edges.push(e[0])
-               j.nodes[e[1].id] = e[1]
-               delete j.removed_nodes[e[1].id]
-               delete j.removed_edges[e[0].index]
-               break
-
-      remove_graph_refs(j) unless i is 1
-
-      delete j.connected_comps 
-   
-   remove_graph_refs(j, null, ((e) -> delete e.pluck_iteration))
    
    callback?(null, j)
 
@@ -3324,7 +3357,7 @@ add_edges : [\"contig1\",[\"contig2\",...]] -- Add back the specified connection
         {\"add_edges\":[\"NODE_1234\",\"NODE_9\"]}\n
 \n
         If more than one node-independent sets of edges are to be added or removed (that\n
-        is, those not sharing any contig(s) in common), then multiple calls to ${args.help}\n
+        is, those not sharing any contig(s) in common), then multiple calls to #{args.help}\n
         are required to accomplish this task.\n
 ")
       callback?(null, j)
@@ -3410,14 +3443,30 @@ new_name : \"new_contig_name\" -- Name for the newly created contig node\n
         Example: #{args.help} {\"new_name\":\"NODE_1234a\"} -- New node will be named\n
         NODE_1234a\n
 \n
+include : [\"contig_name1\", ...] -- Move mate-pair edges from the listed contigs.\n
+\n
+        Example: #{args.help} {\"name\":\"NODE_1234\",\"include\":[\"NODE_567\",\"NODE_234\"]}\n 
+        -- Edges between NODE_1234 and the included contigs will be moved to the new cut\n
+        and copied version of NODE_1234.\n
+\n
 start : <int> -- Beginning sequence coordinate for the new node within the original\n
 end : <int> -- Ending sequence coordinate for the new node within the original\n
+\n
+        NOTE: To facilitate trimming sequences to a fixed maximum length, it is\n
+        allowable for negative 'start' values and positive 'end' values to be longer than\n
+        a sequence. In such cases, the values are set to the start and end of the\n
+        sequence, respectively. Positive start and negative end positions must fall\n
+        within the sequence, because otherwise the start position will be after the end\n
+        position.\n
 \n
         Example: #{args.help} {\"start\":123,\"end\":456} -- The new node will include\n
         sequence from positions 123 to 456\n
 \n
         Example: #{args.help} {\"end\":456} -- The new node will include sequence from\n
         position 0 (implied) to 456. end may also be omitted, implying the last position\n
+\n
+        Example: #{args.help} {\"start\":-1000} -- New node contains at most the last\n
+        1000 bases of any sequence. Sequences under 1000 bases are copied unmodified.\n
 ")
       callback?(null, j)
       return
@@ -3432,7 +3481,19 @@ end : <int> -- Ending sequence coordinate for the new node within the original\n
    args.start ?= 0
    args.end ?= node.seq_len - 1
 
-   unless args.start < args.end and args.end < node.seq_len
+   if args.start < 0
+      args.start = node.seq_len + args.start
+
+   if args.end < 0
+      args.end = node.seq_len + args.end
+
+   if args.start < 0
+      args.start = 0  
+
+   if args.end >= node.seq_len
+      args.end = node.seq_len - 1
+
+   unless args.start < args.end
       callback?(new Error('CUTND requires valid "start" and "end" arguments.'), null)
       return
 
@@ -3440,7 +3501,8 @@ end : <int> -- Ending sequence coordinate for the new node within the original\n
       build_graph_refs(j) 
       build_removed_graph_refs(j)
    catch err
-      callback?(err, null)
+      console.warn "build_graph_refs error in CUTND"
+      callback?(err, null) 
       return
    
    k = 1
@@ -3976,7 +4038,8 @@ tag : \"filename_part\" -- Part of a filename to include in files written from t
          console.warn("NOTE: You appear to be redirecting the output of this session, no interactive command results will be visible.\n")
       
       repl.start({prompt:">> ", output:process.stderr, input:process.stdin, terminal:true, ignoreUndefined:true, eval:(l,cx,fn,cb) ->
-         [cmd, argstr] = l[1..-2].trim().replace(/\t|\n/," ").split(" ",2)           
+         [cmd, argstr...] = l[1..-2].trim().replace(/\t|\n/," ").split(" ")
+         argstr = argstr.join(' ').replace(/^['"]|["']$/g,"") 
          cmd = cmd.toUpperCase()
          if cmd is 'HELP'
             cmd_func = commands[cmd]

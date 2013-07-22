@@ -141,14 +141,14 @@ add_test(NAME csfasta2fasta_paired_test_data COMMAND bash -c "${GAWK_EXEC} -f ${
 set_tests_properties(csfasta2fasta_paired_test_data PROPERTIES PASS_REGULAR_EXPRESSION "587dcdfa4b69f2422172235fb63faf2a" TIMEOUT 30)
 
 add_test(NAME csfasta2ntfasta_test_data COMMAND bash -c "${NODE_EXEC} ${SCRIPT_RUNTIME_OUTPUT_DIRECTORY}/graph_ops.js ${CMAKE_BINARY_DIR}/output_test_data/lambda_asm.json FASTA | tee ${CMAKE_BINARY_DIR}/output_test_data/lambda_asm_recon.fna | ${GAWK_EXEC} -v numstarts=4 -f ${SCRIPT_RUNTIME_OUTPUT_DIRECTORY}/csfasta2ntfasta.awk | tee ${CMAKE_BINARY_DIR}/output_test_data/lambda_asm_recon_4starts.fasta | openssl md5") 
-set_tests_properties(csfasta2ntfasta_test_data PROPERTIES PASS_REGULAR_EXPRESSION "744d427f8f9748f990b4b1a87d0fb1f2" TIMEOUT 30)
+set_tests_properties(csfasta2ntfasta_test_data PROPERTIES PASS_REGULAR_EXPRESSION "185357ad83ec46928edfcc225bcde638" TIMEOUT 30)
 
 add_test(NAME graph_ops_scaffolding_test_data COMMAND bash -c "${NODE_EXEC} ${SCRIPT_RUNTIME_OUTPUT_DIRECTORY}/graph_ops.js ${CMAKE_BINARY_DIR}/output_test_data/lambda_asm.json MST PLUCK PRUNE PUSH INSERT SCAFF DUMP '{\"file\":\"${CMAKE_BINARY_DIR}/output_test_data/lambda_asm_scaffs.json\"}' FASTA '{\"scaff\":true}' | tee ${CMAKE_BINARY_DIR}/output_test_data/lambda_asm_scaffs.fna | openssl md5") 
 set_tests_properties(graph_ops_scaffolding_test_data PROPERTIES ENVIRONMENT "PATH=${SCRIPT_RUNTIME_OUTPUT_DIRECTORY}:$ENV{PATH}")
-set_tests_properties(graph_ops_scaffolding_test_data PROPERTIES PASS_REGULAR_EXPRESSION "7760c7722f392ffe3946d5022397e062" TIMEOUT 30)
+set_tests_properties(graph_ops_scaffolding_test_data PROPERTIES PASS_REGULAR_EXPRESSION "c07eb882a4ff3a3d00937ae261c41ea0" TIMEOUT 30)
 
 add_test(NAME fix_fasta_line_lengths_test_data COMMAND bash -c "${GAWK_EXEC} --re-interval -v minlen=500 -v maxlen=4000 -v ll=80 -f ${SCRIPT_RUNTIME_OUTPUT_DIRECTORY}/fix_fasta_line_lengths.awk ${CMAKE_BINARY_DIR}/output_test_data/lambda_asm_recon.fna | tee ${CMAKE_BINARY_DIR}/output_test_data/lambda_asm_recon_fixed_ll.fna | openssl md5")
-set_tests_properties(fix_fasta_line_lengths_test_data PROPERTIES PASS_REGULAR_EXPRESSION "69d03ede642d6b5bf005199f4e6ec008" TIMEOUT 30)
+set_tests_properties(fix_fasta_line_lengths_test_data PROPERTIES PASS_REGULAR_EXPRESSION "8c8d7485d2e86c55e89b92cdbd15f9fc" TIMEOUT 30)
 
 add_test(NAME RDP_train_to_heirarchy_test_data COMMAND bash -c "echo -e '0*Root*-1*0*norank\\n1*Bacteria*0*1*domain\\n2*Acidobacteria*1*2*phylum\\n3*Holophagae*2*3*class\\n4*Acanthopleuribacterales*3*4*order\\n5*Acanthopleuribacteraceae*4*5*family\\n6*Acanthopleuribacter*5*6*genus' | ${NODE_EXEC} ${SCRIPT_RUNTIME_OUTPUT_DIRECTORY}/RDP_train_to_tree.js | openssl md5")
 set_tests_properties(RDP_train_to_heirarchy_test_data PROPERTIES PASS_REGULAR_EXPRESSION "126f51df16a689518a951e13f3983cf8" TIMEOUT 30)

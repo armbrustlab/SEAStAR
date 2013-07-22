@@ -27,7 +27,7 @@
 
 
 (function() {
-  var cmds, fs, heal_fn, heal_m, heal_max, heal_n, heal_seq, heal_string, input, inputfn, output, overlap_m, overlap_max, overlap_n, p, parm, process_heal_fasta, process_scaffs, rc_tab, rev_comp, scaff_string, scaffs, ss_version, verbose, zlib,
+  var cmds, fs, gap_pad, heal_fn, heal_m, heal_max, heal_n, heal_seq, heal_string, input, inputfn, output, overlap_m, overlap_max, overlap_n, p, parm, process_heal_fasta, process_scaffs, rc_tab, rev_comp, scaff_string, scaffs, ss_version, verbose, zlib,
     __slice = [].slice;
 
   if (!(process.version.split('.')[1] >= 10)) {
@@ -291,7 +291,7 @@
         } else {
           frame = (prmax[0] + crmax[0]) % 3;
         }
-        scafout = scafout + "nnnnnnnnnnnnnnn" + ns[frame] + contig;
+        scafout = scafout + gap_pad + ns[frame] + contig;
         prev_contig = contig;
         rev_prev_contig = rev_contig;
       }
@@ -325,6 +325,8 @@
 
   overlap_max = 35;
 
+  gap_pad = "nnnnnnnnnnnnnnn";
+
   if (process.argv.length < 3) {
     console.error("No inputs provided, use --help for assistance.");
     process.exit(1);
@@ -345,7 +347,8 @@
       case '--help':
       case '-h':
         console.warn("\nUsage: seq_scaffold [options] input.fna");
-        console.warn('[options] : [--overlap=<n>] [--trim=<n>] [--max=<n>] [--heal=<heafile.fna>] [--heal_overlap=<n>] [--heal_trim=<n>] [--heal_max=<n>]\n');
+        console.warn('[options] : [-h|--help] [--overlap=<n>] [--max=<n>] [--trim=<n>] [--heal=<heafile.fna>] [--heal_overlap=<n>] [--heal_max=<n>] [--heal_trim=<n>] [--verbose]\n');
+        console.warn("-h | --help  : Print this help text.");
         console.warn("--overlap=<n> : Minimum number of bases of overlap required to join contigs. Default: " + overlap_n);
         console.warn("--max=<n> : Maximum number of bases of overlap to look for. Default: " + overlap_max);
         console.warn("--trim=<n> : Maximum number of non-ambiguous bases to try trimming from contig ends when looking for overlap. Default: " + overlap_m);
@@ -353,6 +356,7 @@
         console.warn("--heal_overlap=<n> : Minimum number of bases of overlap required to join contigs. Default: " + heal_n);
         console.warn("--heal_max=<n> : Maximum number of bases of gap to try to heal. Default: " + heal_max);
         console.warn("--heal_trim=<n> : Maximum number of non-ambiguous bases to try trimming from contig ends during healing. Default: " + heal_m);
+        console.warn("--gap=<n> : Base number of 'n's (ambiguous bases) to insert in remaining gaps. Default: " + gap_pad.length);
         console.warn("--verbose : Output diagnostic messages to stderr. Default: " + verbose + "\n");
         console.warn("SEASTAR Version: " + ss_version + "\n");
         process.exit(1);
@@ -377,6 +381,9 @@
         break;
       case '--max':
         overlap_max = Number(parm[1]);
+        break;
+      case '--gap':
+        gap_pad = Array(Number(parm[1]) + 1).join("n");
         break;
       case '--verbose':
         verbose = true;

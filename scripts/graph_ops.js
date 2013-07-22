@@ -54,7 +54,9 @@
 
 
 (function() {
-  var JSONStream, add_ends, bisect, build_graph_refs, build_removed_graph_refs, calc_ccomps, calc_seq_stats, callback_list, cc_seq_len, check_connections, child_process, clone_object, cmd, cmds, command_file, commands, cut_branches, cut_node, edge_director, err, execute_selection, export_dot, export_fasta, export_table, filter_edges, find_all_ends, find_connection, find_direct_connection, find_ends, find_indirect_connection, find_neighbors, fs, full_order, grab_ccomps, grab_clusts, grab_neighbors, graph_stats, graph_stats_cc, heuristic, make_directed, maximal_spanning_tree, my_bisect, my_stringify, node_problems, open_output_stream, output_help, path, perform_edits, pop_stash, prev_cmd, process_commands, push_stash, read_input_stream, read_json, relink, remove_graph_refs, remove_leaves, repl, resolve_path, reverse_comp, scaff_link, scaffold, scaffold_spanning_tree, ss_version, start_arg, stash_stack, tetracalc, use_heuristic, write_json, zlib, _i, _len, _ref;
+  var JSONStream, add_ends, bisect, build_graph_refs, build_removed_graph_refs, calc_ccomps, calc_seq_stats, callback_list, cc_seq_len, check_connections, child_process, clone_object, cmd, cmds, command_file, commands, cut_branches, cut_node, edge_director, err, execute_selection, export_dot, export_fasta, export_table, filter_edges, find_all_ends, find_connection, find_direct_connection, find_ends, find_indirect_connection, find_neighbors, fs, full_order, grab_ccomps, grab_clusts, grab_neighbors, graph_stats, graph_stats_cc, heuristic, make_directed, maximal_spanning_tree, my_bisect, my_stringify, node_problems, open_output_stream, output_help, path, perform_edits, pop_stash, prev_cmd, process_commands, push_stash, read_input_stream, read_json, relink, remove_graph_refs, remove_leaves, repl, resolve_path, reverse_comp, scaff_link, scaffold, scaffold_spanning_tree, ss_version, start_arg, stash_stack, tetracalc, use_heuristic, write_json, zlib, _i, _len, _ref,
+    __indexOf = [].indexOf || function(item) { for (var i = 0, l = this.length; i < l; i++) { if (i in this && this[i] === item) return i; } return -1; },
+    __slice = [].slice;
 
   if (!(process.version.split('.')[1] >= 10)) {
     console.error("ERROR: nodejs version v0.10.0 or greater required.");
@@ -505,7 +507,7 @@
 
 
   build_removed_graph_refs = function(j, nf, ef) {
-    var e, e_out, i, l_in, l_out, n, n_out, name, s_gc, s_out, t_gc, _i, _len, _ref;
+    var e, e_out, i, l_in, l_out, n, n_out, name, s_gc, t_gc, _i, _len, _ref;
     if (nf == null) {
       nf = null;
     }
@@ -590,31 +592,7 @@
         ef(e);
       }
     }
-    s_out = (function() {
-      var _base, _base1, _j, _len1, _ref1, _results;
-      _ref1 = j.shared_seq_edges;
-      _results = [];
-      for (i = _j = 0, _len1 = _ref1.length; _j < _len1; i = ++_j) {
-        e = _ref1[i];
-        if (!(e.src = j.nodes[e.n1] || j.removed_nodes[e.n1])) {
-          throw "build_removed_graph_refs: Missing node " + e.n1 + " in shared edge with " + e.n2 + ".";
-        }
-        if (!(e.tar = j.nodes[e.n2] || j.removed_nodes[e.n2])) {
-          throw "build_removed_graph_refs: Missing node " + e.n2 + " in shared edge with " + e.n1 + ".";
-        }
-        if ((_base = e.src).shared_links == null) {
-          _base.shared_links = {};
-        }
-        e.src.shared_links[e.tar.id] = e;
-        if ((_base1 = e.tar).shared_links == null) {
-          _base1.shared_links = {};
-        }
-        e.tar.shared_links[e.src.id] = e;
-        _results.push(e);
-      }
-      return _results;
-    })();
-    return [n_out, e_out, s_out];
+    return [n_out, e_out];
   };
 
   /*   
@@ -640,7 +618,6 @@
       delete n.links;
       delete n.inlinks;
       delete n.outlinks;
-      delete n.shared_links;
       delete n.rem_links;
       delete n.rem_inlinks;
       delete n.rem_outlinks;
@@ -667,21 +644,6 @@
       }
       return _results;
     })();
-    j.shared_seq_edges = (function() {
-      var _i, _len, _ref1, _results;
-      _ref1 = j.shared_seq_edges;
-      _results = [];
-      for (_i = 0, _len = _ref1.length; _i < _len; _i++) {
-        e = _ref1[_i];
-        if (!(e != null)) {
-          continue;
-        }
-        delete e.src;
-        delete e.tar;
-        _results.push(e);
-      }
-      return _results;
-    })();
     if (j.removed_nodes != null) {
       _ref1 = j.removed_nodes;
       for (name in _ref1) {
@@ -690,7 +652,6 @@
         delete n.links;
         delete n.inlinks;
         delete n.outlinks;
-        delete n.shared_links;
         delete n.rem_links;
         delete n.rem_inlinks;
         delete n.rem_outlinks;
@@ -1229,14 +1190,14 @@
 
 
   remove_leaves = function(j, args, callback) {
-    var e, edges, edges_kept, err, i, n, nodes, _i, _j, _k, _len, _len1, _ref, _ref1;
+    var e, edges, edges_kept, err, i, n, nodes, _i, _j, _k, _len, _len1, _ref, _ref1, _ref2;
     if (args == null) {
       args = {};
     }
     if (args.help != null) {
       console.warn("" + args.help + " -- Remove all leaf contig nodes (in or outdegree == 0) from the graph");
       if (args.detailed_help != null) {
-        console.warn("\nParameters:\n\niterate : <int> -- number of iterations of " + args.help + " to run. Each is equivalent to\n       running " + args.help + " again as a separate command.  By Default <int> = 2\n\n        Example: " + args.help + " {\"iterate\":2} -- Equivalent of " + args.help + " " + args.help + "\n");
+        console.warn("\nParameters:\n\niterate : <int> -- number of iterations of " + args.help + " to run. Each is equivalent to\n       running " + args.help + " again as a separate command.  By Default <int> = 2\n\n        Example: " + args.help + " {\"iterate\":2} -- Equivalent of " + args.help + " " + args.help + "\n\nmin_len : <int> -- Minimum length of isolated nodes to keep.\n\n        Example: " + args.help + " {\"min_len\":20000} -- Default. Do not \"pluck away\" an\n        unconnected node containing 20000 or more bases of sequence.\n");
       }
       if (typeof callback === "function") {
         callback(null, j);
@@ -1246,6 +1207,9 @@
     if (args.iterate == null) {
       args.iterate = 2;
     }
+    if (args.min_len == null) {
+      args.min_len = 20000;
+    }
     delete j.connected_comps;
     if (j.removed_edges == null) {
       j.removed_edges = [];
@@ -1253,9 +1217,12 @@
     if (j.removed_nodes == null) {
       j.removed_nodes = {};
     }
-    for (i = _i = 1, _ref = args.iterate; 1 <= _ref ? _i <= _ref : _i >= _ref; i = 1 <= _ref ? ++_i : --_i) {
+    if (j.pluck_iterations == null) {
+      j.pluck_iterations = 1;
+    }
+    for (i = _i = _ref = j.pluck_iterations, _ref1 = args.iterate + j.pluck_iterations - 1; _ref <= _ref1 ? _i <= _ref1 : _i >= _ref1; i = _ref <= _ref1 ? ++_i : --_i) {
       try {
-        _ref1 = build_graph_refs(j), nodes = _ref1[0], edges = _ref1[1];
+        _ref2 = build_graph_refs(j), nodes = _ref2[0], edges = _ref2[1];
       } catch (_error) {
         err = _error;
         if (typeof callback === "function") {
@@ -1265,11 +1232,12 @@
       }
       for (_j = 0, _len = nodes.length; _j < _len; _j++) {
         n = nodes[_j];
-        if (!(n.inlinks.length === 0 || n.outlinks.length === 0)) {
-          continue;
+        if (n.inlinks.length === 0 || n.outlinks.length === 0) {
+          if (!(((n.inlinks.length === 1) && (n.links[0][1].inlinks.length === 0) && (n.links[0][1].outlinks[0][1] === n)) || ((n.outlinks.length === 1) && (n.links[0][1].outlinks.length === 0) && (n.links[0][1].inlinks[0][1] === n)) || ((n.links.length === 0) && ((i > 1) || ((n.seq_len != null) >= args.min_len))))) {
+            j.removed_nodes[n.id] = n;
+            delete j.nodes[n.id];
+          }
         }
-        j.removed_nodes[n.id] = n;
-        delete j.nodes[n.id];
       }
       edges_kept = [];
       for (_k = 0, _len1 = edges.length; _k < _len1; _k++) {
@@ -1283,6 +1251,113 @@
       }
       j.edges = edges_kept;
       remove_graph_refs(j);
+    }
+    j.pluck_iterations = args.iterate + j.pluck_iterations - 1;
+    return typeof callback === "function" ? callback(null, j) : void 0;
+  };
+
+  /*
+  # Add ends
+  */
+
+
+  add_ends = function(j, args, callback) {
+    var c, e, err, head_node, i, tail_node, _i, _j, _k, _l, _len, _len1, _len2, _ref, _ref1, _ref2, _ref3, _ref4, _ref5, _ref6, _ref7;
+    if (args == null) {
+      args = {};
+    }
+    if (args.help != null) {
+      console.warn("" + args.help + " -- Extends scaffold ends (reversing the action of PLUCK at scaffold ends)");
+      if (args.detailed_help != null) {
+        console.warn("\nParameters:\n\niterate : <int> -- number of iterations of " + args.help + " to run. Each is equivalent to\n       running " + args.help + " again as a separate command.  By Default <int> = 3\n\n        Example: " + args.help + " {\"iterate\":2} -- Equivalent of " + args.help + " " + args.help + "\n");
+      }
+      if (typeof callback === "function") {
+        callback(null, j);
+      }
+      return;
+    }
+    if (args.iterate == null) {
+      args.iterate = 3;
+    }
+    if (j.pluck_iterations == null) {
+      console.warn("WARNING: PUSH called on unPLUCKed graph.");
+      if (typeof callback === "function") {
+        callback(null, j);
+      }
+      return;
+    }
+    if (args.iterate > j.pluck_iterations) {
+      args.iterate = j.pluck_iterations;
+    }
+    for (i = _i = _ref = j.pluck_iterations, _ref1 = j.pluck_iterations - args.iterate + 1; _ref <= _ref1 ? _i <= _ref1 : _i >= _ref1; i = _ref <= _ref1 ? ++_i : --_i) {
+      if (j.connected_comps == null) {
+        calc_ccomps(j);
+      }
+      try {
+        build_graph_refs(j);
+        build_removed_graph_refs(j);
+      } catch (_error) {
+        err = _error;
+        if (typeof callback === "function") {
+          callback(err, null);
+        }
+        return;
+      }
+      _ref2 = j.connected_comps;
+      for (_j = 0, _len = _ref2.length; _j < _len; _j++) {
+        c = _ref2[_j];
+        try {
+          _ref3 = find_ends(j, c, true), (_ref4 = _ref3[0], head_node = _ref4[0]), (_ref5 = _ref3[1], tail_node = _ref5[0]);
+        } catch (_error) {
+          err = _error;
+          remove_graph_refs(j, null, (function(e) {
+            return delete e.pluck_iteration;
+          }));
+          if (typeof callback === "function") {
+            callback(err, null);
+          }
+          return;
+        }
+        if (!head_node.no_push) {
+          _ref6 = head_node.rem_inlinks;
+          for (_k = 0, _len1 = _ref6.length; _k < _len1; _k++) {
+            e = _ref6[_k];
+            if (!(e[0].dir === "forward" && e[0].pluck_iteration === i && (j.nodes[e[0].n1] == null))) {
+              continue;
+            }
+            j.edges.push(e[0]);
+            j.nodes[e[1].id] = e[1];
+            delete j.removed_nodes[e[1].id];
+            delete j.removed_edges[e[0].index];
+            break;
+          }
+        }
+        if (!tail_node.no_push) {
+          _ref7 = tail_node.rem_outlinks;
+          for (_l = 0, _len2 = _ref7.length; _l < _len2; _l++) {
+            e = _ref7[_l];
+            if (!(e[0].dir === "forward" && e[0].pluck_iteration === i && (j.nodes[e[0].n2] == null))) {
+              continue;
+            }
+            j.edges.push(e[0]);
+            j.nodes[e[1].id] = e[1];
+            delete j.removed_nodes[e[1].id];
+            delete j.removed_edges[e[0].index];
+            break;
+          }
+        }
+      }
+      if (i !== 1) {
+        remove_graph_refs(j);
+      }
+      delete j.connected_comps;
+    }
+    remove_graph_refs(j, null, (function(e) {
+      return delete e.pluck_iteration;
+    }));
+    j.pluck_iterations = j.pluck_iterations - args.iterate;
+    if (j.pluck_iterations === 0) {
+      delete j.pluck_iterations;
     }
     return typeof callback === "function" ? callback(null, j) : void 0;
   };
@@ -1944,9 +2019,9 @@
       };
     }
     if (args.help != null) {
-      console.warn("" + args.help + " --Write sequences contained in the current graph data to a FASTA format file.");
+      console.warn("" + args.help + " -- Write sequences contained in the current graph data to a FASTA format file.");
       if (args.detailed_help != null) {
-        console.warn("\nParameters:\n\nfile : \"filename.fasta[.gz]\" -- name of FASTA format file to write sequence to\n\n        Example: " + args.help + " {\"file\":\"my_seq.fasta\"} -- Write stats to the file\n        my_seq.fasta\n\n        Example: " + args.help + " {\"file\":\"-\"} -- Default. Write sequence to STDOUT\n\nscaff : true -- Output fully scaffolded sequences (using seq_scaffold tool)\n\n        Example: " + args.help + " {\"scaff\":true} -- Output scaffolded contig sequences\n\n                NOTE: Using this option as in the above example will run seq_scaffold with its\n        default settings.  As an advanced option, this parameter can also accept a string\n        argument, which will be passed along to the external seq_scaffold tool as its\n        [options] parameter string. Run with --help for help with the settings offered by\n        seq_scaffold and the default values.\n\n        Example: " + args.help + " {\"scaff\":\"--help\"}\n\n        Example: " + args.help + " {\"scaff\":\"--overlap=7 --heal=othercontigs.fna\"}\n\nno_merge_scaffs : true -- Write contig sequences in scaffold order with a scaffold ID in\n        each header, ready to be provided to the seq_scaffold tool\n\n        Example: " + args.help + " {\"no_merge_scaffs\":true} -- Output ordered contig sequences\n\nabundance : true -- append relative abundance values to the FASTA sequence IDs\n\n        Example: " + args.help + " {\"abundance\":true} -- Attach abundances\n");
+        console.warn("\nParameters:\n\nfile : \"filename.fasta[.gz]\" -- name of FASTA format file to write sequence to\n\n        Example: " + args.help + " {\"file\":\"my_seq.fasta\"} -- Write stats to the file\n        my_seq.fasta\n\n        Example: " + args.help + " {\"file\":\"-\"} -- Default. Write sequence to STDOUT\n\nscaff : true -- Output fully scaffolded sequences (using seq_scaffold tool)\n\n        Example: " + args.help + " {\"scaff\":true} -- Output scaffolded contig sequences\n\n        NOTE: Using this option as in the above example will run seq_scaffold with its\n        default settings.  As an advanced option, this parameter can also accept a string\n        argument, which will be passed along to the external seq_scaffold tool as its\n        [options] parameter string. Run with --help for help with the settings offered by\n        seq_scaffold and the default values.\n\n        Example: " + args.help + " {\"scaff\":\"--help\"}\n\n        Example: " + args.help + " {\"scaff\":\"--overlap=7 --heal=othercontigs.fna\"}\n\nno_merge_scaffs : true -- Write contig sequences in scaffold order with a scaffold ID in\n        each header, ready to be provided to the seq_scaffold tool\n\n        Example: " + args.help + " {\"no_merge_scaffs\":true} -- Output ordered contig sequences\n\nabundance : true -- append relative abundance values to the FASTA sequence IDs\n\n        Example: " + args.help + " {\"abundance\":true} -- Attach abundances\n");
       }
       if (typeof callback === "function") {
         callback(null, j);
@@ -2248,14 +2323,14 @@
 
 
   grab_ccomps = function(j, args, callback) {
-    var c, cc, err, i, id, new_cclist, nid, nodes, revseq, seq, _i, _j, _k, _l, _len, _len1, _len2, _len3, _len4, _len5, _len6, _len7, _len8, _m, _n, _o, _p, _q, _r, _ref, _ref1, _ref2, _ref3, _ref4, _ref5, _ref6, _ref7, _ref8, _ref9, _results;
+    var all_seqs, c, cc, err, i, id, new_cclist, nid, nodes, s, seq, _i, _j, _k, _l, _len, _len1, _len2, _len3, _len4, _len5, _len6, _len7, _len8, _len9, _m, _n, _o, _p, _q, _r, _ref, _ref1, _ref2, _ref3, _ref4, _ref5, _ref6, _ref7, _ref8, _ref9, _results, _s;
     if (args == null) {
       args = {};
     }
     if (args.help != null) {
       console.warn("" + args.help + " -- Select specific connected components for further processing");
       if (args.detailed_help != null) {
-        console.warn("\nParameters:\n\nccname : \"contig_name\" -- Select the connected component containing the named contig\n\n        Example: " + args.help + " {\"ccname\":\"NODE_1234\"} -- Select the connected component\n        containing the contig named NODE_1234\nccnames : [\"contig_name1\",\"contig_name2\",...] -- Select the connected component(s)\n        containing the named contigs\n\n        Example: " + args.help + " {\"ccnames\":[\"NODE_1234\",\"NODE_5678\"]} -- Select the\n        connected components containing the contigs named NODE_1234 and NODE_5678\n\nccnum : <int> -- Select connected component number <int>\n\n        Example: " + args.help + " {\"ccnum\":0} -- Default. Select connected component 0.\n\nccnums : [<int>,<int>,...] -- Select the connected components from the list of numbers\n\n        Example: " + args.help + " {\"ccnums\":[1,2]} -- Select the second and third\n        connected components (numbering is zero based)\n\nccrange : [<int1>,<int2>] -- Select the connected components numbered in the range\n        <int1>..<int2> (inclusive). See also: 'shift' option below.\n\n        NOTE: <int> may be negative, indicating positions at the end of the list of\n        connected components.\n \n        Example: " + args.help + " {\"ccrange\":[0,5]} -- Select the first 6 connected\n        components\n\n        Example: " + args.help + " {\"ccrange\":[-5,-1]} -- Select the last 5 connected\n        components\n\nshift : true -- Select all connected components except the first one.\n\n        Example: " + args.help + " {\"shift\":true} -- Drop the first connected component.\n\n        This is like " + args.help + " {\"ccrange\":[1,-1]} except it doesn't generate a\n        fatal error when there is only one remaining connected component, allowing\n        processing to potentially continue in any calling SCRIPT commands.\n\nmin_nodes : <int> -- Select connected components with <int> or more nodes.\n\n        Example: " + args.help + " {\"min_nodes\":2} -- Select connected components\n        with 2 or more nodes.\n\nmin_seqlen : <int> -- Select connected components with <int> or more sequence within nodes.\n\n        Example: " + args.help + " {\"min_seqlen\":1000} -- Select connected components containing\n        at least 1000 bases of sequence.\n\nsequence : <string> -- Select connected components containing the provided DNA sequence.\n\n        NOTE! This isn't BLAST, the sequence must match exactly. Any differences, including\n        ambiguity codes, etc. will prevent matching. The only extra thing that is done is the\n        reverse complement of the provided sequence is also searched.\n\n        Example: " + args.help + " {\"sequence\":\"AGACTAGCAGATATACGATAACGATACGATACGAT\"}\n        Select connected components containing the provided sequence (or its reverse\n        complement).\n\n");
+        console.warn("\nParameters:\n\nccname : \"contig_name\" -- Select the connected component containing the named contig\n\n        Example: " + args.help + " {\"ccname\":\"NODE_1234\"} -- Select the connected component\n        containing the contig named NODE_1234\nccnames : [\"contig_name1\",\"contig_name2\",...] -- Select the connected component(s)\n        containing the named contigs\n\n        Example: " + args.help + " {\"ccnames\":[\"NODE_1234\",\"NODE_5678\"]} -- Select the\n        connected components containing the contigs named NODE_1234 and NODE_5678\n\nccnum : <int> -- Select connected component number <int>\n\n        Example: " + args.help + " {\"ccnum\":0} -- Default. Select connected component 0.\n\nccnums : [<int>,<int>,...] -- Select the connected components from the list of numbers\n\n        Example: " + args.help + " {\"ccnums\":[1,2]} -- Select the second and third\n        connected components (numbering is zero based)\n\nccrange : [<int1>,<int2>] -- Select the connected components numbered in the range\n        <int1>..<int2> (inclusive). See also: 'shift' option below.\n\n        NOTE: <int> may be negative, indicating positions at the end of the list of\n        connected components.\n \n        Example: " + args.help + " {\"ccrange\":[0,5]} -- Select the first 6 connected\n        components\n\n        Example: " + args.help + " {\"ccrange\":[-5,-1]} -- Select the last 5 connected\n        components\n\nshift : true -- Select all connected components except the first one.\n\n        Example: " + args.help + " {\"shift\":true} -- Drop the first connected component.\n\n        This is like " + args.help + " {\"ccrange\":[1,-1]} except it doesn't generate a\n        fatal error when there is only one remaining connected component, allowing\n        processing to potentially continue in any calling SCRIPT commands.\n\nmin_nodes : <int> -- Select connected components with <int> or more nodes.\n\n        Example: " + args.help + " {\"min_nodes\":2} -- Select connected components\n        with 2 or more nodes.\n\nmin_seqlen : <int> -- Select connected components with <int> or more sequence within nodes.\n\n        Example: " + args.help + " {\"min_seqlen\":1000} -- Select connected components containing\n        at least 1000 bases of sequence.\n\nsequence : <string> -- Select connected components containing the provided DNA sequence.\n\n        NOTE! This isn't BLAST, the sequence must match exactly. Any differences, including\n        ambiguity codes, etc. will prevent matching. The only extra thing that is done is the\n        reverse complement of the provided sequence is also searched.\n\n        Example: " + args.help + " {\"sequence\":\"AGACTAGCAGATATACGATAACGATACGATACGAT\"}\n        Select connected components containing the provided sequence (or its reverse\n        complement).\n\nsequences : [<string>, ...] -- Like 'sequence' parameter, but takes a list of sequences.\n\n        Example: " + args.help + " {\"sequences\":[\"AGACTAGCAGATATAC\",\"GATAACGATACGATACGAT\"]}\n        Select connected components containing any of the provided sequences (or their\n        reverse complements).\n");
       }
       if (typeof callback === "function") {
         callback(null, j);
@@ -2275,15 +2350,22 @@
       return;
     }
     if (args.sequence) {
+      args.sequences = [args.sequence];
+    }
+    if (args.sequences) {
       args.ccnums = [];
-      revseq = reverse_comp(args.sequence);
+      all_seqs = args.sequences.map(reverse_comp).concat(args.sequences);
       _ref = j.connected_comps;
       for (i = _i = 0, _len = _ref.length; _i < _len; i = ++_i) {
         c = _ref[i];
         for (_j = 0, _len1 = c.length; _j < _len1; _j++) {
           nid = c[_j];
-          if (seq = j.nodes[nid].recon_seq) {
-            if (seq.indexOf(args.sequence) !== -1 || seq.indexOf(revseq) !== -1) {
+          if ((seq = j.nodes[nid].recon_seq) && !(__indexOf.call(args.ccnums, i) >= 0)) {
+            for (_k = 0, _len2 = all_seqs.length; _k < _len2; _k++) {
+              s = all_seqs[_k];
+              if (!(seq.indexOf(s) !== -1)) {
+                continue;
+              }
               args.ccnums.push(i);
               break;
             }
@@ -2294,7 +2376,7 @@
       args.ccrange = [1, -1];
     } else if (args.ccname != null) {
       _ref1 = j.connected_comps;
-      for (i = _k = 0, _len2 = _ref1.length; _k < _len2; i = ++_k) {
+      for (i = _l = 0, _len3 = _ref1.length; _l < _len3; i = ++_l) {
         c = _ref1[i];
         if (!(c.indexOf(args.ccname) !== -1)) {
           continue;
@@ -2305,10 +2387,10 @@
     } else if (args.ccnames != null) {
       args.ccnums = [];
       _ref2 = args.ccnames;
-      for (_l = 0, _len3 = _ref2.length; _l < _len3; _l++) {
-        id = _ref2[_l];
+      for (_m = 0, _len4 = _ref2.length; _m < _len4; _m++) {
+        id = _ref2[_m];
         _ref3 = j.connected_comps;
-        for (i = _m = 0, _len4 = _ref3.length; _m < _len4; i = ++_m) {
+        for (i = _n = 0, _len5 = _ref3.length; _n < _len5; i = ++_n) {
           c = _ref3[i];
           if (!(c.indexOf(id) !== -1 && args.ccnums.indexOf(i) === -1)) {
             continue;
@@ -2322,7 +2404,7 @@
     } else if (args.min_nodes != null) {
       args.ccnums = [];
       _ref4 = j.connected_comps;
-      for (i = _n = 0, _len5 = _ref4.length; _n < _len5; i = ++_n) {
+      for (i = _o = 0, _len6 = _ref4.length; _o < _len6; i = ++_o) {
         c = _ref4[i];
         if (c.length >= args.min_nodes) {
           args.ccnums.push(i);
@@ -2331,7 +2413,7 @@
     } else if (args.min_seqlen != null) {
       args.ccnums = [];
       _ref5 = j.connected_comps;
-      for (i = _o = 0, _len6 = _ref5.length; _o < _len6; i = ++_o) {
+      for (i = _p = 0, _len7 = _ref5.length; _p < _len7; i = ++_p) {
         c = _ref5[i];
         if (cc_seq_len(j, c) >= args.min_seqlen) {
           args.ccnums.push(i);
@@ -2347,7 +2429,7 @@
       }
       args.ccnums = (function() {
         _results = [];
-        for (var _p = _ref6 = args.ccrange[0], _ref7 = args.ccrange[1]; _ref6 <= _ref7 ? _p <= _ref7 : _p >= _ref7; _ref6 <= _ref7 ? _p++ : _p--){ _results.push(_p); }
+        for (var _q = _ref6 = args.ccrange[0], _ref7 = args.ccrange[1]; _ref6 <= _ref7 ? _q <= _ref7 : _q >= _ref7; _ref6 <= _ref7 ? _q++ : _q--){ _results.push(_q); }
         return _results;
       }).apply(this);
     }
@@ -2364,8 +2446,8 @@
     nodes = {};
     new_cclist = [];
     _ref8 = args.ccnums;
-    for (_q = 0, _len7 = _ref8.length; _q < _len7; _q++) {
-      cc = _ref8[_q];
+    for (_r = 0, _len8 = _ref8.length; _r < _len8; _r++) {
+      cc = _ref8[_r];
       if (j.connected_comps[cc] == null) {
         remove_graph_refs(j);
         if (args.shift) {
@@ -2381,8 +2463,8 @@
       }
       new_cclist.push(j.connected_comps[cc]);
       _ref9 = j.connected_comps[cc];
-      for (_r = 0, _len8 = _ref9.length; _r < _len8; _r++) {
-        nid = _ref9[_r];
+      for (_s = 0, _len9 = _ref9.length; _s < _len9; _s++) {
+        nid = _ref9[_s];
         nodes[nid] = j.nodes[nid];
       }
     }
@@ -2429,14 +2511,14 @@
 
 
   grab_neighbors = function(j, args, callback) {
-    var err, n, name, nid, nodes, revseq, seq, _i, _j, _len, _len1, _ref, _ref1, _ref2;
+    var all_seqs, err, n, name, nid, nodes, revseq, s, seq, _i, _j, _k, _len, _len1, _len2, _ref, _ref1, _ref2, _ref3;
     if (args == null) {
       args = {};
     }
     if (args.help != null) {
       console.warn("" + args.help + " -- Select contigs from the connected neighborhood(s) of the given contig(s)");
       if (args.detailed_help != null) {
-        console.warn("\nParameters:\n\nname : \"contig_name\" -- Use a single contig by name\n\n        Example: " + args.help + " {\"name\":\"NODE_1234\"} -- Select NODE_1234 (and its\n        neighbors)\n\nnames : [\"contig_name1\",\"contig_name2\",...] -- Use multiple contigs by name\n\n        Example: " + args.help + " {\"names\":[\"NODE_1234\",\"NODE_5678\"]} -- Select these\n        two contigs (and their neighbors...)\n\nradius : <int> -- Size of the neighborhood of contigs to select\n\n        Example: " + args.help + " {\"radius\":2} -- Select all neighbors and neighbors of\n                neighbors\n\n        Example: " + args.help + " {\"radius\":0} -- Default. Select only the named contig(s)\n\nsequence : <string> -- Select contig(s) found to contain the provided DNA sequence.\n\n        NOTE! This isn't BLAST, the sequence must match exactly. Any differences, including\n        ambiguity codes, etc. will prevent matching. The only extra thing that is done is the\n        reverse complement of the provided sequence is also searched.\n\n        Example: " + args.help + " {\"sequence\":\"AGACTAGCAGATATACGATAACGATACGATACGAT\"}\n        Select contig(s) containing the provided sequence (or its reverse complement).\n        \n");
+        console.warn("\nParameters:\n\nname : \"contig_name\" -- Use a single contig by name\n\n        Example: " + args.help + " {\"name\":\"NODE_1234\"} -- Select NODE_1234 (and its\n        neighbors)\n\nnames : [\"contig_name1\",\"contig_name2\",...] -- Use multiple contigs by name\n\n        Example: " + args.help + " {\"names\":[\"NODE_1234\",\"NODE_5678\"]} -- Select these\n        two contigs (and their neighbors...)\n\nradius : <int> -- Size of the neighborhood of contigs to select\n\n        Example: " + args.help + " {\"radius\":2} -- Select all neighbors and neighbors of\n                neighbors\n\n        Example: " + args.help + " {\"radius\":0} -- Default. Select only the named contig(s)\n\nsequence : <string> -- Select contig(s) found to contain the provided DNA sequence.\n\n        NOTE! This isn't BLAST, the sequence must match exactly. Any differences, including\n        ambiguity codes, etc. will prevent matching. The only extra thing that is done is the\n        reverse complement of the provided sequence is also searched.\n\n        Example: " + args.help + " {\"sequence\":\"AGACTAGCAGATATACGATAACGATACGATACGAT\"}\n        Select contig(s) containing the provided sequence (or its reverse complement).\n        \nsequences : [<string>, ...] -- Like 'sequence' parameter, but takes a list of sequences.\n\n        Example: " + args.help + " {\"sequences\":[\"AGACTAGCAGATATAC\",\"GATAACGATACGATACGAT\"]}\n        Select contigs containing any of the provided sequences (or their reverse\n        complements).\n");
       }
       if (typeof callback === "function") {
         callback(null, j);
@@ -2456,11 +2538,32 @@
       args.names = [args.name];
     }
     if (args.sequence) {
+      args.sequences = [args.sequence];
+    }
+    if (args.sequences) {
       args.names = [];
-      revseq = reverse_comp(args.sequence);
+      all_seqs = args.sequences.map(reverse_comp).concat(args.sequences);
       _ref = j.nodes;
       for (nid in _ref) {
         n = _ref[nid];
+        if (seq = n.recon_seq) {
+          for (_i = 0, _len = all_seqs.length; _i < _len; _i++) {
+            s = all_seqs[_i];
+            if (!(seq.indexOf(s) !== -1)) {
+              continue;
+            }
+            args.names.push(nid);
+            break;
+          }
+        }
+      }
+    }
+    if (args.sequence) {
+      args.names = [];
+      revseq = reverse_comp(args.sequence);
+      _ref1 = j.nodes;
+      for (nid in _ref1) {
+        n = _ref1[nid];
         if (seq = n.recon_seq) {
           if (seq.indexOf(args.sequence) !== -1 || seq.indexOf(revseq) !== -1) {
             args.names.push(nid);
@@ -2472,12 +2575,12 @@
       args.radius = 0;
     }
     nodes = {};
-    _ref1 = args.names;
-    for (_i = 0, _len = _ref1.length; _i < _len; _i++) {
-      name = _ref1[_i];
-      _ref2 = find_neighbors(j.nodes[name], args.radius);
-      for (_j = 0, _len1 = _ref2.length; _j < _len1; _j++) {
-        nid = _ref2[_j];
+    _ref2 = args.names;
+    for (_j = 0, _len1 = _ref2.length; _j < _len1; _j++) {
+      name = _ref2[_j];
+      _ref3 = find_neighbors(j.nodes[name], args.radius);
+      for (_k = 0, _len2 = _ref3.length; _k < _len2; _k++) {
+        nid = _ref3[_k];
         nodes[nid] = j.nodes[nid];
       }
     }
@@ -2486,98 +2589,6 @@
       return delete n.seen;
     });
     delete j.connected_comps;
-    return typeof callback === "function" ? callback(null, j) : void 0;
-  };
-
-  /*
-  # Add ends
-  */
-
-
-  add_ends = function(j, args, callback) {
-    var c, e, err, head_node, i, tail_node, _i, _j, _k, _l, _len, _len1, _len2, _ref, _ref1, _ref2, _ref3, _ref4, _ref5, _ref6;
-    if (args == null) {
-      args = {};
-    }
-    if (args.help != null) {
-      console.warn("" + args.help + " -- Extends scaffold ends (reversing the action of PLUCK at scaffold ends)");
-      if (args.detailed_help != null) {
-        console.warn("\nParameters:\n\niterate : <int> -- number of iterations of " + args.help + " to run. Each is equivalent to\n       running " + args.help + " again as a separate command.  By Default <int> = 3\n\n        Example: " + args.help + " {\"iterate\":2} -- Equivalent of " + args.help + " " + args.help + "\n");
-      }
-      if (typeof callback === "function") {
-        callback(null, j);
-      }
-      return;
-    }
-    if (args.iterate == null) {
-      args.iterate = 3;
-    }
-    for (i = _i = _ref = args.iterate; _ref <= 1 ? _i <= 1 : _i >= 1; i = _ref <= 1 ? ++_i : --_i) {
-      if (j.connected_comps == null) {
-        calc_ccomps(j);
-      }
-      try {
-        build_graph_refs(j);
-        build_removed_graph_refs(j);
-      } catch (_error) {
-        err = _error;
-        if (typeof callback === "function") {
-          callback(err, null);
-        }
-        return;
-      }
-      _ref1 = j.connected_comps;
-      for (_j = 0, _len = _ref1.length; _j < _len; _j++) {
-        c = _ref1[_j];
-        try {
-          _ref2 = find_ends(j, c, true), (_ref3 = _ref2[0], head_node = _ref3[0]), (_ref4 = _ref2[1], tail_node = _ref4[0]);
-        } catch (_error) {
-          err = _error;
-          remove_graph_refs(j, null, (function(e) {
-            return delete e.pluck_iteration;
-          }));
-          if (typeof callback === "function") {
-            callback(err, null);
-          }
-          return;
-        }
-        if (!head_node.no_push) {
-          _ref5 = head_node.rem_inlinks;
-          for (_k = 0, _len1 = _ref5.length; _k < _len1; _k++) {
-            e = _ref5[_k];
-            if (!(e[0].dir === "forward" && e[0].pluck_iteration === i && (j.nodes[e[0].n1] == null))) {
-              continue;
-            }
-            j.edges.push(e[0]);
-            j.nodes[e[1].id] = e[1];
-            delete j.removed_nodes[e[1].id];
-            delete j.removed_edges[e[0].index];
-            break;
-          }
-        }
-        if (!tail_node.no_push) {
-          _ref6 = tail_node.rem_outlinks;
-          for (_l = 0, _len2 = _ref6.length; _l < _len2; _l++) {
-            e = _ref6[_l];
-            if (!(e[0].dir === "forward" && e[0].pluck_iteration === i && (j.nodes[e[0].n2] == null))) {
-              continue;
-            }
-            j.edges.push(e[0]);
-            j.nodes[e[1].id] = e[1];
-            delete j.removed_nodes[e[1].id];
-            delete j.removed_edges[e[0].index];
-            break;
-          }
-        }
-      }
-      if (i !== 1) {
-        remove_graph_refs(j);
-      }
-      delete j.connected_comps;
-    }
-    remove_graph_refs(j, null, (function(e) {
-      return delete e.pluck_iteration;
-    }));
     return typeof callback === "function" ? callback(null, j) : void 0;
   };
 
@@ -3739,7 +3750,7 @@
     if (args.help != null) {
       console.warn("" + args.help + " -- Make manual explicit edits to the selected graph structure");
       if (args.detailed_help != null) {
-        console.warn("\nParameters:\n\nrem_nodes : [\"contig1\",\"contig2\",...] -- Remove the specified contig nodes by name\n\n        Example: " + args.help + " {\"rem_nodes\":[\"NODE_1234\",\"NODE_5678\"]} -- Remove\n        these two contigs from the graph\n\nadd_nodes : [\"contig1\",\"contig2\",...] -- Add back the specified contig nodes by name\n\n        Example: " + args.help + " {\"add_nodes\":[\"NODE_1234\",\"NODE_5678\"]} -- Move\n        these two contigs from the removed pool to the selected graph\n\nrem_edges : [\"contig1\",[\"contig2\",...]] -- Remove the specified connections between\n        contig1 and any number of others.\n\n        Example: " + args.help + " {\"rem_edges\":[\"NODE_1234\",[\"NODE_5678\",\"NODE_9\"]]}\n        -- Remove two connection edges from the graph, both connected to NODE_1234\n\nadd_edges : [\"contig1\",[\"contig2\",...]] -- Add back the specified connections between\n        contig1 and any number of others.\n\n        Example: " + args.help + " {\"add_edges\":[\"NODE_1234\",[\"NODE_5678\",\"NODE_9\"]]}\n        -- Add two connection edges from the graph, both connected to NODE_1234\n\n        NOTE: for rem_edges and add_edges above, if only a single edge is involved, then\n        the parameter syntax may optionally be flattened. For example:\n        {\"add_edges\":[\"NODE_1234\",[\"NODE_9\"]]} is equivalent to\n        {\"add_edges\":[\"NODE_1234\",\"NODE_9\"]}\n\n        If more than one node-independent sets of edges are to be added or removed (that\n        is, those not sharing any contig(s) in common), then multiple calls to ${args.help}\n        are required to accomplish this task.\n");
+        console.warn("\nParameters:\n\nrem_nodes : [\"contig1\",\"contig2\",...] -- Remove the specified contig nodes by name\n\n        Example: " + args.help + " {\"rem_nodes\":[\"NODE_1234\",\"NODE_5678\"]} -- Remove\n        these two contigs from the graph\n\nadd_nodes : [\"contig1\",\"contig2\",...] -- Add back the specified contig nodes by name\n\n        Example: " + args.help + " {\"add_nodes\":[\"NODE_1234\",\"NODE_5678\"]} -- Move\n        these two contigs from the removed pool to the selected graph\n\nrem_edges : [\"contig1\",[\"contig2\",...]] -- Remove the specified connections between\n        contig1 and any number of others.\n\n        Example: " + args.help + " {\"rem_edges\":[\"NODE_1234\",[\"NODE_5678\",\"NODE_9\"]]}\n        -- Remove two connection edges from the graph, both connected to NODE_1234\n\nadd_edges : [\"contig1\",[\"contig2\",...]] -- Add back the specified connections between\n        contig1 and any number of others.\n\n        Example: " + args.help + " {\"add_edges\":[\"NODE_1234\",[\"NODE_5678\",\"NODE_9\"]]}\n        -- Add two connection edges from the graph, both connected to NODE_1234\n\n        NOTE: for rem_edges and add_edges above, if only a single edge is involved, then\n        the parameter syntax may optionally be flattened. For example:\n        {\"add_edges\":[\"NODE_1234\",[\"NODE_9\"]]} is equivalent to\n        {\"add_edges\":[\"NODE_1234\",\"NODE_9\"]}\n\n        If more than one node-independent sets of edges are to be added or removed (that\n        is, those not sharing any contig(s) in common), then multiple calls to " + args.help + "\n        are required to accomplish this task.\n");
       }
       if (typeof callback === "function") {
         callback(null, j);
@@ -3869,7 +3880,7 @@
     if (args.help != null) {
       console.warn("" + args.help + " -- Create a new node from an existing node using the given coordinates");
       if (args.detailed_help != null) {
-        console.warn("\nParameters:\n\nname : \"contig_name\" -- Name of the contig node to be copied\n\n        Example: " + args.help + " {\"name\":\"NODE_1234\"} -- Use sequence from NODE_1234\n\nnew_name : \"new_contig_name\" -- Name for the newly created contig node\n\n        Example: " + args.help + " {\"new_name\":\"NODE_1234a\"} -- New node will be named\n        NODE_1234a\n\nstart : <int> -- Beginning sequence coordinate for the new node within the original\nend : <int> -- Ending sequence coordinate for the new node within the original\n\n        Example: " + args.help + " {\"start\":123,\"end\":456} -- The new node will include\n        sequence from positions 123 to 456\n\n        Example: " + args.help + " {\"end\":456} -- The new node will include sequence from\n        position 0 (implied) to 456. end may also be omitted, implying the last position\n");
+        console.warn("\nParameters:\n\nname : \"contig_name\" -- Name of the contig node to be copied\n\n        Example: " + args.help + " {\"name\":\"NODE_1234\"} -- Use sequence from NODE_1234\n\nnew_name : \"new_contig_name\" -- Name for the newly created contig node\n\n        Example: " + args.help + " {\"new_name\":\"NODE_1234a\"} -- New node will be named\n        NODE_1234a\n\ninclude : [\"contig_name1\", ...] -- Move mate-pair edges from the listed contigs.\n\n        Example: " + args.help + " {\"name\":\"NODE_1234\",\"include\":[\"NODE_567\",\"NODE_234\"]}\n         -- Edges between NODE_1234 and the included contigs will be moved to the new cut\n        and copied version of NODE_1234.\n\nstart : <int> -- Beginning sequence coordinate for the new node within the original\nend : <int> -- Ending sequence coordinate for the new node within the original\n\n        NOTE: To facilitate trimming sequences to a fixed maximum length, it is\n        allowable for negative 'start' values and positive 'end' values to be longer than\n        a sequence. In such cases, the values are set to the start and end of the\n        sequence, respectively. Positive start and negative end positions must fall\n        within the sequence, because otherwise the start position will be after the end\n        position.\n\n        Example: " + args.help + " {\"start\":123,\"end\":456} -- The new node will include\n        sequence from positions 123 to 456\n\n        Example: " + args.help + " {\"end\":456} -- The new node will include sequence from\n        position 0 (implied) to 456. end may also be omitted, implying the last position\n\n        Example: " + args.help + " {\"start\":-1000} -- New node contains at most the last\n        1000 bases of any sequence. Sequences under 1000 bases are copied unmodified.\n");
       }
       if (typeof callback === "function") {
         callback(null, j);
@@ -3890,7 +3901,19 @@
     if (args.end == null) {
       args.end = node.seq_len - 1;
     }
-    if (!(args.start < args.end && args.end < node.seq_len)) {
+    if (args.start < 0) {
+      args.start = node.seq_len + args.start;
+    }
+    if (args.end < 0) {
+      args.end = node.seq_len + args.end;
+    }
+    if (args.start < 0) {
+      args.start = 0;
+    }
+    if (args.end >= node.seq_len) {
+      args.end = node.seq_len - 1;
+    }
+    if (!(args.start < args.end)) {
       if (typeof callback === "function") {
         callback(new Error('CUTND requires valid "start" and "end" arguments.'), null);
       }
@@ -3901,6 +3924,7 @@
       build_removed_graph_refs(j);
     } catch (_error) {
       err = _error;
+      console.warn("build_graph_refs error in CUTND");
       if (typeof callback === "function") {
         callback(err, null);
       }
@@ -4472,7 +4496,8 @@
         ignoreUndefined: true,
         "eval": function(l, cx, fn, cb) {
           var arg_json, argstr, cmd, cmd_func, err, _ref;
-          _ref = l.slice(1, -1).trim().replace(/\t|\n/, " ").split(" ", 2), cmd = _ref[0], argstr = _ref[1];
+          _ref = l.slice(1, -1).trim().replace(/\t|\n/, " ").split(" "), cmd = _ref[0], argstr = 2 <= _ref.length ? __slice.call(_ref, 1) : [];
+          argstr = argstr.join(' ').replace(/^['"]|["']$/g, "");
           cmd = cmd.toUpperCase();
           if (cmd === 'HELP') {
             cmd_func = commands[cmd];
