@@ -1,3 +1,16 @@
+### 0.4.13 ###
+
+- Fixed a bug in ref_select that could cause the program to hang when 
+writing FASTQ output files on systems with only 1 or 2 processor cores, or
+when the option --num_threads=2 was used.
+
+- Fixed another case where the graph_ops PLUCK command could completely
+remove a scaffold with a small number of contigs. Specifically, nodes with
+two or more "in" edges and zero "out" edges (or the reverse) are no longer
+plucked away.
+
+- Documentation fixes.
+
 ### 0.4.12 ###
 
 - Fixed bug that could cause crashes in graph_ops after use of the SELND 

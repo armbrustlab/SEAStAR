@@ -1,6 +1,6 @@
 <link href="style.css" media="screen" rel="stylesheet" type="text/css" />
 
-SEAStAR User Guide, version 0.4.12
+SEAStAR User Guide, version 0.4.13
 ==============================
 ####Vaughn Iverson and Chris Berthiaume
 
@@ -309,6 +309,7 @@ Write two separate singlet files that segregate the singlets by input files. Thi
 singlets from `R3` &rarr; `<out_prefix>.single1.fastq`
 
 `<in_prefix>_F3[.csfasta|_QV.qual]` &rarr; `<out_prefix>.read2.fastq`
+
 singlets from `F3` &rarr; `<out_prefix>.single2.fastq`
 
 *****************
@@ -583,9 +584,9 @@ Write FASTA format files instead of FASTQ files for all outputs. FASTA files are
 
 `ref_select` requires any SAM (or FASTQ) format input files to be named using the [SEAStAR naming convention used for FASTQ files][FASTQ]. Crucially, individual SAM alignment files must not mix alignments for reads from different categories (`read1`, `read2`, `single`), and the corresponding filename suffixes of the SAM files must match those of the FASTQ files used to generate them:
 
-`sample.read1.fq` &rarr; `alignment.read1.sam`
-`sample.read2.fq` &rarr; `alignment.read2.sam`
-`sample.single.fq` &rarr; `alignment.single.sam`
+`sample.read1.fastq` &rarr; `alignment.read1.sam`
+`sample.read2.fastq` &rarr; `alignment.read2.sam`
+`sample.single.fastq` &rarr; `alignment.single.sam`
 
 Note that `ref_select` may also write warnings, errors and diagnostic information to STDERR, so it is important to keep STDOUT and STDERR separate when saving the output to a file, or the resulting saved JSON data file syntax may be corrupted by messages written to STDERR.
     
@@ -696,7 +697,7 @@ SEAStAR uses its own random number generator (for reproducibility among differen
 
 <b>`--num_threads=<n>`</b>
 
-`ref_select` is highly multithreaded to support modern multi-core processors. Sometimes you will want to restrict the number of cores it uses (e.g. to prevent resource competition on clusters or shared computers, or when you are running more than one instance of `ref_select` at a time on a given computer.)  By default `--num_threads` is the number of cores on the machine (including "hyper-threads").
+`ref_select` is highly multithreaded to support modern multi-core processors. Sometimes you will want to restrict the number of cores it uses (e.g. to prevent resource competition on clusters or shared computers, or when you are running more than one instance of `ref_select` at a time on a given computer.)  By default `--num_threads` is the number of cores on the machine (including "hyper-threads"). The minimum number of threads required for proper operation is 2 or 3 depending on the parmeters being used, and ref_select checks to ensure that the proper minimum number of threads is allocated.
 
 [ref_select_bitscore]: #ref_select_bitscore
 ###<a name="ref_select_bitscore">`ref_select` parameters for bitscore calculation and reference selection</a> `[options]` : 

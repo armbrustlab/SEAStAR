@@ -1,6 +1,6 @@
 <link href="style.css" media="screen" rel="stylesheet" type="text/css" />
 
-<h1>SEAStAR User Guide, version 0.4.12</h1>
+<h1>SEAStAR User Guide, version 0.4.13</h1>
 <h4>Vaughn Iverson and Chris Berthiaume</h4>
 <h5><a href="http://armbrustlab.ocean.washington.edu">Armbrust Lab</a>, School of Oceanography, University of Washington</h5>
 <h2>Table of Contents</h2>
@@ -191,8 +191,8 @@ for i in lambda_asm?.dot; do neato -Tpdf $i &gt; ${i##.*}.pdf; done</code></pre>
 <p>Write two separate singlet files that segregate the singlets by input files. This is useful for doing strand-specific analyses using paired-end libraries, where the mated reads are sequenced from opposite strands. For example:</p>
 <p><code>&lt;in_prefix&gt;_R3[.csfasta|_QV.qual]</code> &rarr; <code>&lt;out_prefix&gt;.read1.fastq</code></p>
 <p>singlets from <code>R3</code> &rarr; <code>&lt;out_prefix&gt;.single1.fastq</code></p>
-<p><code>&lt;in_prefix&gt;_F3[.csfasta|_QV.qual]</code> &rarr; <code>&lt;out_prefix&gt;.read2.fastq</code>
-singlets from <code>F3</code> &rarr; <code>&lt;out_prefix&gt;.single2.fastq</code></p>
+<p><code>&lt;in_prefix&gt;_F3[.csfasta|_QV.qual]</code> &rarr; <code>&lt;out_prefix&gt;.read2.fastq</code></p>
+<p>singlets from <code>F3</code> &rarr; <code>&lt;out_prefix&gt;.single2.fastq</code></p>
 <hr>
 <h2><a name="fastq_nodup"><code>fastq_nodup</code></a></h2>
 <p>This tool reads paired <code>.fastq</code> files (with associated singlets), and removes the lowest quality pair(s) of presumed PCR duplicate reads. This operation assumes that multiple read-pairs sharing substantially the same sequences for both mates are statistically unlikely to occur frequently at random (due to the distribution of insert sizes), and therefore represent likely artifactual duplications resulting from PCR over-amplification during library construction. If this assumption does not hold for a given library, then use of this tool is inappropriate. </p>
@@ -332,9 +332,9 @@ TGTTGTGCGCGCCATAGCGAGGGGCTCAGCACGCGTC
 <p><code>ref_select</code> has a lot of options, and depending on what type of analysis you are doing, you may use quite a few of them. However, at its simplest, <code>ref_select</code> reads one or more SAM alignment files and writes a JSON &quot;sequence graph&quot; to STDOUT:</p>
 <pre><code>ref_select alignment.single.sam &gt; seq_graph.json</code></pre>
 <p><code>ref_select</code> requires any SAM (or FASTQ) format input files to be named using the <a href="#FASTQ">SEAStAR naming convention used for FASTQ files</a>. Crucially, individual SAM alignment files must not mix alignments for reads from different categories (<code>read1</code>, <code>read2</code>, <code>single</code>), and the corresponding filename suffixes of the SAM files must match those of the FASTQ files used to generate them:</p>
-<p><code>sample.read1.fq</code> &rarr; <code>alignment.read1.sam</code>
-<code>sample.read2.fq</code> &rarr; <code>alignment.read2.sam</code>
-<code>sample.single.fq</code> &rarr; <code>alignment.single.sam</code></p>
+<p><code>sample.read1.fastq</code> &rarr; <code>alignment.read1.sam</code>
+<code>sample.read2.fastq</code> &rarr; <code>alignment.read2.sam</code>
+<code>sample.single.fastq</code> &rarr; <code>alignment.single.sam</code></p>
 <p>Note that <code>ref_select</code> may also write warnings, errors and diagnostic information to STDERR, so it is important to keep STDOUT and STDERR separate when saving the output to a file, or the resulting saved JSON data file syntax may be corrupted by messages written to STDERR.</p>
 <p>Of course, since these types of files may be very large, you may prefer to keep everything compressed:</p>
 <pre><code>ref_select alignment.single.sam.gz | gzip -c &gt; seq_graph.json.gz</code></pre>
@@ -409,7 +409,7 @@ TGTTGTGCGCGCCATAGCGAGGGGCTCAGCACGCGTC
 <p><b><code>--seed=&lt;n&gt;</code></b></p>
 <p>SEAStAR uses its own random number generator (for reproducibility among different platforms). You may use a different seed to investigate what difference randomized decisions made in the analysis are having on the results. By default <code>--seed=12345</code>.</p>
 <p><b><code>--num_threads=&lt;n&gt;</code></b></p>
-<p><code>ref_select</code> is highly multithreaded to support modern multi-core processors. Sometimes you will want to restrict the number of cores it uses (e.g. to prevent resource competition on clusters or shared computers, or when you are running more than one instance of <code>ref_select</code> at a time on a given computer.)  By default <code>--num_threads</code> is the number of cores on the machine (including &quot;hyper-threads&quot;).</p>
+<p><code>ref_select</code> is highly multithreaded to support modern multi-core processors. Sometimes you will want to restrict the number of cores it uses (e.g. to prevent resource competition on clusters or shared computers, or when you are running more than one instance of <code>ref_select</code> at a time on a given computer.)  By default <code>--num_threads</code> is the number of cores on the machine (including &quot;hyper-threads&quot;). The minimum number of threads required for proper operation is 2 or 3 depending on the parmeters being used, and ref_select checks to ensure that the proper minimum number of threads is allocated.</p>
 <h3><a name="ref_select_bitscore"><code>ref_select</code> parameters for bitscore calculation and reference selection</a> <code>[options]</code> :</h3>
 <p><code>[-t &lt;n&gt;|--bit_thresh=&lt;n&gt;]</code> <code>[-f &lt;n&gt;|--bit_fraction=&lt;n&gt;]</code> <code>[-l &lt;n&gt;|--read_map_limit=&lt;n&gt;]</code> <code>[-s|--second_chance_reads]</code> <code>[--relax_read_sharing]</code> <code>[--all_taxa]</code> <code>[-a|--absolute_bitscores]</code> <code>[--no_rand]</code> <code>[--sim_frac=&lt;n&gt;]</code> <code>[-e &lt;seq_id&gt;|--exclude=&lt;seq_id&gt;]...</code> <code>[--exclude_file=&lt;exclude_file&gt;]</code> <code>[--invert_exclude]</code> </p>
 <p><b><code>-t &lt;n&gt;</code> / <code>--bit_thresh=&lt;n&gt;</code></b></p>

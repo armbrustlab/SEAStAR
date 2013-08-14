@@ -735,15 +735,22 @@ int main(const int argc, char *argv[]) {
     // this should be carefully tuned.
     
 #ifdef _OPENMP
-    if (num_threads->count) {
-        if (num_threads->ival[0] < 2) {
+    if (num_threads->count) { 
+        if ((read_out->count) && (num_threads->ival[0] < 3)) {
+            omp_set_num_threads(3);
+            fprintf(stderr, "WARNING: --num_threads must be at least 3 when writing FASTQ output. Proceeding with 3 threads.\n");
+        } else if (num_threads->ival[0] < 2) {
             omp_set_num_threads(2);
             fprintf(stderr, "WARNING: --num_threads must be at least 2. Proceeding with 2 threads.\n");
         } else {
             omp_set_num_threads(num_threads->ival[0]);
         }
-    } else {
-        omp_set_num_threads(omp_get_num_procs());
+    } else {  // Ensure the required minimum number of threads, regardless of CPU core count
+        if (read_out->count) {
+           omp_set_num_threads((omp_get_num_procs() >= 3) ? omp_get_num_procs() : 3);
+        } else {
+           omp_set_num_threads((omp_get_num_procs() >= 2) ? omp_get_num_procs() : 2);
+        }
     }
 #endif
     
@@ -2396,7 +2403,9 @@ int main(const int argc, char *argv[]) {
             // Pipe used for inter-thread communication
             int pipe2[2];
             pipe(pipe1);
-            pipe(pipe2);
+            if (read_out->count) {            
+                pipe(pipe2);
+            }    
             
 #pragma omp parallel sections default(shared)       
             {

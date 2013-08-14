@@ -1076,25 +1076,17 @@ min_len : <int> -- Minimum length of isolated nodes to keep.\n
          callback?(err, null)
          return
 
-      # Walk all nodes looking for nodes with zero in or out degree
-      for n in nodes when (n.inlinks.length == 0 or n.outlinks.length == 0)
-      
-         # This test prohibits plucking the "leaves" of two isolated connected nodes
-         # preventing low node count scaffolds from being "plucked" away.
-         # For the same reason, tt also preserves single nodes after the first pluck 
-         # iteration, or when they contain significant sequence (> args.min_len) 
-         
-         unless ((n.inlinks.length is 1) and 
-                 (n.links[0][1].inlinks.length is 0) and 
-                 (n.links[0][1].outlinks[0][1] is n)) or
-                ((n.outlinks.length is 1) and 
-                 (n.links[0][1].outlinks.length is 0) and 
-                 (n.links[0][1].inlinks[0][1] is n)) or                 
-                ((n.links.length is 0) and 
-                 ((i > 1) or 
-                  (n.seq_len? >= args.min_len)))  
+      # Remove short single node scaffolds in the first iteration only 
+      if i is 1
+         # Walk all nodes looking for nodes with zero in or out degree
+         for n in nodes when (n.links.length is 0) and (n.seq_len? < args.min_len)
             j.removed_nodes[n.id] = n   # Remove the node itself
             delete j.nodes[n.id]
+
+      # Walk all nodes looking for leaves (degree = 1) with non-removed connected nodes
+      for n in nodes when (n.links.length is 1) and (not (n.links[0][1].id in j.removed_nodes))
+         j.removed_nodes[n.id] = n   # Remove the node itself
+         delete j.nodes[n.id]
 
       edges_kept = []
 

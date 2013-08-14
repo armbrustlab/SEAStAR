@@ -101,7 +101,7 @@ if (GIT_VERSION)
 	add_definitions("-D SS_BUILD_VERSION='\"${GIT_VERSION}\"'")
 else (GIT_VERSION)
 	message(WARNING "SEAStAR version not detected from git. ${GIT_VERSION}") 
-	set(GIT_VERSION "v0.4.12")
+	set(GIT_VERSION "v0.4.13")
 	add_definitions("-D SS_BUILD_VERSION='\"${GIT_VERSION}\"'")
 endif (GIT_VERSION)
 
@@ -124,7 +124,7 @@ file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/output_test_data)
 file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/bin)
 
 # Note, it's important to keep these in this order for CTest because 
-# the outputs of some tool's tests are used as the inputs of others.
+# the outputs of some tools' tests are used as the inputs of others.
 add_subdirectory(src_solid2fastq)
 add_subdirectory(src_fastq_nodup)
 add_subdirectory(src_trimfastq)

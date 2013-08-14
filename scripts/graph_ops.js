@@ -1190,7 +1190,7 @@
 
 
   remove_leaves = function(j, args, callback) {
-    var e, edges, edges_kept, err, i, n, nodes, _i, _j, _k, _len, _len1, _ref, _ref1, _ref2;
+    var e, edges, edges_kept, err, i, n, nodes, _i, _j, _k, _l, _len, _len1, _len2, _ref, _ref1, _ref2, _ref3;
     if (args == null) {
       args = {};
     }
@@ -1230,18 +1230,27 @@
         }
         return;
       }
-      for (_j = 0, _len = nodes.length; _j < _len; _j++) {
-        n = nodes[_j];
-        if (n.inlinks.length === 0 || n.outlinks.length === 0) {
-          if (!(((n.inlinks.length === 1) && (n.links[0][1].inlinks.length === 0) && (n.links[0][1].outlinks[0][1] === n)) || ((n.outlinks.length === 1) && (n.links[0][1].outlinks.length === 0) && (n.links[0][1].inlinks[0][1] === n)) || ((n.links.length === 0) && ((i > 1) || ((n.seq_len != null) >= args.min_len))))) {
-            j.removed_nodes[n.id] = n;
-            delete j.nodes[n.id];
+      if (i === 1) {
+        for (_j = 0, _len = nodes.length; _j < _len; _j++) {
+          n = nodes[_j];
+          if (!((n.links.length === 0) && ((n.seq_len != null) < args.min_len))) {
+            continue;
           }
+          j.removed_nodes[n.id] = n;
+          delete j.nodes[n.id];
         }
       }
+      for (_k = 0, _len1 = nodes.length; _k < _len1; _k++) {
+        n = nodes[_k];
+        if (!((n.links.length === 1) && (!(_ref3 = n.links[0][1].id, __indexOf.call(j.removed_nodes, _ref3) >= 0)))) {
+          continue;
+        }
+        j.removed_nodes[n.id] = n;
+        delete j.nodes[n.id];
+      }
       edges_kept = [];
-      for (_k = 0, _len1 = edges.length; _k < _len1; _k++) {
-        e = edges[_k];
+      for (_l = 0, _len2 = edges.length; _l < _len2; _l++) {
+        e = edges[_l];
         if ((j.nodes[e.n1] != null) && (j.nodes[e.n2] != null)) {
           edges_kept.push(e);
         } else {
