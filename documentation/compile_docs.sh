@@ -1,6 +1,8 @@
 # Make updated pipeline diagram
 dot -Tpng SEAStAR_Pipeline_Stages.gv >SEAStAR_Pipeline_Stages.png
 
+# marked is from: https://github.com/chjj/marked
+# Installed as: sudo npm install -g marked
 marked SEAStAR_User_Guide.md > SEAStAR_User_Guide.html
 marked ../README.md > ../README.html
 marked RDP_vignette.md > RDP_vignette.html

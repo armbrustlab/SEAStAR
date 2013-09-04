@@ -1,6 +1,6 @@
 <link href="style.css" media="screen" rel="stylesheet" type="text/css" />
 
-SEAStAR User Guide, version 0.4.13
+SEAStAR User Guide, version 0.4.14
 ==============================
 ####Vaughn Iverson and Chris Berthiaume
 
@@ -190,7 +190,7 @@ This will produce the same scaffolded assembly as the previous example, but in a
     # and color by %GC. Black arrows are mate-pair connections with thickness indicating  
     # bitscore. Red arrows are added dependencies to produce a fully ordered layout for SCAFF.
     
-    for i in lambda_asm?.dot; do neato -Tpdf $i > ${i##.*}.pdf; done
+    for i in lambda_asm?.dot; do neato -Tpdf $i > ${i%.*}.pdf; done
 
 You should now be able to load the PDF files with your favorite PDF viewer in order from `lambda_asm0.pdf` through `lambda_asm6.pdf` to see the effect of each `graph_ops` command in the script above. Each graph represents the state of the assembly before/after each successive step, showing the operation of graph_ops as it operated on this example dataset.  
 
@@ -1208,7 +1208,7 @@ is, multiple iterations of `PLUCK` will not completely remove contigs that happe
 
 + `iterate : <int>`
 
-   Specify the number of iterations of PLUCK to run. Each is equivalent to running PLUCK again as a separate command. By default `<int>`= 2.
+   Specify the number of iterations of PLUCK to run. Each is equivalent to running PLUCK again as a separate command. By default `<int>`= 3.
 
    Examples:
         
@@ -1717,7 +1717,10 @@ Reconnect previously removed connections between contigs. `RELINK` can move cont
    
    Expand the sphere of restored connections to neighbors.
    
-   Example:
+   Examples:
+
+        # Default value. Restore edges only to neighboring contigs
+        RELINK {"radius":0}
    
         # Recursively restore edges to all contigs within two hops of any selected contigs 
         # (including along newly restored edge paths)
@@ -1727,19 +1730,33 @@ Reconnect previously removed connections between contigs. `RELINK` can move cont
    
    Restore connections among all types of contigs.
    
-   Example:
-   
-        # Restore connections among contigs which are both removed from and part 
-        # of currently selected connected components
+   Examples:
+
+        # Restore connections among contigs which are both removed from, and part of, 
+        # currently selected connected components. This is like running with both modes of 
+        # the 'existing' parameter (below) simultaneously.
+        # 
         RELINK {"complete":true}
+
+        # Default case. 
+        # The 'existing' parameter (below) determines which type of connections are restored.
+        RELINK {"complete":false}
 
 + `existing : true` 
    
-   Only restore connections between nodes currently part of selected connected components. NOTE: If `complete:false` and `existing:false` (the default case) then only connections between contigs in currently selected connected components and those removed from such components are restored. That is, no new connections *within* connected components are added.
+   Only restore connections between nodes currently part of selected connected components.  This parameter has no effect when the 'complete' parmeter (above) is true.
 
-   Example:
-   
-        RELINK {"existing":true} -- Only add among to non-removed contigs
+   Examples:
+
+        # Only restore connections between currently selected contigs
+        RELINK {"existing":true}
+
+        # Default case.
+        # Only restore connections between currently selected and currently unselected 
+        # contigs (this causes the unselected contigs to become part of the selected set 
+        # again). That is, no new connections within the contigs of currently selected 
+        # connected components are restored.
+        RELINK {"existing":false}
  
 + `problems : true` 
    
@@ -1877,17 +1894,19 @@ Create a new node from an existing node using the given coordinates. Using this 
         # Edges between NODE_1234 and the "included" contigs will be moved to NEW_1234.
         CUTND {"name":"NODE_1234","new_name":"NEW_1234","include":["NODE_567","NODE_234"]}
 
-+ `start : <int>` and `end : <int>`
++ `begin : <int>` and `end : <int>`
 
-   `start` is the beginning sequence coordinate for the new node (from within the original). 
+   `begin` is the beginning sequence coordinate for the new node (from within the original). 
    `end` is the ending sequence coordinate for the new node (from within the original).
 
-   NOTE: To facilitate trimming sequences to a fixed maximum length, it is allowable for negative 'start' values and positive 'end' values to be longer than a sequence. In such cases, the values are set to the start and end of the sequence, respectively. Positive start and negative end positions must fall within the sequence, because otherwise the start position will be after the end position.
+   NOTE: To facilitate trimming sequences to a fixed maximum length, it is allowable for negative `begin` values and positive `end` values to be longer than a sequence. In such cases, the values are set to the beginning and end of the sequence, respectively. Positive `begin` and negative `end` positions must fall within the sequence, otherwise the `begin` position will be after the `end` position.
+
+   Deprecated with SEAStAR version v0.4.13: `start` may be used as a synonym for `begin`.
 
    Examples: 
    
         # The new node will include sequence from positions 123 to 456
-        CUTND {"start":123,"end":456}
+        CUTND {"begin":123,"end":456}
 
         # The new node will include sequence from position 0 (implied) to 456. 
         # end may also be omitted, implying the last position
@@ -1896,7 +1915,7 @@ Create a new node from an existing node using the given coordinates. Using this 
         # The new node will include at most the last 1000 bases of sequence.
         # If the sequence is shorter than 1000 bases, it will be copied without
         # modification.
-        CUTND {"start":-1000}         
+        CUTND {"begin":-1000}         
 
 [`GC`]: #GC
 ###<a name="GC">`GC`</a> 

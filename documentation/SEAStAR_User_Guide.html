@@ -1,6 +1,6 @@
 <link href="style.css" media="screen" rel="stylesheet" type="text/css" />
 
-<h1>SEAStAR User Guide, version 0.4.13</h1>
+<h1>SEAStAR User Guide, version 0.4.14</h1>
 <h4>Vaughn Iverson and Chris Berthiaume</h4>
 <h5><a href="http://armbrustlab.ocean.washington.edu">Armbrust Lab</a>, School of Oceanography, University of Washington</h5>
 <h2>Table of Contents</h2>
@@ -131,7 +131,7 @@ FASTA {&quot;scaff&quot;:true,&quot;file&quot;:&quot;lambda_scaffs.fna&quot;}</c
 # and color by %GC. Black arrows are mate-pair connections with thickness indicating  
 # bitscore. Red arrows are added dependencies to produce a fully ordered layout for SCAFF.
 
-for i in lambda_asm?.dot; do neato -Tpdf $i &gt; ${i##.*}.pdf; done</code></pre>
+for i in lambda_asm?.dot; do neato -Tpdf $i &gt; ${i%.*}.pdf; done</code></pre>
 <p>You should now be able to load the PDF files with your favorite PDF viewer in order from <code>lambda_asm0.pdf</code> through <code>lambda_asm6.pdf</code> to see the effect of each <code>graph_ops</code> command in the script above. Each graph represents the state of the assembly before/after each successive step, showing the operation of graph_ops as it operated on this example dataset.  </p>
 <h3>Estimating 16S sequence abundance</h3>
 <p>The tools in SEAStAR can be used to create a pipeline for estimating sequence abundance in a short-read data set.  This is particularly useful for assessing community composition in a metagenomic sample through alignments to a 16S database.  See vignettes/RDP/RDP_vignette.html for a walk-through of an implementation of this pipeline using the <a href="http://rdp.cme.msu.edu/">RDP</a> 16S database.</p>
@@ -757,7 +757,7 @@ is, multiple iterations of <code>PLUCK</code> will not completely remove contigs
 <p><strong>Parameters:</strong></p>
 <ul>
 <li><p><code>iterate : &lt;int&gt;</code></p>
-<p> Specify the number of iterations of PLUCK to run. Each is equivalent to running PLUCK again as a separate command. By default <code>&lt;int&gt;</code>= 2.</p>
+<p> Specify the number of iterations of PLUCK to run. Each is equivalent to running PLUCK again as a separate command. By default <code>&lt;int&gt;</code>= 3.</p>
 <p> Examples:</p>
 <pre><code>  # Default is {&quot;iterate&quot;:2}
   PLUCK 
@@ -1117,22 +1117,39 @@ is, multiple iterations of <code>PLUCK</code> will not completely remove contigs
 </li>
 <li><p><code>radius : &lt;int&gt;</code></p>
 <p> Expand the sphere of restored connections to neighbors.</p>
-<p> Example:</p>
-<pre><code>  # Recursively restore edges to all contigs within two hops of any selected contigs 
+<p> Examples:</p>
+<pre><code>  # Default value. Restore edges only to neighboring contigs
+  RELINK {&quot;radius&quot;:0}
+
+  # Recursively restore edges to all contigs within two hops of any selected contigs 
   # (including along newly restored edge paths)
   RELINK {&quot;radius&quot;:2}</code></pre>
 </li>
 <li><p><code>complete : true</code></p>
 <p> Restore connections among all types of contigs.</p>
-<p> Example:</p>
-<pre><code>  # Restore connections among contigs which are both removed from and part 
-  # of currently selected connected components
-  RELINK {&quot;complete&quot;:true}</code></pre>
+<p> Examples:</p>
+<pre><code>  # Restore connections among contigs which are both removed from, and part of, 
+  # currently selected connected components. This is like running with both modes of 
+  # the &#39;existing&#39; parameter (below) simultaneously.
+  # 
+  RELINK {&quot;complete&quot;:true}
+
+  # Default case. 
+  # The &#39;existing&#39; parameter (below) determines which type of connections are restored.
+  RELINK {&quot;complete&quot;:false}</code></pre>
 </li>
 <li><p><code>existing : true</code> </p>
-<p> Only restore connections between nodes currently part of selected connected components. NOTE: If <code>complete:false</code> and <code>existing:false</code> (the default case) then only connections between contigs in currently selected connected components and those removed from such components are restored. That is, no new connections <em>within</em> connected components are added.</p>
-<p> Example:</p>
-<pre><code>  RELINK {&quot;existing&quot;:true} -- Only add among to non-removed contigs</code></pre>
+<p> Only restore connections between nodes currently part of selected connected components.  This parameter has no effect when the &#39;complete&#39; parmeter (above) is true.</p>
+<p> Examples:</p>
+<pre><code>  # Only restore connections between currently selected contigs
+  RELINK {&quot;existing&quot;:true}
+
+  # Default case.
+  # Only restore connections between currently selected and currently unselected 
+  # contigs (this causes the unselected contigs to become part of the selected set 
+  # again). That is, no new connections within the contigs of currently selected 
+  # connected components are restored.
+  RELINK {&quot;existing&quot;:false}</code></pre>
 </li>
 <li><p><code>problems : true</code> </p>
 <p> Restore all connections to contigs that are marked with potential assembly problems. Uses <code>radius:1</code> and <code>existing:true</code> </p>
@@ -1226,13 +1243,14 @@ EDIT {&quot;add_edges&quot;:[&quot;NODE_1234&quot;,&quot;NODE_9&quot;]}</code></
 <pre><code>  # Edges between NODE_1234 and the &quot;included&quot; contigs will be moved to NEW_1234.
   CUTND {&quot;name&quot;:&quot;NODE_1234&quot;,&quot;new_name&quot;:&quot;NEW_1234&quot;,&quot;include&quot;:[&quot;NODE_567&quot;,&quot;NODE_234&quot;]}</code></pre>
 </li>
-<li><p><code>start : &lt;int&gt;</code> and <code>end : &lt;int&gt;</code></p>
-<p> <code>start</code> is the beginning sequence coordinate for the new node (from within the original). 
+<li><p><code>begin : &lt;int&gt;</code> and <code>end : &lt;int&gt;</code></p>
+<p> <code>begin</code> is the beginning sequence coordinate for the new node (from within the original). 
  <code>end</code> is the ending sequence coordinate for the new node (from within the original).</p>
-<p> NOTE: To facilitate trimming sequences to a fixed maximum length, it is allowable for negative &#39;start&#39; values and positive &#39;end&#39; values to be longer than a sequence. In such cases, the values are set to the start and end of the sequence, respectively. Positive start and negative end positions must fall within the sequence, because otherwise the start position will be after the end position.</p>
+<p> NOTE: To facilitate trimming sequences to a fixed maximum length, it is allowable for negative <code>begin</code> values and positive <code>end</code> values to be longer than a sequence. In such cases, the values are set to the beginning and end of the sequence, respectively. Positive <code>begin</code> and negative <code>end</code> positions must fall within the sequence, otherwise the <code>begin</code> position will be after the <code>end</code> position.</p>
+<p> Deprecated with SEAStAR version v0.4.13: <code>start</code> may be used as a synonym for <code>begin</code>.</p>
 <p> Examples: </p>
 <pre><code>  # The new node will include sequence from positions 123 to 456
-  CUTND {&quot;start&quot;:123,&quot;end&quot;:456}
+  CUTND {&quot;begin&quot;:123,&quot;end&quot;:456}
 
   # The new node will include sequence from position 0 (implied) to 456. 
   # end may also be omitted, implying the last position
@@ -1241,7 +1259,7 @@ EDIT {&quot;add_edges&quot;:[&quot;NODE_1234&quot;,&quot;NODE_9&quot;]}</code></
   # The new node will include at most the last 1000 bases of sequence.
   # If the sequence is shorter than 1000 bases, it will be copied without
   # modification.
-  CUTND {&quot;start&quot;:-1000}         </code></pre>
+  CUTND {&quot;begin&quot;:-1000}         </code></pre>
 </li>
 </ul>
 <h3><a name="GC"><code>GC</code></a></h3>

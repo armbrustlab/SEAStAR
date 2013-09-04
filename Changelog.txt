@@ -1,3 +1,34 @@
+### 0.4.14 ###
+
+- Fixed a bug that could lead to a crash in the graph_ops INSERT command
+when run on a graph that contains no reconstructed sequence.
+
+- Fixed a bug that could cause the graph_ops SCAFLNK command to find and
+report suboptimal scaffold connections.
+
+- Fixed a bug in the graph_ops CUTND command that could lead to 
+unintentional movement of mate-pair edges when the "include" parameter is 
+omitted.  Also removed a previous limitation in CUTND that silently 
+prohibited moving edges to newly created nodes when the mean mate-pair
+position of the edge didn't fall within the region of the new node.
+
+- Added a new feature to graph_ops CUTND: the 'auto_include' parameter, 
+which will automatically move all selected mate-pair edges with positions
+that fall within the cut sequence, as though they had been individually 
+named in an 'include' parameter.
+
+- Changed the name of the graph_ops CUTND parameter 'start' to 'begin'.
+'start' still works as a synonym, but its use is deprecated.
+
+- Changed the default value of the "iterate" parameter of the graph_ops
+PLUCK command from 2 to 3. This makes the default behavior more stable,
+as stub branches of length 3 do occasionally occur, but are difficult
+to track down, leading to scaffolds that are prematurely terminated.
+PUSH already had an 'iterate' default value of 3, so this change also
+makes the defaults of these complementary operations match each other.
+
+- Documentation improvements.
+
 ### 0.4.13 ###
 
 - Fixed a bug in ref_select that could cause the program to hang when 

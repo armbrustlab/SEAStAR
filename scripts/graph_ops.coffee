@@ -1045,9 +1045,11 @@ remove_leaves = (j, args={}, callback) ->
 Parameters:\n
 \n
 iterate : <int> -- number of iterations of #{args.help} to run. Each is equivalent to\n
-       running #{args.help} again as a separate command.  By Default <int> = 2\n
+       running #{args.help} again as a separate command.  By Default <int> = 3\n
 \n
-        Example: #{args.help} {\"iterate\":2} -- Equivalent of #{args.help} #{args.help}\n
+        Example: #{args.help} {\"iterate\":2} -- Equivalent to running:
+           #{args.help} {\"iterate\":1}\n
+           #{args.help} {\"iterate\":1}\n
 \n
 min_len : <int> -- Minimum length of isolated nodes to keep.\n
 \n
@@ -1057,7 +1059,7 @@ min_len : <int> -- Minimum length of isolated nodes to keep.\n
       callback?(null, j)
       return
 
-   args.iterate ?= 2
+   args.iterate ?= 3
    args.min_len ?= 20000
 
    delete j.connected_comps   # This invalidates the cached ccomps
@@ -2402,28 +2404,34 @@ find_direct_connection = (head, tail, thresh = 0) ->
          null
 
    select_edge = null
+   select_head = null
+   select_tail = null
 
    if (edge = try_dir_links(head, tail)) and edge[0]?.bits > thresh
+      select_head = head
+      select_tail = tail
       select_edge = edge
       thresh = edge[0].bits
       
    if (edge = try_dir_links(head.outlinks[0]?[1], tail)) and edge[0]?.bits > thresh
-      head = head.outlinks[0][1]
+      select_head = head.outlinks[0][1]
+      select_tail = tail
       select_edge = edge
       thresh = edge[0].bits
       
    if (edge = try_dir_links(head, tail.inlinks[0]?[1])) and edge[0]?.bits > thresh
-      tail = tail.inlinks[0][1]
+      select_head = head
+      select_tail = tail.inlinks[0][1]
       select_edge = edge
       thresh = edge[0].bits
    
    if (edge = try_dir_links(head.outlinks[0]?[1], tail.inlinks[0]?[1])) and edge[0]?.bits > thresh
-      head = head.outlinks[0][1]         
-      tail = tail.inlinks[0][1]
+      select_head = head.outlinks[0][1]         
+      select_tail = tail.inlinks[0][1]
       select_edge = edge
       thresh = edge[0].bits
          
-   [select_edge, head, tail, thresh]
+   [select_edge, select_head, select_tail, thresh]
 
 ###
 # Look for indirect connections (via another node not part of either scaffold)
@@ -2449,28 +2457,34 @@ find_indirect_connection = (head, tail, thresh = 0) ->
          if (et and eh) then [et, eh] else null
    
    select_result = null
+   select_head = null
+   select_tail = null
    
    if (result = try_indir_links(head.outlinks[0]?[1], tail.inlinks[0]?[1])) and result?[0]?.bits > thresh and result?[1]?.bits > thresh
-      head = head.outlinks[0][1]         
-      tail = tail.inlinks[0][1]
+      select_head = head.outlinks[0][1]         
+      select_tail = tail.inlinks[0][1]
       select_result = result
       thresh = Math.min(result[0].bits, result[1].bits)
    
    if (result = try_indir_links(head, tail.inlinks[0]?[1])) and result?[0]?.bits > thresh and result?[1]?.bits > thresh
-      tail = tail.inlinks[0][1]
+      select_head = head
+      select_tail = tail.inlinks[0][1]
       select_result = result
       thresh = Math.min(result[0].bits, result[1].bits)
    
    if (result = try_indir_links(head.outlinks[0]?[1], tail)) and result?[0]?.bits > thresh and result?[1]?.bits > thresh
-      head = head.outlinks[0][1]         
+      select_head = head.outlinks[0][1]         
+      select_tail = tail
       select_result = result
       thresh = Math.min(result[0].bits, result[1].bits)
    
-   if (result = try_indir_links(head, tail)) and result?[0]?.score > thresh and result?[1]?.score > thresh
+   if (result = try_indir_links(head, tail)) and result?[0]?.bits > thresh and result?[1]?.bits > thresh
+      select_head = head
+      select_tail = tail
       select_result = result
       thresh = Math.min(result[0].bits, result[1].bits)
 
-   [select_result, head, tail, thresh]
+   [select_result, select_head, select_tail, thresh]
 
 ###
 # Look for both direct and indirect connections
@@ -2636,23 +2650,29 @@ ccnames : [\"contig_name1\",\"contig_name2\",...] -- Restore edges to all contig
 \n
 radius : <int> -- Expand the sphere of restored connections to neighbors\n
 \n
+        Default: #{args.help} {\"radius\":0} -- Restore edges only to neighboring contigs\n
+\n
         Example: #{args.help} {\"radius\":2} -- Restore edges to all contigs within two\n
         hops of the selected contigs (including along newly restored paths)\n
 \n
 complete : true -- Restore connections among all types of contigs\n
 \n
-        Example: #{args.help} {\"complete\":true} -- Restore connections among contigs\n
-        which are both removed from and part of currently selected connected components\n
+        Example: #{args.help} {\"complete\":true} -- Restore connections between contigs\n
+        which are both removed from, and part of, currently selected connected components\n
 \n
-existing : true -- Only restore connections between nodes currently part of selected\n
-        connected components\n
+        Default: #{args.help} {\"complete\":false} -- The 'existing' parameter (below)\n
+        determines which type of connections are restored.\n
 \n
-        Example: #{args.help} {\"existing\":true} -- Only add among to non-removed contigs\n
+existing : true -- Only restore connections between contigs currently part of selected\n
+        connected components. This parameter has no effect when the 'complete' parmeter\n
+        (above) is true.\n
 \n
-        Note: If complete:false and existing:false (the Default case) then only\n
-        connections between contigs in currently selected connected components and those\n
-        removed from such components are restored.  That is, no new connections within\n
-        connected components are added.\n 
+        Example: #{args.help} {\"existing\":true} -- Only restore connection between\n
+        currently selected contigs\n
+\n
+        Default: #{args.help} {\"existing\":false} -- Only restore connection between\n
+        currently selected and currently unselected contigs; That is, no new connections\n
+        within the contigs of currently selected connected components are restored.\n
 \n
 problems : true -- Restore all connections to contigs that are marked with potential\n
         assembly problems\n
@@ -2671,6 +2691,7 @@ problems : true -- Restore all connections to contigs that are marked with poten
       args.names = (nid for nid, n of j.nodes when n.contig_problems?)
 
    args.complete ?= false
+   args.existing ?= false
    args.thresh ?= 0.0
    args.radius ?= 0
 
@@ -2904,15 +2925,18 @@ verbose : true -- output diagnostics on STDERR\n
 
       if args.dup_kmer
          all_mers = {}
-         for n, l in chain_levels
+         for n, l in chain_levels when n.recon_seq?.length >= args.dup_kmer
             all_mers = calc_mers(args.dup_kmer, n.recon_seq, all_mers)
+         unless Object.keys(all_mers).length
+            console.warn("INSERT parameter dup_kmer = #{args.dup_kmer} but graph has no sequence. Disabling INSERT kmer checking.") if args.verbose
+            args.dup_kmer = 0
       
       for n, l in chain_levels
          for e in n.rem_links when j.removed_nodes[e[1].id]? and edge = edge_director(n, e[1], e[0])
 
             other = if n.id is edge.n1 then edge.n2 else edge.n1
 
-            if args.dup_kmer
+            if args.dup_kmer and e[1].recon_seq?.length >= args.dup_kmer
                contig_mers = calc_mers(args.dup_kmer, e[1].recon_seq)
                all_mers_shared = shared_mers(all_mers, contig_mers)
             
@@ -2997,7 +3021,8 @@ verbose : true -- output diagnostics on STDERR\n
             nodes_added[node_id] = node
             node.slot = [chain_minmax.ins.min, chain_minmax.outs.max]
             node.ccnum = idx
-         else if ((chain_minmax.ins.min > chain_minmax.outs.max) and 
+         else if (not (tail.terminal) and
+                  (chain_minmax.ins.min > chain_minmax.outs.max) and 
                   (chain_minmax.outs.max - chain_minmax.outs.min < 4) and 
                   (chain_minmax.ins.max - chain_minmax.ins.min < 4) and 
                   (chain_minmax.ins.min - chain_minmax.outs.max > j.connected_comps[idx].length - 7))    # Nodes entirely "between" the scaffold ends
@@ -3441,7 +3466,14 @@ include : [\"contig_name1\", ...] -- Move mate-pair edges from the listed contig
         -- Edges between NODE_1234 and the included contigs will be moved to the new cut\n
         and copied version of NODE_1234.\n
 \n
-start : <int> -- Beginning sequence coordinate for the new node within the original\n
+auto_include : true -- Automatically move mate-pair edges falling within the cut sequence.\n
+\n
+        Example: #{args.help} {\"name\":\"NODE_1234\",\"auto_include\":true}\n 
+        -- All selected edges between NODE_1234 and any other contigs will be moved to the\n
+         new cut and copied version of NODE_1234. Note that currently removed edges will\n
+         not be moved. To accomplish this, the node needs to be RELINKed first.
+\n
+begin : <int> -- Beginning sequence coordinate for the new node within the original\n
 end : <int> -- Ending sequence coordinate for the new node within the original\n
 \n
         NOTE: To facilitate trimming sequences to a fixed maximum length, it is\n
@@ -3451,13 +3483,13 @@ end : <int> -- Ending sequence coordinate for the new node within the original\n
         within the sequence, because otherwise the start position will be after the end\n
         position.\n
 \n
-        Example: #{args.help} {\"start\":123,\"end\":456} -- The new node will include\n
+        Example: #{args.help} {\"begin\":123,\"end\":456} -- The new node will include\n
         sequence from positions 123 to 456\n
 \n
         Example: #{args.help} {\"end\":456} -- The new node will include sequence from\n
         position 0 (implied) to 456. end may also be omitted, implying the last position\n
 \n
-        Example: #{args.help} {\"start\":-1000} -- New node contains at most the last\n
+        Example: #{args.help} {\"begin\":-1000} -- New node contains at most the last\n
         1000 bases of any sequence. Sequences under 1000 bases are copied unmodified.\n
 ")
       callback?(null, j)
@@ -3470,23 +3502,30 @@ end : <int> -- Ending sequence coordinate for the new node within the original\n
       callback?(new Error('CUTND requires a valid node "name" argument.'), null)
       return
 
-   args.start ?= 0
+   # Maintain compatability with "start" instead of "begin"
+   if args.start? and not args.begin?
+      console.warn("CUTND: Warning: 'start' parameter is deprecated. Use 'begin' instead.")
+      args.begin = args.start 
+
+   args.begin ?= 0
    args.end ?= node.seq_len - 1
 
-   if args.start < 0
-      args.start = node.seq_len + args.start
+   args.include ?= []
+
+   if args.begin < 0
+      args.begin = node.seq_len + args.begin
 
    if args.end < 0
       args.end = node.seq_len + args.end
 
-   if args.start < 0
-      args.start = 0  
+   if args.begin < 0
+      args.begin = 0  
 
    if args.end >= node.seq_len
       args.end = node.seq_len - 1
 
-   unless args.start < args.end
-      callback?(new Error('CUTND requires valid "start" and "end" arguments.'), null)
+   unless args.begin < args.end
+      callback?(new Error('CUTND requires valid "begin" and "end" arguments.'), null)
       return
 
    try
@@ -3504,7 +3543,7 @@ end : <int> -- Ending sequence coordinate for the new node within the original\n
 
    j.nodes[args.new_name] = new_node
    
-   console.warn("CUTND: Adding #{args.new_name} from #{args.start} - #{args.end} of #{node.name}")
+   console.warn("CUTND: Adding #{args.new_name} from #{args.begin} - #{args.end} of #{node.name}")
    
    for p of node  # Copy parameters
       new_node[p] = node[p]
@@ -3512,32 +3551,45 @@ end : <int> -- Ending sequence coordinate for the new node within the original\n
    # Now fix them up
    new_node.name = args.new_name
    new_node.id = args.new_name
-   new_node.seq_len = args.end - args.start + 1
+   new_node.seq_len = args.end - args.begin + 1
    
    delete new_node.contig_problems
       
    if new_node.per_nt_cov?
-      new_node.per_nt_cov = new_node.per_nt_cov.slice(args.start,args.end)
+      new_node.per_nt_cov = new_node.per_nt_cov.slice(args.begin,args.end)
 
    if new_node.per_nt_phys_cov?
-      new_node.per_nt_phys_cov = new_node.per_nt_phys_cov.slice(args.start,args.end)
+      new_node.per_nt_phys_cov = new_node.per_nt_phys_cov.slice(args.begin,args.end)
 
    if new_node.per_nt_mp_ins?
-      new_node.per_nt_mp_ins = new_node.per_nt_mp_ins.slice(args.start,args.end)
+      new_node.per_nt_mp_ins = new_node.per_nt_mp_ins.slice(args.begin,args.end)
 
    if new_node.recon_seq?
-      new_node.recon_seq = new_node.recon_seq.substring(args.start,args.end)
+      new_node.recon_seq = new_node.recon_seq.substring(args.begin,args.end)
 
-   # Currently the code below silently ignores edges to "included" nodes that don't land within this slice of the original contig
-   for e in new_node.inlinks when e[0].p2 >= args.start and e[0].p2 <= args.end and args.include?.indexOf(e[1].id) isnt -1 
+   if args.auto_include
+      args.include.push(e[1].id) for e in new_node.inlinks when args.begin <= e[0].p2 <= args.end
+      args.include.push(e[1].id) for e in new_node.outlinks when args.begin <= e[0].p1 <= args.end
+
+   for e in new_node.inlinks when args.include?.indexOf(e[1].id) isnt -1
       console.warn("CUTND: Moving edge #{e[0].n1} --> #{e[0].n2} to #{args.new_name}")
       e[0].n2 = args.new_name
-      e[0].p2 = e[0].p2 - args.start
+      if e[0].p2 < args.begin
+         e[0].p2 = 0
+      else if e[0].p2 > args.end
+         e[0].p2 = new_node.seq_len - 1
+      else
+         e[0].p2 = e[0].p2 - args.begin
 
-   for e in new_node.outlinks when e[0].p1 >= args.start and e[0].p1 <= args.end and args.include?.indexOf(e[1].id) isnt -1 
+   for e in new_node.outlinks when args.include?.indexOf(e[1].id) isnt -1 
       console.warn("CUTND: Moving edge #{e[0].n1} --> #{e[0].n2} to #{args.new_name}")
       e[0].n1 = args.new_name
-      e[0].p1 = e[0].p1 - args.start
+      if e[0].p1 < args.begin
+         e[0].p1 = 0
+      else if e[0].p1 > args.end
+         e[0].p1 = new_node.seq_len - 1
+      else
+         e[0].p1 = e[0].p1 - args.begin
 
    remove_graph_refs(j) 
 

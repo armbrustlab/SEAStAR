@@ -1197,7 +1197,7 @@
     if (args.help != null) {
       console.warn("" + args.help + " -- Remove all leaf contig nodes (in or outdegree == 0) from the graph");
       if (args.detailed_help != null) {
-        console.warn("\nParameters:\n\niterate : <int> -- number of iterations of " + args.help + " to run. Each is equivalent to\n       running " + args.help + " again as a separate command.  By Default <int> = 2\n\n        Example: " + args.help + " {\"iterate\":2} -- Equivalent of " + args.help + " " + args.help + "\n\nmin_len : <int> -- Minimum length of isolated nodes to keep.\n\n        Example: " + args.help + " {\"min_len\":20000} -- Default. Do not \"pluck away\" an\n        unconnected node containing 20000 or more bases of sequence.\n");
+        console.warn("\nParameters:\n\niterate : <int> -- number of iterations of " + args.help + " to run. Each is equivalent to\n       running " + args.help + " again as a separate command.  By Default <int> = 3\n\n        Example: " + args.help + " {\"iterate\":2} -- Equivalent to running:           " + args.help + " {\"iterate\":1}\n           " + args.help + " {\"iterate\":1}\n\nmin_len : <int> -- Minimum length of isolated nodes to keep.\n\n        Example: " + args.help + " {\"min_len\":20000} -- Default. Do not \"pluck away\" an\n        unconnected node containing 20000 or more bases of sequence.\n");
       }
       if (typeof callback === "function") {
         callback(null, j);
@@ -1205,7 +1205,7 @@
       return;
     }
     if (args.iterate == null) {
-      args.iterate = 2;
+      args.iterate = 3;
     }
     if (args.min_len == null) {
       args.min_len = 20000;
@@ -2607,7 +2607,7 @@
 
 
   find_direct_connection = function(head, tail, thresh) {
-    var edge, select_edge, try_dir_links, _ref, _ref1, _ref2, _ref3, _ref4, _ref5, _ref6, _ref7;
+    var edge, select_edge, select_head, select_tail, try_dir_links, _ref, _ref1, _ref2, _ref3, _ref4, _ref5, _ref6, _ref7;
     if (thresh == null) {
       thresh = 0;
     }
@@ -2632,27 +2632,33 @@
       }
     };
     select_edge = null;
+    select_head = null;
+    select_tail = null;
     if ((edge = try_dir_links(head, tail)) && ((_ref = edge[0]) != null ? _ref.bits : void 0) > thresh) {
+      select_head = head;
+      select_tail = tail;
       select_edge = edge;
       thresh = edge[0].bits;
     }
     if ((edge = try_dir_links((_ref1 = head.outlinks[0]) != null ? _ref1[1] : void 0, tail)) && ((_ref2 = edge[0]) != null ? _ref2.bits : void 0) > thresh) {
-      head = head.outlinks[0][1];
+      select_head = head.outlinks[0][1];
+      select_tail = tail;
       select_edge = edge;
       thresh = edge[0].bits;
     }
     if ((edge = try_dir_links(head, (_ref3 = tail.inlinks[0]) != null ? _ref3[1] : void 0)) && ((_ref4 = edge[0]) != null ? _ref4.bits : void 0) > thresh) {
-      tail = tail.inlinks[0][1];
+      select_head = head;
+      select_tail = tail.inlinks[0][1];
       select_edge = edge;
       thresh = edge[0].bits;
     }
     if ((edge = try_dir_links((_ref5 = head.outlinks[0]) != null ? _ref5[1] : void 0, (_ref6 = tail.inlinks[0]) != null ? _ref6[1] : void 0)) && ((_ref7 = edge[0]) != null ? _ref7.bits : void 0) > thresh) {
-      head = head.outlinks[0][1];
-      tail = tail.inlinks[0][1];
+      select_head = head.outlinks[0][1];
+      select_tail = tail.inlinks[0][1];
       select_edge = edge;
       thresh = edge[0].bits;
     }
-    return [select_edge, head, tail, thresh];
+    return [select_edge, select_head, select_tail, thresh];
   };
 
   /*
@@ -2661,7 +2667,7 @@
 
 
   find_indirect_connection = function(head, tail, thresh) {
-    var result, select_result, try_indir_links, _ref, _ref1, _ref10, _ref11, _ref2, _ref3, _ref4, _ref5, _ref6, _ref7, _ref8, _ref9;
+    var result, select_head, select_result, select_tail, try_indir_links, _ref, _ref1, _ref10, _ref11, _ref2, _ref3, _ref4, _ref5, _ref6, _ref7, _ref8, _ref9;
     if (thresh == null) {
       thresh = 0;
     }
@@ -2696,27 +2702,33 @@
       }
     };
     select_result = null;
+    select_head = null;
+    select_tail = null;
     if ((result = try_indir_links((_ref = head.outlinks[0]) != null ? _ref[1] : void 0, (_ref1 = tail.inlinks[0]) != null ? _ref1[1] : void 0)) && (result != null ? (_ref2 = result[0]) != null ? _ref2.bits : void 0 : void 0) > thresh && (result != null ? (_ref3 = result[1]) != null ? _ref3.bits : void 0 : void 0) > thresh) {
-      head = head.outlinks[0][1];
-      tail = tail.inlinks[0][1];
+      select_head = head.outlinks[0][1];
+      select_tail = tail.inlinks[0][1];
       select_result = result;
       thresh = Math.min(result[0].bits, result[1].bits);
     }
     if ((result = try_indir_links(head, (_ref4 = tail.inlinks[0]) != null ? _ref4[1] : void 0)) && (result != null ? (_ref5 = result[0]) != null ? _ref5.bits : void 0 : void 0) > thresh && (result != null ? (_ref6 = result[1]) != null ? _ref6.bits : void 0 : void 0) > thresh) {
-      tail = tail.inlinks[0][1];
+      select_head = head;
+      select_tail = tail.inlinks[0][1];
       select_result = result;
       thresh = Math.min(result[0].bits, result[1].bits);
     }
     if ((result = try_indir_links((_ref7 = head.outlinks[0]) != null ? _ref7[1] : void 0, tail)) && (result != null ? (_ref8 = result[0]) != null ? _ref8.bits : void 0 : void 0) > thresh && (result != null ? (_ref9 = result[1]) != null ? _ref9.bits : void 0 : void 0) > thresh) {
-      head = head.outlinks[0][1];
+      select_head = head.outlinks[0][1];
+      select_tail = tail;
       select_result = result;
       thresh = Math.min(result[0].bits, result[1].bits);
     }
-    if ((result = try_indir_links(head, tail)) && (result != null ? (_ref10 = result[0]) != null ? _ref10.score : void 0 : void 0) > thresh && (result != null ? (_ref11 = result[1]) != null ? _ref11.score : void 0 : void 0) > thresh) {
+    if ((result = try_indir_links(head, tail)) && (result != null ? (_ref10 = result[0]) != null ? _ref10.bits : void 0 : void 0) > thresh && (result != null ? (_ref11 = result[1]) != null ? _ref11.bits : void 0 : void 0) > thresh) {
+      select_head = head;
+      select_tail = tail;
       select_result = result;
       thresh = Math.min(result[0].bits, result[1].bits);
     }
-    return [select_result, head, tail, thresh];
+    return [select_result, select_head, select_tail, thresh];
   };
 
   /*
@@ -2884,7 +2896,7 @@
     if (args.help != null) {
       console.warn("" + args.help + " -- Reconnect previously removed connections between contigs");
       if (args.detailed_help != null) {
-        console.warn("\nParameters:\n\nname : \"contig_name\" -- Use a single contig by name\n\n        Example: " + args.help + " {\"name\":\"NODE_1234\"} -- Restore edges to this contig\n\nnames : [\"contig_name1\",\"contig_name2\",...] -- Use multiple contigs by name\n\n        Example: " + args.help + " {\"names\":[\"NODE_1234\",\"NODE_5678\"]} -- Restore edges\n        to these two contigs (though not necessarily between them...)\n\nccname : \"contig_name\" -- Use all contigs in the connected component containing the\n        named contig\n\n        Example: " + args.help + " {\"ccname\":\"NODE_1234\"} -- Restore edges to all contigs\n        in the connected component containing this contig\n\nccnames : [\"contig_name1\",\"contig_name2\",...] -- Restore edges to all contigs\n        in the connected components containing these contigs\n\n        Example: " + args.help + " {\"ccnames\":[\"NODE_1234\",\"NODE_5678\"]} -- Restore edges\n        to all contigs within the connected compontent(s) containing these two contigs\n\nradius : <int> -- Expand the sphere of restored connections to neighbors\n\n        Example: " + args.help + " {\"radius\":2} -- Restore edges to all contigs within two\n        hops of the selected contigs (including along newly restored paths)\n\ncomplete : true -- Restore connections among all types of contigs\n\n        Example: " + args.help + " {\"complete\":true} -- Restore connections among contigs\n        which are both removed from and part of currently selected connected components\n\nexisting : true -- Only restore connections between nodes currently part of selected\n        connected components\n\n        Example: " + args.help + " {\"existing\":true} -- Only add among to non-removed contigs\n\n        Note: If complete:false and existing:false (the Default case) then only\n        connections between contigs in currently selected connected components and those\n        removed from such components are restored.  That is, no new connections within\n        connected components are added.\n \nproblems : true -- Restore all connections to contigs that are marked with potential\n        assembly problems\n\n        Example: " + args.help + " {\"problems\":true} -- Reconnect all problem contigs to\n        all of their potential neighbors.  Uses radius:1 and existing:true\n");
+        console.warn("\nParameters:\n\nname : \"contig_name\" -- Use a single contig by name\n\n        Example: " + args.help + " {\"name\":\"NODE_1234\"} -- Restore edges to this contig\n\nnames : [\"contig_name1\",\"contig_name2\",...] -- Use multiple contigs by name\n\n        Example: " + args.help + " {\"names\":[\"NODE_1234\",\"NODE_5678\"]} -- Restore edges\n        to these two contigs (though not necessarily between them...)\n\nccname : \"contig_name\" -- Use all contigs in the connected component containing the\n        named contig\n\n        Example: " + args.help + " {\"ccname\":\"NODE_1234\"} -- Restore edges to all contigs\n        in the connected component containing this contig\n\nccnames : [\"contig_name1\",\"contig_name2\",...] -- Restore edges to all contigs\n        in the connected components containing these contigs\n\n        Example: " + args.help + " {\"ccnames\":[\"NODE_1234\",\"NODE_5678\"]} -- Restore edges\n        to all contigs within the connected compontent(s) containing these two contigs\n\nradius : <int> -- Expand the sphere of restored connections to neighbors\n\n        Default: " + args.help + " {\"radius\":0} -- Restore edges only to neighboring contigs\n\n        Example: " + args.help + " {\"radius\":2} -- Restore edges to all contigs within two\n        hops of the selected contigs (including along newly restored paths)\n\ncomplete : true -- Restore connections among all types of contigs\n\n        Example: " + args.help + " {\"complete\":true} -- Restore connections between contigs\n        which are both removed from, and part of, currently selected connected components\n\n        Default: " + args.help + " {\"complete\":false} -- The 'existing' parameter (below)\n        determines which type of connections are restored.\n\nexisting : true -- Only restore connections between contigs currently part of selected\n        connected components. This parameter has no effect when the 'complete' parmeter\n        (above) is true.\n\n        Example: " + args.help + " {\"existing\":true} -- Only restore connection between\n        currently selected contigs\n\n        Default: " + args.help + " {\"existing\":false} -- Only restore connection between\n        currently selected and currently unselected contigs; That is, no new connections\n        within the contigs of currently selected connected components are restored.\n\nproblems : true -- Restore all connections to contigs that are marked with potential\n        assembly problems\n\n        Example: " + args.help + " {\"problems\":true} -- Reconnect all problem contigs to\n        all of their potential neighbors.  Uses radius:1 and existing:true\n");
       }
       if (typeof callback === "function") {
         callback(null, j);
@@ -2912,6 +2924,9 @@
     }
     if (args.complete == null) {
       args.complete = false;
+    }
+    if (args.existing == null) {
+      args.existing = false;
     }
     if (args.thresh == null) {
       args.thresh = 0.0;
@@ -3061,7 +3076,7 @@
 
 
   full_order = function(j, args, callback) {
-    var add_dep_edges, all_mers, all_mers_shared, base_n, base_p, c, calc_mers, cc_chain_levels, cc_list, chain_levels, chain_minmax, check_list, cnt, contig_mers, cur_lev, dep_edges_added, die, dup, e, e_n, e_p, edge, edge_list, edge_obj, edges_added, err, good, head, i, id, idx, in_idx, in_nodes_added, l, mers_shared, n, new_in_edges, new_in_idx, new_out_edges, new_out_idx, next, nid, node, node_id, nodes_added, other, out_idx, out_nodes_added, p, pos, pos_rank, prev, shared_mers, shared_seq_nodes, tail, _aa, _base, _i, _j, _k, _l, _len, _len1, _len10, _len11, _len12, _len13, _len14, _len15, _len16, _len17, _len2, _len3, _len4, _len5, _len6, _len7, _len8, _len9, _m, _n, _name, _name1, _name2, _name3, _name4, _name5, _name6, _o, _p, _q, _r, _ref, _ref1, _ref10, _ref11, _ref12, _ref13, _ref14, _ref15, _ref16, _ref17, _ref18, _ref19, _ref2, _ref20, _ref21, _ref22, _ref23, _ref24, _ref25, _ref26, _ref27, _ref28, _ref29, _ref3, _ref4, _ref5, _ref6, _ref7, _ref8, _ref9, _results, _s, _t, _u, _v, _w, _x, _y, _z;
+    var add_dep_edges, all_mers, all_mers_shared, base_n, base_p, c, calc_mers, cc_chain_levels, cc_list, chain_levels, chain_minmax, check_list, cnt, contig_mers, cur_lev, dep_edges_added, die, dup, e, e_n, e_p, edge, edge_list, edge_obj, edges_added, err, good, head, i, id, idx, in_idx, in_nodes_added, l, mers_shared, n, new_in_edges, new_in_idx, new_out_edges, new_out_idx, next, nid, node, node_id, nodes_added, other, out_idx, out_nodes_added, p, pos, pos_rank, prev, shared_mers, shared_seq_nodes, tail, _aa, _base, _i, _j, _k, _l, _len, _len1, _len10, _len11, _len12, _len13, _len14, _len15, _len16, _len17, _len2, _len3, _len4, _len5, _len6, _len7, _len8, _len9, _m, _n, _name, _name1, _name2, _name3, _name4, _name5, _name6, _o, _p, _q, _r, _ref, _ref1, _ref10, _ref11, _ref12, _ref13, _ref14, _ref15, _ref16, _ref17, _ref18, _ref19, _ref2, _ref20, _ref21, _ref22, _ref23, _ref24, _ref25, _ref26, _ref27, _ref28, _ref29, _ref3, _ref30, _ref31, _ref4, _ref5, _ref6, _ref7, _ref8, _ref9, _results, _s, _t, _u, _v, _w, _x, _y, _z;
     if (args == null) {
       args = {
         "verbose": false
@@ -3186,19 +3201,27 @@
         all_mers = {};
         for (l = _m = 0, _len3 = chain_levels.length; _m < _len3; l = ++_m) {
           n = chain_levels[l];
-          all_mers = calc_mers(args.dup_kmer, n.recon_seq, all_mers);
+          if (((_ref7 = n.recon_seq) != null ? _ref7.length : void 0) >= args.dup_kmer) {
+            all_mers = calc_mers(args.dup_kmer, n.recon_seq, all_mers);
+          }
+        }
+        if (!Object.keys(all_mers).length) {
+          if (args.verbose) {
+            console.warn("INSERT parameter dup_kmer = " + args.dup_kmer + " but graph has no sequence. Disabling INSERT kmer checking.");
+          }
+          args.dup_kmer = 0;
         }
       }
       for (l = _n = 0, _len4 = chain_levels.length; _n < _len4; l = ++_n) {
         n = chain_levels[l];
-        _ref7 = n.rem_links;
-        for (_o = 0, _len5 = _ref7.length; _o < _len5; _o++) {
-          e = _ref7[_o];
+        _ref8 = n.rem_links;
+        for (_o = 0, _len5 = _ref8.length; _o < _len5; _o++) {
+          e = _ref8[_o];
           if (!((j.removed_nodes[e[1].id] != null) && (edge = edge_director(n, e[1], e[0])))) {
             continue;
           }
           other = n.id === edge.n1 ? edge.n2 : edge.n1;
-          if (args.dup_kmer) {
+          if (args.dup_kmer && ((_ref9 = e[1].recon_seq) != null ? _ref9.length : void 0) >= args.dup_kmer) {
             contig_mers = calc_mers(args.dup_kmer, e[1].recon_seq);
             all_mers_shared = shared_mers(all_mers, contig_mers);
           }
@@ -3258,9 +3281,9 @@
       chain_minmax = {};
       for (id in in_idx) {
         check_list = {};
-        _ref8 = j.removed_nodes[id].rem_links;
-        for (_p = 0, _len6 = _ref8.length; _p < _len6; _p++) {
-          _ref9 = _ref8[_p], e = _ref9[0], n = _ref9[1];
+        _ref10 = j.removed_nodes[id].rem_links;
+        for (_p = 0, _len6 = _ref10.length; _p < _len6; _p++) {
+          _ref11 = _ref10[_p], e = _ref11[0], n = _ref11[1];
           if (!(in_idx[n.id] != null)) {
             continue;
           }
@@ -3317,18 +3340,18 @@
           nodes_added[node_id] = node;
           node.slot = [chain_minmax.ins.min, chain_minmax.outs.max];
           node.ccnum = idx;
-        } else if ((chain_minmax.ins.min > chain_minmax.outs.max) && (chain_minmax.outs.max - chain_minmax.outs.min < 4) && (chain_minmax.ins.max - chain_minmax.ins.min < 4) && (chain_minmax.ins.min - chain_minmax.outs.max > j.connected_comps[idx].length - 7)) {
+        } else if (!tail.terminal && (chain_minmax.ins.min > chain_minmax.outs.max) && (chain_minmax.outs.max - chain_minmax.outs.min < 4) && (chain_minmax.ins.max - chain_minmax.ins.min < 4) && (chain_minmax.ins.min - chain_minmax.outs.max > j.connected_comps[idx].length - 7)) {
           edges_added = edges_added.concat(out_nodes_added[id]);
           nodes_added[node_id] = node;
           node.slot = [chain_minmax.ins.min, Number.MAX_VALUE];
           node.ccnum = idx;
-        } else if ((((chain_minmax.outs.min < (_ref11 = chain_minmax.ins.min) && _ref11 <= (_ref10 = chain_minmax.ins.max)) && _ref10 < chain_minmax.outs.max)) && (chain_minmax.ins.max - chain_minmax.ins.min < 4) && (chain_minmax.outs.max - chain_minmax.outs.min > j.connected_comps[idx].length - 7)) {
+        } else if ((((chain_minmax.outs.min < (_ref13 = chain_minmax.ins.min) && _ref13 <= (_ref12 = chain_minmax.ins.max)) && _ref12 < chain_minmax.outs.max)) && (chain_minmax.ins.max - chain_minmax.ins.min < 4) && (chain_minmax.outs.max - chain_minmax.outs.min > j.connected_comps[idx].length - 7)) {
           new_out_edges = (function() {
-            var _len7, _q, _ref12, _results1;
-            _ref12 = in_nodes_added[id];
+            var _len7, _q, _ref14, _results1;
+            _ref14 = in_nodes_added[id];
             _results1 = [];
-            for (_q = 0, _len7 = _ref12.length; _q < _len7; _q++) {
-              e = _ref12[_q];
+            for (_q = 0, _len7 = _ref14.length; _q < _len7; _q++) {
+              e = _ref14[_q];
               if (e.tar.chain_idx > chain_minmax.ins.max) {
                 _results1.push(e);
               }
@@ -3348,13 +3371,13 @@
           nodes_added[node_id] = node;
           node.slot = [chain_minmax.ins.min, Math.max.apply(null, new_out_idx)];
           node.ccnum = idx;
-        } else if ((((chain_minmax.ins.min < (_ref13 = chain_minmax.outs.min) && _ref13 <= (_ref12 = chain_minmax.outs.max)) && _ref12 < chain_minmax.ins.max)) && (chain_minmax.outs.max - chain_minmax.outs.min < 4) && (chain_minmax.ins.max - chain_minmax.ins.min > j.connected_comps[idx].length - 7)) {
+        } else if ((((chain_minmax.ins.min < (_ref15 = chain_minmax.outs.min) && _ref15 <= (_ref14 = chain_minmax.outs.max)) && _ref14 < chain_minmax.ins.max)) && (chain_minmax.outs.max - chain_minmax.outs.min < 4) && (chain_minmax.ins.max - chain_minmax.ins.min > j.connected_comps[idx].length - 7)) {
           new_in_edges = (function() {
-            var _len7, _q, _ref14, _results1;
-            _ref14 = out_nodes_added[id];
+            var _len7, _q, _ref16, _results1;
+            _ref16 = out_nodes_added[id];
             _results1 = [];
-            for (_q = 0, _len7 = _ref14.length; _q < _len7; _q++) {
-              e = _ref14[_q];
+            for (_q = 0, _len7 = _ref16.length; _q < _len7; _q++) {
+              e = _ref16[_q];
               if (e.src.chain_idx < chain_minmax.outs.min) {
                 _results1.push(e);
               }
@@ -3380,22 +3403,22 @@
           }
         }
         if ((nodes_added[node_id] != null) && dup) {
-          _ref14 = out_nodes_added[id];
-          for (_q = 0, _len7 = _ref14.length; _q < _len7; _q++) {
-            e = _ref14[_q];
+          _ref16 = out_nodes_added[id];
+          for (_q = 0, _len7 = _ref16.length; _q < _len7; _q++) {
+            e = _ref16[_q];
             e.n2 = node_id;
           }
-          _ref15 = in_nodes_added[id];
-          for (_r = 0, _len8 = _ref15.length; _r < _len8; _r++) {
-            e = _ref15[_r];
+          _ref17 = in_nodes_added[id];
+          for (_r = 0, _len8 = _ref17.length; _r < _len8; _r++) {
+            e = _ref17[_r];
             e.n1 = node_id;
           }
         }
       }
     }
-    _ref16 = j.removed_edges;
-    for (_s = 0, _len9 = _ref16.length; _s < _len9; _s++) {
-      e = _ref16[_s];
+    _ref18 = j.removed_edges;
+    for (_s = 0, _len9 = _ref18.length; _s < _len9; _s++) {
+      e = _ref18[_s];
       if ((e != null) && ((nodes_added[e.n1] != null) && (nodes_added[e.n2] != null))) {
         if ((edge = edge_director(e.src, e.tar, e)) && (edge.src.slot[0] <= edge.tar.slot[0]) && (edge.src.slot[1] <= edge.tar.slot[1]) && ((edge.tar.slot[0] - edge.src.slot[1]) < 7) && (edge.src.ccnum === edge.tar.ccnum)) {
           edges_added.push(edge);
@@ -3431,14 +3454,14 @@
       }
       dep_edges_added = [];
       add_dep_edges = function(rank_list) {
-        var new_head, new_tail, pos, prev_pos, _len11, _ref17, _results1, _u;
+        var new_head, new_tail, pos, prev_pos, _len11, _ref19, _results1, _u;
         rank_list.sort(function(a, b) {
           return a[0] - b[0];
         });
         new_tail = null;
         _results1 = [];
         for (_u = 0, _len11 = rank_list.length; _u < _len11; _u++) {
-          _ref17 = rank_list[_u], pos = _ref17[0], new_head = _ref17[1];
+          _ref19 = rank_list[_u], pos = _ref19[0], new_head = _ref19[1];
           if (new_tail && (new_tail.out_nodes[new_head.id] == null) && (new_tail.in_nodes[new_head.id] == null) && pos - prev_pos > args.min_pos_diff) {
             dep_edges_added.push({
               n1: new_tail.id,
@@ -3461,21 +3484,21 @@
           base_n = 0;
           cur_lev = {};
           pos_rank = [];
-          prev = chain_levels != null ? (_ref17 = chain_levels[l - 1]) != null ? _ref17.id : void 0 : void 0;
-          next = chain_levels != null ? (_ref18 = chain_levels[l + 1]) != null ? _ref18.id : void 0 : void 0;
+          prev = chain_levels != null ? (_ref19 = chain_levels[l - 1]) != null ? _ref19.id : void 0 : void 0;
+          next = chain_levels != null ? (_ref20 = chain_levels[l + 1]) != null ? _ref20.id : void 0 : void 0;
           if (prev) {
             base_p = n.in_nodes[prev].p1;
-            _ref19 = j.nodes[prev].outlinks;
-            for (_w = 0, _len13 = _ref19.length; _w < _len13; _w++) {
-              _ref20 = _ref19[_w], edge = _ref20[0], node = _ref20[1];
+            _ref21 = j.nodes[prev].outlinks;
+            for (_w = 0, _len13 = _ref21.length; _w < _len13; _w++) {
+              _ref22 = _ref21[_w], edge = _ref22[0], node = _ref22[1];
               cur_lev[edge.n2] = [edge];
             }
           }
           if (next) {
             base_n = n.out_nodes[next].p2;
-            _ref21 = j.nodes[next].inlinks;
-            for (_x = 0, _len14 = _ref21.length; _x < _len14; _x++) {
-              _ref22 = _ref21[_x], edge = _ref22[0], node = _ref22[1];
+            _ref23 = j.nodes[next].inlinks;
+            for (_x = 0, _len14 = _ref23.length; _x < _len14; _x++) {
+              _ref24 = _ref23[_x], edge = _ref24[0], node = _ref24[1];
               if (cur_lev[_name5 = edge.n1] == null) {
                 cur_lev[_name5] = [];
               }
@@ -3483,14 +3506,14 @@
             }
           }
           for (id in cur_lev) {
-            _ref23 = cur_lev[id], e_p = _ref23[0], e_n = _ref23[1];
+            _ref25 = cur_lev[id], e_p = _ref25[0], e_n = _ref25[1];
             if (e_p && e_n && (e_p.bits + e_n.bits > args.thresh)) {
               pos = ((e_p.bits / (e_p.bits + e_n.bits)) * (e_p.p1 - base_p)) + ((e_n.bits / (e_p.bits + e_n.bits)) * (e_n.p2 - base_n));
               pos_rank.push([pos, e_p.tar]);
-            } else if (e_p && (e_p.bits > args.thresh) && !(((_ref24 = j.nodes[next]) != null ? (_ref25 = _ref24.out_nodes) != null ? _ref25[e_p.tar.id] : void 0 : void 0) != null)) {
+            } else if (e_p && (e_p.bits > args.thresh) && !(((_ref26 = j.nodes[next]) != null ? (_ref27 = _ref26.out_nodes) != null ? _ref27[e_p.tar.id] : void 0 : void 0) != null)) {
               pos = e_p.p1 - base_p;
               pos_rank.push([pos, e_p.tar]);
-            } else if (e_n && (e_n.bits > args.thresh) && !(((_ref26 = j.nodes[prev]) != null ? (_ref27 = _ref26.in_nodes) != null ? _ref27[e_n.src.id] : void 0 : void 0) != null)) {
+            } else if (e_n && (e_n.bits > args.thresh) && !(((_ref28 = j.nodes[prev]) != null ? (_ref29 = _ref28.in_nodes) != null ? _ref29[e_n.src.id] : void 0 : void 0) != null)) {
               pos = e_n.p2 - base_n;
               pos_rank.push([pos, e_n.src]);
             }
@@ -3510,9 +3533,9 @@
         e = dep_edges_added[_z];
         if (!(edge_obj["" + e.n2 + "_" + e.n1] || --edge_obj["" + e.n1 + "_" + e.n2])) {
           good = true;
-          _ref28 = j.nodes[e.n2].outlinks;
-          for (_aa = 0, _len17 = _ref28.length; _aa < _len17; _aa++) {
-            _ref29 = _ref28[_aa], edge = _ref29[0], node = _ref29[1];
+          _ref30 = j.nodes[e.n2].outlinks;
+          for (_aa = 0, _len17 = _ref30.length; _aa < _len17; _aa++) {
+            _ref31 = _ref30[_aa], edge = _ref31[0], node = _ref31[1];
             if (!node.out_nodes[e.n1]) {
               continue;
             }
@@ -3882,14 +3905,14 @@
 
 
   cut_node = function(j, args, callback) {
-    var e, err, k, new_node, node, p, _i, _j, _len, _len1, _ref, _ref1, _ref2, _ref3;
+    var e, err, k, new_node, node, p, _i, _j, _k, _l, _len, _len1, _len2, _len3, _ref, _ref1, _ref2, _ref3, _ref4, _ref5, _ref6, _ref7;
     if (args == null) {
       args = {};
     }
     if (args.help != null) {
       console.warn("" + args.help + " -- Create a new node from an existing node using the given coordinates");
       if (args.detailed_help != null) {
-        console.warn("\nParameters:\n\nname : \"contig_name\" -- Name of the contig node to be copied\n\n        Example: " + args.help + " {\"name\":\"NODE_1234\"} -- Use sequence from NODE_1234\n\nnew_name : \"new_contig_name\" -- Name for the newly created contig node\n\n        Example: " + args.help + " {\"new_name\":\"NODE_1234a\"} -- New node will be named\n        NODE_1234a\n\ninclude : [\"contig_name1\", ...] -- Move mate-pair edges from the listed contigs.\n\n        Example: " + args.help + " {\"name\":\"NODE_1234\",\"include\":[\"NODE_567\",\"NODE_234\"]}\n         -- Edges between NODE_1234 and the included contigs will be moved to the new cut\n        and copied version of NODE_1234.\n\nstart : <int> -- Beginning sequence coordinate for the new node within the original\nend : <int> -- Ending sequence coordinate for the new node within the original\n\n        NOTE: To facilitate trimming sequences to a fixed maximum length, it is\n        allowable for negative 'start' values and positive 'end' values to be longer than\n        a sequence. In such cases, the values are set to the start and end of the\n        sequence, respectively. Positive start and negative end positions must fall\n        within the sequence, because otherwise the start position will be after the end\n        position.\n\n        Example: " + args.help + " {\"start\":123,\"end\":456} -- The new node will include\n        sequence from positions 123 to 456\n\n        Example: " + args.help + " {\"end\":456} -- The new node will include sequence from\n        position 0 (implied) to 456. end may also be omitted, implying the last position\n\n        Example: " + args.help + " {\"start\":-1000} -- New node contains at most the last\n        1000 bases of any sequence. Sequences under 1000 bases are copied unmodified.\n");
+        console.warn("\nParameters:\n\nname : \"contig_name\" -- Name of the contig node to be copied\n\n        Example: " + args.help + " {\"name\":\"NODE_1234\"} -- Use sequence from NODE_1234\n\nnew_name : \"new_contig_name\" -- Name for the newly created contig node\n\n        Example: " + args.help + " {\"new_name\":\"NODE_1234a\"} -- New node will be named\n        NODE_1234a\n\ninclude : [\"contig_name1\", ...] -- Move mate-pair edges from the listed contigs.\n\n        Example: " + args.help + " {\"name\":\"NODE_1234\",\"include\":[\"NODE_567\",\"NODE_234\"]}\n         -- Edges between NODE_1234 and the included contigs will be moved to the new cut\n        and copied version of NODE_1234.\n\nauto_include : true -- Automatically move mate-pair edges falling within the cut sequence.\n\n        Example: " + args.help + " {\"name\":\"NODE_1234\",\"auto_include\":true}\n         -- All selected edges between NODE_1234 and any other contigs will be moved to the\n         new cut and copied version of NODE_1234. Note that currently removed edges will\n         not be moved. To accomplish this, the node needs to be RELINKed first.\nbegin : <int> -- Beginning sequence coordinate for the new node within the original\nend : <int> -- Ending sequence coordinate for the new node within the original\n\n        NOTE: To facilitate trimming sequences to a fixed maximum length, it is\n        allowable for negative 'start' values and positive 'end' values to be longer than\n        a sequence. In such cases, the values are set to the start and end of the\n        sequence, respectively. Positive start and negative end positions must fall\n        within the sequence, because otherwise the start position will be after the end\n        position.\n\n        Example: " + args.help + " {\"begin\":123,\"end\":456} -- The new node will include\n        sequence from positions 123 to 456\n\n        Example: " + args.help + " {\"end\":456} -- The new node will include sequence from\n        position 0 (implied) to 456. end may also be omitted, implying the last position\n\n        Example: " + args.help + " {\"begin\":-1000} -- New node contains at most the last\n        1000 bases of any sequence. Sequences under 1000 bases are copied unmodified.\n");
       }
       if (typeof callback === "function") {
         callback(null, j);
@@ -3904,27 +3927,34 @@
       }
       return;
     }
-    if (args.start == null) {
-      args.start = 0;
+    if ((args.start != null) && (args.begin == null)) {
+      console.warn("CUTND: Warning: 'start' parameter is deprecated. Use 'begin' instead.");
+      args.begin = args.start;
+    }
+    if (args.begin == null) {
+      args.begin = 0;
     }
     if (args.end == null) {
       args.end = node.seq_len - 1;
     }
-    if (args.start < 0) {
-      args.start = node.seq_len + args.start;
+    if (args.include == null) {
+      args.include = [];
+    }
+    if (args.begin < 0) {
+      args.begin = node.seq_len + args.begin;
     }
     if (args.end < 0) {
       args.end = node.seq_len + args.end;
     }
-    if (args.start < 0) {
-      args.start = 0;
+    if (args.begin < 0) {
+      args.begin = 0;
     }
     if (args.end >= node.seq_len) {
       args.end = node.seq_len - 1;
     }
-    if (!(args.start < args.end)) {
+    if (!(args.begin < args.end)) {
       if (typeof callback === "function") {
-        callback(new Error('CUTND requires valid "start" and "end" arguments.'), null);
+        callback(new Error('CUTND requires valid "begin" and "end" arguments.'), null);
       }
       return;
     }
@@ -3949,45 +3979,73 @@
       })());
     }
     j.nodes[args.new_name] = new_node;
-    console.warn("CUTND: Adding " + args.new_name + " from " + args.start + " - " + args.end + " of " + node.name);
+    console.warn("CUTND: Adding " + args.new_name + " from " + args.begin + " - " + args.end + " of " + node.name);
     for (p in node) {
       new_node[p] = node[p];
     }
     new_node.name = args.new_name;
     new_node.id = args.new_name;
-    new_node.seq_len = args.end - args.start + 1;
+    new_node.seq_len = args.end - args.begin + 1;
     delete new_node.contig_problems;
     if (new_node.per_nt_cov != null) {
-      new_node.per_nt_cov = new_node.per_nt_cov.slice(args.start, args.end);
+      new_node.per_nt_cov = new_node.per_nt_cov.slice(args.begin, args.end);
     }
     if (new_node.per_nt_phys_cov != null) {
-      new_node.per_nt_phys_cov = new_node.per_nt_phys_cov.slice(args.start, args.end);
+      new_node.per_nt_phys_cov = new_node.per_nt_phys_cov.slice(args.begin, args.end);
     }
     if (new_node.per_nt_mp_ins != null) {
-      new_node.per_nt_mp_ins = new_node.per_nt_mp_ins.slice(args.start, args.end);
+      new_node.per_nt_mp_ins = new_node.per_nt_mp_ins.slice(args.begin, args.end);
     }
     if (new_node.recon_seq != null) {
-      new_node.recon_seq = new_node.recon_seq.substring(args.start, args.end);
+      new_node.recon_seq = new_node.recon_seq.substring(args.begin, args.end);
     }
-    _ref = new_node.inlinks;
-    for (_i = 0, _len = _ref.length; _i < _len; _i++) {
-      e = _ref[_i];
-      if (!(e[0].p2 >= args.start && e[0].p2 <= args.end && ((_ref1 = args.include) != null ? _ref1.indexOf(e[1].id) : void 0) !== -1)) {
+    if (args.auto_include) {
+      _ref = new_node.inlinks;
+      for (_i = 0, _len = _ref.length; _i < _len; _i++) {
+        e = _ref[_i];
+        if ((args.begin <= (_ref1 = e[0].p2) && _ref1 <= args.end)) {
+          args.include.push(e[1].id);
+        }
+      }
+      _ref2 = new_node.outlinks;
+      for (_j = 0, _len1 = _ref2.length; _j < _len1; _j++) {
+        e = _ref2[_j];
+        if ((args.begin <= (_ref3 = e[0].p1) && _ref3 <= args.end)) {
+          args.include.push(e[1].id);
+        }
+      }
+    }
+    _ref4 = new_node.inlinks;
+    for (_k = 0, _len2 = _ref4.length; _k < _len2; _k++) {
+      e = _ref4[_k];
+      if (!(((_ref5 = args.include) != null ? _ref5.indexOf(e[1].id) : void 0) !== -1)) {
         continue;
       }
       console.warn("CUTND: Moving edge " + e[0].n1 + " --> " + e[0].n2 + " to " + args.new_name);
       e[0].n2 = args.new_name;
-      e[0].p2 = e[0].p2 - args.start;
+      if (e[0].p2 < args.begin) {
+        e[0].p2 = 0;
+      } else if (e[0].p2 > args.end) {
+        e[0].p2 = new_node.seq_len - 1;
+      } else {
+        e[0].p2 = e[0].p2 - args.begin;
+      }
     }
-    _ref2 = new_node.outlinks;
-    for (_j = 0, _len1 = _ref2.length; _j < _len1; _j++) {
-      e = _ref2[_j];
-      if (!(e[0].p1 >= args.start && e[0].p1 <= args.end && ((_ref3 = args.include) != null ? _ref3.indexOf(e[1].id) : void 0) !== -1)) {
+    _ref6 = new_node.outlinks;
+    for (_l = 0, _len3 = _ref6.length; _l < _len3; _l++) {
+      e = _ref6[_l];
+      if (!(((_ref7 = args.include) != null ? _ref7.indexOf(e[1].id) : void 0) !== -1)) {
         continue;
       }
       console.warn("CUTND: Moving edge " + e[0].n1 + " --> " + e[0].n2 + " to " + args.new_name);
       e[0].n1 = args.new_name;
-      e[0].p1 = e[0].p1 - args.start;
+      if (e[0].p1 < args.begin) {
+        e[0].p1 = 0;
+      } else if (e[0].p1 > args.end) {
+        e[0].p1 = new_node.seq_len - 1;
+      } else {
+        e[0].p1 = e[0].p1 - args.begin;
+      }
     }
     remove_graph_refs(j);
     return typeof callback === "function" ? callback(null, j) : void 0;
