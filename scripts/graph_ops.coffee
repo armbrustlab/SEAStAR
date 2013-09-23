@@ -64,6 +64,8 @@ JSONStream = require('JSONStream')   # npm library for dealing with JSON streams
 
 ss_version = "SS_BUILD_VERSION"   # Note, this gets replaced in the build process
 
+no_data_str = "No data, ending SCRIPT processing."
+
 ###
 # This array stores the stack of json_graph structures used by the (UN)STASH commands 
 ###
@@ -567,8 +569,18 @@ sortby : <string> -- Specify how to sort the resulting list of CCs.  \"nodes\" o
       if l
          n = l[1]
       else # On to a new component
-         # Sort the node ids in the ccomp in descending order by sequence length
-         nodes_added.sort((a,b) -> (j.nodes[b].seq_len - j.nodes[a].seq_len))
+         # Sort the node ids in the ccomp in descending order by sequence length, then
+         # alphabetically by node id with two have the same length
+         nodes_added.sort((a,b) -> 
+              lendiff = j.nodes[b].seq_len - j.nodes[a].seq_len
+              if lendiff is 0
+                 if j.nodes[a].id > j.nodes[b].id
+                    return 1
+                 else
+                    return -1 
+              else
+                 return lendiff
+            )
          j.connected_comps.push(nodes_added)
          nodes_added = []
          n = nodes.pop()
@@ -646,7 +658,7 @@ edge_director = (prev_n, n, e) ->
    # performed later based on the .ref_str property of each node.
 
    # In this case, this edge is already properly directed so there's no work to do
-   if e.dir is "forward"
+   if e.dir is "forward" or e.dir is "pos"
       return e
 
    e.org_dir = e.dir      # Save the original direction of this edge.
@@ -797,13 +809,13 @@ make_directed = (j) ->
          
          if l
             if not ccnodes[l[1].id]
-               throw "make_directed: Cycle detected at node: #{l[1].id}"
+               throw new Error("make_directed: Cycle detected at node: #{l[1].id}")
 
             n = l[1]
 
             # Reorient the edge/nodes to be on the same strand
             unless e = edge_director(l[2], n, l[0])
-               throw "make_directed: Improper edge type #{e.dir} detected between nodes: #{n.id} and #{l[2].id}"
+               throw new Error("make_directed: Improper edge type detected between nodes: #{n.id} and #{l[2].id}")
 
             # Reverse compliment this node's sequence if it's not on the reference strand
             unless n.ref_str or not n.recon_seq?
@@ -2168,6 +2180,12 @@ shift : true -- Select all connected components except the first one.\n
         fatal error when there is only one remaining connected component, allowing\n
         processing to potentially continue in any calling SCRIPT commands.\n
 \n
+NOTE: The following parameters are \"filters\" that are applied to the set of connected\n
+components selected by one of the above parameters (or by default, the set of all\n
+connected components.) These filters may be used in combination, resulting in a logical\n
+\"AND\" relationship (only connected components satisfying all of the filters are\n
+selected).\n
+\n
 min_nodes : <int> -- Select connected components with <int> or more nodes.\n
 \n
         Example: #{args.help} {\"min_nodes\":2} -- Select connected components\n
@@ -2205,18 +2223,13 @@ sequences : [<string>, ...] -- Like 'sequence' parameter, but takes a list of se
       callback?(err, null)
       return
 
-   if args.sequence
-      args.sequences = [ args.sequence ]
-   if args.sequences
-      args.ccnums = []
-      all_seqs = args.sequences.map(reverse_comp).concat(args.sequences)
-      for c, i in j.connected_comps
-         for nid in c when (seq = j.nodes[nid].recon_seq) and not (i in args.ccnums)
-            for s in all_seqs when seq.indexOf(s) isnt -1
-               args.ccnums.push(i)
-               break
-   else if args.shift
+   if args.shift
       args.ccrange=[1,-1]
+   
+   if args.ccrange? # Select a range of CComps by number
+      args.ccrange[0] = (j.connected_comps.length + args.ccrange[0]) if args.ccrange[0] < 0
+      args.ccrange[1] = (j.connected_comps.length + args.ccrange[1]) if args.ccrange[1] < 0
+      args.ccnums = [args.ccrange[0]..args.ccrange[1]]
    else if args.ccname?  # Find the CComp containing node with this name
       for c, i in j.connected_comps when c.indexOf(args.ccname) != -1
          args.ccnums = [i]
@@ -2229,27 +2242,40 @@ sequences : [<string>, ...] -- Like 'sequence' parameter, but takes a list of se
             break
    else if args.ccnum? # Select CComp with this number (ordered by number of nodes)
       args.ccnums = [args.ccnum]
-   else if args.min_nodes? # Select all CComps with at least this many nodes
+
+   if args.sequence
+      args.sequences = [ args.sequence ]
+      
+   if args.sequences
+      ccnums = args.ccnums ? [0...j.connected_comps.length]
       args.ccnums = []
-      for c, i in j.connected_comps when c.length >= args.min_nodes
+      all_seqs = args.sequences.map(reverse_comp).concat(args.sequences)
+      for i in ccnums
+         c = j.connected_comps[i]
+         for nid in c when (seq = j.nodes[nid].recon_seq) and not (i in args.ccnums)
+            for s in all_seqs when seq.indexOf(s) isnt -1
+               args.ccnums.push(i)
+               break
+
+   if args.min_nodes? # Select all CComps with at least this many nodes
+      ccnums = args.ccnums ? [0...j.connected_comps.length]
+      args.ccnums = []
+      for i in ccnums when j.connected_comps[i].length >= args.min_nodes
          args.ccnums.push(i)
-   else if args.min_seqlen? # Select all CComps with at least this much sequence with the nodes
+
+   if args.min_seqlen? # Select all CComps with at least this much sequence with the nodes
+      ccnums = args.ccnums ? [0...j.connected_comps.length]
       args.ccnums = []
-      for c, i in j.connected_comps
-         if cc_seq_len(j,c) >= args.min_seqlen
-            args.ccnums.push(i)
-            
-   if args.ccrange? # Select a range of CComps by number
-      args.ccrange[0] = (j.connected_comps.length + args.ccrange[0]) if args.ccrange[0] < 0
-      args.ccrange[1] = (j.connected_comps.length + args.ccrange[1]) if args.ccrange[1] < 0
-      args.ccnums = [args.ccrange[0]..args.ccrange[1]]
+      for i in ccnums when cc_seq_len(j,j.connected_comps[i]) >= args.min_seqlen
+         args.ccnums.push(i)
 
    unless args.ccnums?  # Default to ccnum 0
       args.ccnums = [0]
    
    unless args.ccnums.length  # Default parameter type is list of ccnums 
       remove_graph_refs(j)
-      callback?(new Error("No connected components found matching selection criteria"), null)
+      console.warn "WARN: SELCC: No connected components found matching selection criteria"
+      callback?(undefined, null)
       return
    
    nodes = {}
@@ -2268,10 +2294,20 @@ sequences : [<string>, ...] -- Like 'sequence' parameter, but takes a list of se
          
    execute_selection(j, nodes)
    
-   unless args.preserve_ccomps
-      delete j.connected_comps
-   else 
-      j.connected_comps = new_cclist
+   j.connected_comps = new_cclist  # Set new connected components
+   
+   if j.scaffolds?  # Maintain the current mapping of scaffolds to ccomps 
+      j.connected_comps = new_cclist  # Set new connected components
+      new_scaffs = {}                 # Build a new scaffold object
+      for sn, sc of j.scaffolds       # Walk the current scaffold object and rematch scaffs to ccomps
+         nid = sc.nodes[0]            # Choose a node in this scaffold
+         # Find a ccomp containing this node
+         for cc, ci in j.connected_comps when cc.indexOf(nid) isnt -1  
+            sc.ccnum = ci             # The ccnumber has changed, so correct it 
+            new_scaffs[sn] = sc       # Copy in the scaffold (keeping the same name)
+            break                     # Done processign this scaffold
+      j.scaffolds = new_scaffs        # Commit the new scaffold list
+      delete j.clusters               # Clusters don't survive this.
    
    remove_graph_refs(j) 
    
@@ -3254,6 +3290,11 @@ Parameters: NONE.\n
       all_tsort.push(tsort)
       
       len_to = {}
+      
+      unless tsort.length
+         callback?(new Error("SCAFF: No nodes in topological sort list. Circular scaffold?"), null)
+         return
+      
       max_id = tsort[0]
       max_len = j.nodes[max_id].seq_len
       
@@ -3285,7 +3326,7 @@ Parameters: NONE.\n
          end_id = longest_chain[longest_chain.length-1].id
          console.warn("Scaffold Warning: CCOMP #{cci} was not completely traversed. #{end_id} #{(100.0*(tsort.length/j.connected_comps[cci].length)).toFixed(1)}% #{(100.0*(longest_chain.length/j.connected_comps[cci].length)).toFixed(1)}% ")    
       
-   for e in j.edges when not e.keep?
+   for e in j.edges when not e?.keep?
       j.removed_edges.push(e)
       delete j.edges[e.index]
 
@@ -3834,7 +3875,7 @@ exclusive : true -- Remove all scaffolds outside of the selected clusters\n
          if args.shift
             callback?(null, undefined)
          else
-            callback?(new Error("Invalid selected clustnum: #{cl}.  clustnums are zero-based and there are only #{j.clusters.length} clusters in this graph."), null)
+            callback?(new Error("Invalid selected clustnum: #{cl}. clustnums are zero-based and there are only #{j.clusters.length} clusters in this graph."), null)
          return
       new_clusts.push(j.clusters[cl])   
       for scaf_id in j.clusters[cl]
@@ -3843,18 +3884,10 @@ exclusive : true -- Remove all scaffolds outside of the selected clusters\n
          new_scaffs[scaf_id] = j.scaffolds[scaf_id]
          
    if args.exclusive      
-      grab_ccomps(j,{"ccnums" : new_cclist, "preserve_ccomps":true})
-      # The above call caused the ccomps to be renumbered, so we need to 
-      # re-establish the mapping between the ccnum in each scaffold and 
-      # the current ccomp ordering
-      for sn, sc of new_scaffs  
-         nid = sc.nodes[0]
-         for cc, ci in j.connected_comps when cc.indexOf(nid) isnt -1
-            sc.ccnum = ci
-            break
+      grab_ccomps(j,{"ccnums" : new_cclist})
 
    j.clusters = new_clusts
-   j.scaffolds = new_scaffs   
+   j.scaffolds = new_scaffs
  
    remove_graph_refs(j) 
    
@@ -3986,7 +4019,7 @@ Parameters:\n
 file : \"filename[.gz]\" -- Read commands from the named file\n
 \n
         Example: #{args.help} {\"file\":\"my_script.go\"} -- Read and run commands from\n
-        the file my_script.txt\n
+        the file my_script.go\n
 \n
         Example: #{args.help} -- Enter an interactive (command line) session at this point\n
         typing commands one at a time\n
@@ -4044,8 +4077,7 @@ tag : \"filename_part\" -- Part of a filename to include in files written from t
 
       read_buffer = null
 
-      script_next_cmd = (err, j) ->
-         no_data_str = "No data, ending SCRIPT processing."
+      script_next_cmd = (err, return_j) ->
          if err
             err_str = "SCRIPT aborted due to error in command execution."
             unless err.message is no_data_str  # Ignore, it will be regenerated below if necessary 
@@ -4057,15 +4089,17 @@ tag : \"filename_part\" -- Part of a filename to include in files written from t
    
          if (script_cmds.length)  # If there are commands remaining to process
             [cmd_func, cmd_args, cmd] = script_cmds.shift()    # Prepare the next command
-            unless j?.nodes? or cmd is 'LOAD' or cmd is 'SCRIPT' or cmd is 'UNSTASH' or cmd is 'HELP'
-               callback?(new Error(no_data_str), null)
-               return
+
+            unless return_j?.nodes? or cmd is 'LOAD' or cmd is 'SCRIPT' or cmd is 'UNSTASH' or cmd is 'HELP'
+               callback?(new Error(no_data_str), {"processing" : (j?.processing or [])})  # Empty JSON object, except preserve command history
+               return   
+
             # Record history of this command in the graph object   
-            j?.processing?.push([args.file, ss_version, cmd, clone_object(cmd_args)]) unless cmd is 'HELP'  
+            return_j?.processing?.push([args.file, ss_version, cmd, clone_object(cmd_args)]) unless cmd is 'HELP'  
             console.warn("Executing (#{args.file}) #{cmd} #{JSON.stringify(cmd_args)}")  # Output progress to stderr
-            setImmediate(cmd_func, j, cmd_args, script_next_cmd)  # Invoke the command with the graph object, args, and callback function
+            setImmediate(cmd_func, return_j, cmd_args, script_next_cmd)  # Invoke the command with the graph object, args, and callback function
          else
-            callback?(null, j)
+            callback?(null, return_j)
 
       script_next_cmd(null, j) 
 
@@ -4114,14 +4148,17 @@ tag : \"filename_part\" -- Part of a filename to include in files written from t
                console.warn("\nInvalid command: You may not launch nested interactive SCRIPT sessions.\n")
                cb(null, undefined)
             else unless (j?.nodes? or cmd is 'LOAD' or cmd is 'SCRIPT' or cmd is 'UNSTASH') or cmd is 'HELP'
-               console.warn("\nError: No data is currently loaded. Use the LOAD command to read a datafile\n")
+               console.warn("\nERROR: No data is currently loaded. Use the LOAD command to read a datafile\n")
                cb(null, undefined)
             else
                cmd_func = commands[cmd]
                setImmediate(cmd_func, j, args, (err, return_j) ->
-                  if err or not return_j
+                  if err 
                      console.error("ERROR: #{err.message}\n")
                      console.warn("\nCommand failed: Please examine the above error messages and try again.\n")
+                  else unless return_j
+                     console.warn("\nWARNING: Previous command returned no output.\n")
+                     j = {"processing" : (j?.processing or [])}  # Maintain the command history
                   else
                      j = return_j
                      j?.processing?.push([">>", ss_version, cmd, clone_object(args)])

@@ -84,6 +84,12 @@ int keep_read(UT_string *header);
 
 int main(int argc, char *argv[]) {
     
+#ifndef _OPENMP
+    fprintf(stderr, "\nERROR: Program built with compiler lacking OpenMP support.\n");
+    fprintf(stderr, "See SEAStAR README file for information about suitable compilers.\n");
+    exit(EXIT_FAILURE);
+#endif
+    
     ///////////////////////////
     // Variable declarations
     ///////////////////////////

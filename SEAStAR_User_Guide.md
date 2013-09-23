@@ -1,6 +1,6 @@
 <link href="style.css" media="screen" rel="stylesheet" type="text/css" />
 
-SEAStAR User Guide, version 0.4.14
+SEAStAR User Guide, version 0.4.15
 ==============================
 ####Vaughn Iverson and Chris Berthiaume
 
@@ -594,7 +594,7 @@ Of course, since these types of files may be very large, you may prefer to keep 
 
     ref_select alignment.single.sam.gz | gzip -c > seq_graph.json.gz
 
-Because `ref_select` has many options, and produces many different kinds of outputs, we made the decision to organise all of the output data into a single output stream in a standard text-based format ([JSON][JSON_ref]), that is flexible and straightforward to process in any language. The JSON formatted output produced by `ref_select` is documented in the appendix: [JSON Sequence Graph File Format Reference][JSON]. However, for most tasks you will not need to look directly into theses files because the `graph_ops` tool will handle that work for you (including the work of extracting data into other standard file formats). 
+Because `ref_select` has many options, and produces many different kinds of outputs, we made the decision to organise all of the output data into a single output stream in a standard text-based format ([JSON][JSON_ref]), that is flexible and straightforward to process in any language. The JSON formatted output produced by `ref_select` is documented in the appendix: [JSON Sequence Graph File Format Reference][JSON]. However, for most tasks you will not need to look directly into these files because the `graph_ops` tool will handle that work for you (including the work of extracting data into other standard file formats). 
 
 `ref_select` has four main pieces of functionality:
 
@@ -1371,7 +1371,7 @@ Reconnect contigs with ambiguous placement within a scaffold using relative mean
         # Disable duplicate variant contig checks.
         INSERT {"dup_kmer":0} 
 
-`dup_thresh : <float>`
++ `dup_thresh : <float>`
 
    Fraction of kmers from a contig with hits to scaffold backbone.
 
@@ -1440,7 +1440,9 @@ Calculate the current assembly graph connected components. Note, this is a low-l
 
 Select specific connected components for further processing. "Unselected" connected components are saved in a "removed" data structure and may be recalled with other commands.
 
-**Parameters:**
+NOTE: There are two types of parameters below. "Selection parameters" allow a subset of connected components to be selected by contig names or component number. "Filter parameters" are applied to the set of "selected" connected components (or by default, to the set of all connected components.) These filters may also be used in combination, resulting in a logical "AND" relationship (ie. connected components not satisfying all of the filters are removed).
+
+**Selection Parameters:**
 
 + `ccname : "contig_name"`
    
@@ -1497,6 +1499,8 @@ Select specific connected components for further processing. "Unselected" connec
    
         # Drop the first connected component.
         SELCC {"shift":true}
+
+**Filter Parameters:**
 
 + `min_nodes : <int>`
    
@@ -1587,7 +1591,7 @@ Select clusters of scaffolds for further processing
 
 + `exclusive : true`
 
-Remove all scaffolds outside of the selected clusters
+   Remove all scaffolds outside of the selected clusters
 
    Example:
         
@@ -2013,7 +2017,7 @@ Use contents of a file as a series of `graph_ops` commands to run. Commands and 
         # This is the write_fasta.go file
         LOAD { "file" : "assembly.json" }
         
-        # scripts can use SCRIPT! (with a file)
+        # scripts can use SCRIPT (with a file)
         SCRIPT { "file" : "do_something.go" }   
         
         FASTA { "file" : "sequence.fna" }

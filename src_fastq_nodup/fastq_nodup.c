@@ -107,6 +107,12 @@ unsigned long int mismatch_rejecter(int reject_pipe_fd, read_list_entry **r_list
 // Entry point
 int main(int argc, char *argv[]) {
     
+#ifndef _OPENMP
+    fprintf(stderr, "\nERROR: Program built with compiler lacking OpenMP support.\n");
+    fprintf(stderr, "See SEAStAR README file for information about suitable compilers.\n");
+    exit(EXIT_FAILURE);
+#endif
+    
     ///////////////////////////
     // Variable declarations
     ///////////////////////////

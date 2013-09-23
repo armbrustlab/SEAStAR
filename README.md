@@ -1,10 +1,9 @@
 <link href="style.css" media="screen" rel="stylesheet" type="text/css" />
 
 SEAStAR - A framework for the analysis of next-generation metagenomes (and more)
-==============================
-
-The Basics
 ------------------------------
+
+###The Basics
 
 ####SEAStAR is a package of tools supporting the construction of complete analysis pipelines for next-generation (Illumina&reg;, SOLiD&trade;) sequencing data generated from environmental samples.  
 ##### It includes high-performance tools for dealing with:
@@ -30,12 +29,10 @@ You can find out more about SEAStAR on its [Armbrust Lab Homepage](http://armbru
 
 This file contains information on how to build and install the SEAStAR tools. For information on using the tools themselves, please see the included SEAStAR User Guide file.
 
-License
-------------------------------
+###License
 SEAStAR is released under the GPLv3 license, a copy of which is provided in the included file "COPYING". By using this software, you are agreeing to be bound by the terms of this license.
 
-Installation
-------------------------------
+###Installation
 The instructions that follow are for building the SEAStAR tools from source code. However, if you'd initially like to try out SEAStAR by working through our "Quick Start" tutorial, we provide a "ready-to-go" [SEAStAR Virtual Machine appliance](http://armbrustlab.ocean.washington.edu/node/305) image that includes all of the necessary tools and a working sample dataset that can be run within VirtualBox without the need to compile any of the tools on your computer. This pre-built VM is intended as an aid to learning and we strongly advise against (and will not provide any help for) trying to use it for analysis of real datasets.
 
 SEAStAR is designed to build and run on any 64-bit Unix-like system, including Linux and Mac OS X version 10.7 or later. Many components of SEAStAR are optimized for multiple CPU cores and require substantial memory. We recommend a machine with a minimum of 4 CPU cores and 32 GB of RAM to run these tools.  Depending on your datasets and what you are trying to do (e.g. de novo assembly) you may require a substantially more powerful machine than this minimum recommendation. 
@@ -76,8 +73,7 @@ To clean all files generated in the source directory for an in-source build (thi
 
 For an out-of-source build you can simply delete the destination tree directory and start again.
 
-Additional installation details for Mac OS X
-------------------------------
+###Additional installation details for Mac OS X
 
 For Mac OS X users: To fulfill the above requirements, you will first need to download and install Apple's XCode developer package (using the [App store](https://developer.apple.com/xcode/index.php)), and then we recommend installing the other required packages using [MacPorts](http://www.macports.org/).
 
@@ -92,7 +88,7 @@ Then run the following commands to install the required packages:
     sudo port install gawk
     sudo port install gcc44
 
-Note, it is possible to use a newer version of gcc (such as gcc46) if you already have it installed or for some other reason. However, most of our OS X testing has been performed with gcc version 4.4.
+Note, it is possible to use a newer version of gcc (such as gcc47) if you already have it installed or for some other reason. However, most of our OS X testing has been performed with gcc version 4.4.
 
 It may be possible to use [HomeBrew](http://mxcl.github.com/homebrew/) instead of Macports to install these packages, but we haven't tested it.
 
@@ -102,10 +98,9 @@ You will need to define an environment variable to explicitly tell cmake which c
 
 ####An important note about compilers on Mac OS X (starting with Xcode 4.2 on OS X 10.7 and later versions):
 
-There are known bugs in OpenMP (multi-core processor support) in the gcc compiler Apple supplies with Xcode on OS X Lion (or later).  This is why we specify above that you install gcc separately with MacPorts. The cmake script provided checks OS X systems to see if the OpenMP support is working correctly with the default (or specified) C compiler. If you receive an error when trying to build that says "You need to install gcc (version 4.4 or later) from MacPorts" it is because our build system is attempting to use the XCode gcc compiler, and not the one you installed from MacPorts.
+There are known bugs in OpenMP (multi-core processor support) in the gcc compiler Apple supplies with Xcode 4.x on OS X 10.7+ (gcc support has been completely dropped in Xcode 5). Xcode's default Clang-based compiler does not support OpenMP; this is why we specify above that you must install the gcc compiler using MacPorts. The cmake script provided checks OS X systems to see if the OpenMP support is working correctly with the default (or specified) C compiler. If you receive an error when trying to build that says "You need to install gcc (version 4.4 or later) from MacPorts" it is because our build system is attempting to use the XCode gcc compiler, and not the one you installed from MacPorts.
 
-For Developers
-------------------------------
+###For Developers
 
 Some of the included JavaScript (.js) files are automatically generated from [CoffeeScript](http://coffeescript.org) source files (CoffeeScript is a [transcompiled](http://en.wikipedia.org/wiki/Source-to-source_compiler) dialect of JavaScript with Python-like syntax.) If you wish to modify these components, please edit the .coffee files in the scripts/ subdirectory of the source tree. The make system will automatically regenerate the .js files in the bin/ subdirectory of the destination tree. To successfully transcompile these files, you will need the to install the CoffeeScript package for node.js:
 
@@ -115,10 +110,12 @@ It is sometimes useful to build with GCC debug flags turned on.  To achieve this
 
     cmake -D DEBUG=ON [dir]
 
-For Mac OS X Developers
-------------------------------
+###For Mac OS X Developers
 
-The following section covers using cmake to build XCode project files. However, we do not recommend using executables built by XCode for anything other than development and debugging purposes due to the aforementioned bugs in the XCode compilers. This may change in the future, but as of now beware of these known issues with OpenMP in XCode.
+####Important note!  The instructions below only work with XCode 4.x  
+Beginning with XCode 5, Apple has removed all support for GNU compilers and with that decision all support for OpenMP in XCode has been dropped. SEAStAR executables built with XCode 5 tools will NOT run correctly, and sadly there is nothing we can do to fix this (short of re-writing all of our parallel threaded code to use something other than OpenMP, which is not worth the effort simply to maintain compatability with XCode 5). There are [efforts to add OpenMP support to the Clang compiler][http://clang-omp.github.io/] that Apple now exclusively uses, but it remains to be seen if these efforts will be widely adopted. While that is being sorted out, using XCode 4.x is the only workable option.  
+
+The following section covers using cmake to build XCode project files. However, we do not recommend using executables built by XCode for "production use" due to the aforementioned bugs in the XCode compilers.
 
 To make XCode project files (for Mac OS X only):
 
@@ -131,7 +128,4 @@ Alternatively, an xcode project may be built on the command line as (choosing De
     xcodebuild -alltargets -configuration [Debug|Release] 
 
 A word of Warning: once the project is imported into XCode, the destination tree will not be backed-up by Time Machine on OS X. For in-source builds, the binary and source trees are the same directory, so Time Machine will not back up your source code changes if you develop and build within the source tree. For this reason, it is highly advisable to do out-of-source builds when developing in XCode, unless you back up your local git repository via a mechanism other than Time Machine.
-
-
-
 

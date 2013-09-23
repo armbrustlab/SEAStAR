@@ -1,6 +1,6 @@
 <link href="style.css" media="screen" rel="stylesheet" type="text/css" />
 
-<h1>SEAStAR User Guide, version 0.4.14</h1>
+<h1>SEAStAR User Guide, version 0.4.15</h1>
 <h4>Vaughn Iverson and Chris Berthiaume</h4>
 <h5><a href="http://armbrustlab.ocean.washington.edu">Armbrust Lab</a>, School of Oceanography, University of Washington</h5>
 <h2>Table of Contents</h2>
@@ -338,7 +338,7 @@ TGTTGTGCGCGCCATAGCGAGGGGCTCAGCACGCGTC
 <p>Note that <code>ref_select</code> may also write warnings, errors and diagnostic information to STDERR, so it is important to keep STDOUT and STDERR separate when saving the output to a file, or the resulting saved JSON data file syntax may be corrupted by messages written to STDERR.</p>
 <p>Of course, since these types of files may be very large, you may prefer to keep everything compressed:</p>
 <pre><code>ref_select alignment.single.sam.gz | gzip -c &gt; seq_graph.json.gz</code></pre>
-<p>Because <code>ref_select</code> has many options, and produces many different kinds of outputs, we made the decision to organise all of the output data into a single output stream in a standard text-based format (<a href="http://www.json.org">JSON</a>), that is flexible and straightforward to process in any language. The JSON formatted output produced by <code>ref_select</code> is documented in the appendix: <a href="#JSON">JSON Sequence Graph File Format Reference</a>. However, for most tasks you will not need to look directly into theses files because the <code>graph_ops</code> tool will handle that work for you (including the work of extracting data into other standard file formats). </p>
+<p>Because <code>ref_select</code> has many options, and produces many different kinds of outputs, we made the decision to organise all of the output data into a single output stream in a standard text-based format (<a href="http://www.json.org">JSON</a>), that is flexible and straightforward to process in any language. The JSON formatted output produced by <code>ref_select</code> is documented in the appendix: <a href="#JSON">JSON Sequence Graph File Format Reference</a>. However, for most tasks you will not need to look directly into these files because the <code>graph_ops</code> tool will handle that work for you (including the work of extracting data into other standard file formats). </p>
 <p><code>ref_select</code> has four main pieces of functionality:</p>
 <ol>
 <li><p>Quantitatively analyzing reads aligned to a known reference database (e.g. metagenomic reads to a 16S rDNA database, or reads from mRNA transcripts to the gene models of one or more genomes):</p>
@@ -877,14 +877,13 @@ is, multiple iterations of <code>PLUCK</code> will not completely remove contigs
   # Disable duplicate variant contig checks.
   INSERT {&quot;dup_kmer&quot;:0} </code></pre>
 </li>
-</ul>
-<p><code>dup_thresh : &lt;float&gt;</code></p>
-<p>   Fraction of kmers from a contig with hits to scaffold backbone.</p>
-<p>   Example: </p>
-<pre><code>    # Default. If more than 15% of kmers for a contig hit kmers from the scaffold 
-    # backbone contigs, then do not insert that contig. 
-    INSERT {&quot;dup_thresh&quot;:0.15} </code></pre>
-<ul>
+<li><p><code>dup_thresh : &lt;float&gt;</code></p>
+<p> Fraction of kmers from a contig with hits to scaffold backbone.</p>
+<p> Example: </p>
+<pre><code>  # Default. If more than 15% of kmers for a contig hit kmers from the scaffold 
+  # backbone contigs, then do not insert that contig. 
+  INSERT {&quot;dup_thresh&quot;:0.15} </code></pre>
+</li>
 <li><p><code>verbose : true</code></p>
 <p> Output diagnostics on STDERR</p>
 <p> Example:</p>
@@ -925,7 +924,8 @@ is, multiple iterations of <code>PLUCK</code> will not completely remove contigs
 </ul>
 <h3><a name="SELCC"><code>SELCC</code></a></h3>
 <p>Select specific connected components for further processing. &quot;Unselected&quot; connected components are saved in a &quot;removed&quot; data structure and may be recalled with other commands.</p>
-<p><strong>Parameters:</strong></p>
+<p>NOTE: There are two types of parameters below. &quot;Selection parameters&quot; allow a subset of connected components to be selected by contig names or component number. &quot;Filter parameters&quot; are applied to the set of &quot;selected&quot; connected components (or by default, to the set of all connected components.) These filters may also be used in combination, resulting in a logical &quot;AND&quot; relationship (ie. connected components not satisfying all of the filters are removed).</p>
+<p><strong>Selection Parameters:</strong></p>
 <ul>
 <li><p><code>ccname : &quot;contig_name&quot;</code></p>
 <p> Select the connected component containing the named contig</p>
@@ -966,6 +966,9 @@ is, multiple iterations of <code>PLUCK</code> will not completely remove contigs
 <pre><code>  # Drop the first connected component.
   SELCC {&quot;shift&quot;:true}</code></pre>
 </li>
+</ul>
+<p><strong>Filter Parameters:</strong></p>
+<ul>
 <li><p><code>min_nodes : &lt;int&gt;</code></p>
 <p> Select connected components with <int> or more nodes.</p>
 <p> Example:</p>
@@ -1028,12 +1031,12 @@ is, multiple iterations of <code>PLUCK</code> will not completely remove contigs
   SELCLUST {&quot;shift&quot;:true}</code></pre>
 </li>
 <li><p><code>exclusive : true</code></p>
+<p> Remove all scaffolds outside of the selected clusters</p>
+<p> Example:</p>
+<pre><code>  # Default. Keep all unselected scaffolds for subsequence processing
+  SELCLUST &#39;{&quot;exclusive&quot;:false}&#39;</code></pre>
 </li>
 </ul>
-<p>Remove all scaffolds outside of the selected clusters</p>
-<p>   Example:</p>
-<pre><code>    # Default. Keep all unselected scaffolds for subsequence processing
-    SELCLUST &#39;{&quot;exclusive&quot;:false}&#39;</code></pre>
 <h3><a name="SELND"><code>SELND</code></a></h3>
 <p>Select contigs from the connected neighborhood(s) of the given contig(s)</p>
 <p><strong>Parameters:</strong></p>
@@ -1331,7 +1334,7 @@ graph_ops   # Same as above</code></pre>
 <pre><code>  # This is the write_fasta.go file
   LOAD { &quot;file&quot; : &quot;assembly.json&quot; }
 
-  # scripts can use SCRIPT! (with a file)
+  # scripts can use SCRIPT (with a file)
   SCRIPT { &quot;file&quot; : &quot;do_something.go&quot; }   
 
   FASTA { &quot;file&quot; : &quot;sequence.fna&quot; }</code></pre>

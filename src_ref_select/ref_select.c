@@ -221,6 +221,12 @@ int create_catalog_entry(char *seq_id_str, int seq_len, char *ref_seq_id_str,
 
 int main(const int argc, char *argv[]) {
     
+#ifndef _OPENMP
+    fprintf(stderr, "\nERROR: Program built with compiler lacking OpenMP support.\n");
+    fprintf(stderr, "See SEAStAR README file for information about suitable compilers.\n");
+    exit(EXIT_FAILURE);
+#endif
+        
     ///////////////////////////
     // Variable declarations
     ///////////////////////////    
@@ -4041,6 +4047,15 @@ long unsigned int sam_stream_reader(UT_string *fn, int pipe_fd) {
             
             // Split on spaces and tabs
             strtok_r(input_buf, "\t", &save_ptr);    // input_buf is now the read_id only
+            
+            // Remove /1 or /2 from end of read ID.  BWA removes this characters,
+            // but other aligners may not (e.g. Bowtie).  The rest of ref_select
+            // assumes read IDs returned from this function have /1 and /2 stripped.
+            length = strlen(input_buf);
+            if (length > 2 && input_buf[length-2] == '/' && (input_buf[length-1] == '1' || input_buf[length-1] == '2')) {
+                length -= 2;
+                input_buf[length] = '\0';
+            }
             
             if (!(tok_ptr = strtok_r(NULL, "\t", &save_ptr))) {      // get the second field
                 fprintf(stderr, "ERROR: SAM File format error! %s  Line: %lu  %s\n", utstring_body(fn), cnt, input_buf);
