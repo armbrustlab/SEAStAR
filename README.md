@@ -75,7 +75,7 @@ For an out-of-source build you can simply delete the destination tree directory 
 
 ###Additional installation details for Mac OS X
 
-For Mac OS X users: To fulfill the above requirements, you will first need to download and install Apple's XCode developer package (using the [App store](https://developer.apple.com/xcode/index.php)), and then we recommend installing the other required packages using [MacPorts](http://www.macports.org/).
+For Mac OS X users: To fulfill the above requirements, you will first need to download and install Apple's Xcode developer package (using the [App store](https://developer.apple.com/xcode/index.php)), and then we recommend installing the other required packages using [MacPorts](http://www.macports.org/).
 
 Visit the link below to download and install MacPorts.
 > http://www.macports.org/install.php
@@ -98,7 +98,7 @@ You will need to define an environment variable to explicitly tell cmake which c
 
 ####An important note about compilers on Mac OS X (starting with Xcode 4.2 on OS X 10.7 and later versions):
 
-There are known bugs in OpenMP (multi-core processor support) in the gcc compiler Apple supplies with Xcode 4.x on OS X 10.7+ (gcc support has been completely dropped in Xcode 5). Xcode's default Clang-based compiler does not support OpenMP; this is why we specify above that you must install the gcc compiler using MacPorts. The cmake script provided checks OS X systems to see if the OpenMP support is working correctly with the default (or specified) C compiler. If you receive an error when trying to build that says "You need to install gcc (version 4.4 or later) from MacPorts" it is because our build system is attempting to use the XCode gcc compiler, and not the one you installed from MacPorts.
+There are known bugs in OpenMP (multi-core processor support) in the gcc compiler Apple supplies with Xcode 4.x on OS X 10.7+ (gcc support has been completely dropped in Xcode 5). Xcode's default Clang-based compiler does not support OpenMP; this is why we specify above that you must install the gcc compiler using MacPorts. The cmake script provided checks OS X systems to see if the OpenMP support is working correctly with the default (or specified) C compiler. If you receive an error when trying to build that says "You need to install gcc (version 4.4 or later) from MacPorts" it is because our build system is attempting to use the Xcode gcc compiler, and not the one you installed from MacPorts.
 
 ###For Developers
 
@@ -112,20 +112,20 @@ It is sometimes useful to build with GCC debug flags turned on.  To achieve this
 
 ###For Mac OS X Developers
 
-####Important note!  The instructions below only work with XCode 4.x  
-Beginning with XCode 5, Apple has removed all support for GNU compilers and with that decision all support for OpenMP in XCode has been dropped. SEAStAR executables built with XCode 5 tools will NOT run correctly, and sadly there is nothing we can do to fix this (short of re-writing all of our parallel threaded code to use something other than OpenMP, which is not worth the effort simply to maintain compatability with XCode 5). There are [efforts to add OpenMP support to the Clang compiler][http://clang-omp.github.io/] that Apple now exclusively uses, but it remains to be seen if these efforts will be widely adopted. While that is being sorted out, using XCode 4.x is the only workable option.  
+####Important note!  The instructions below only work with Xcode 4.x  
+Beginning with Xcode 5, Apple has removed all support for GNU compilers and with that decision all support for OpenMP in Xcode has been dropped. SEAStAR executables built with Xcode 5 tools will NOT run correctly, and sadly there is nothing we can do to fix this (short of re-writing all of our parallel threaded code to use something other than OpenMP, which is not worth the effort simply to maintain compatability with Xcode 5). There are [efforts to add OpenMP support to the Clang compiler](http://clang-omp.github.io/) that Apple now exclusively uses, but it remains to be seen if these efforts will be widely adopted. While that is being sorted out, using Xcode 4.x is the only workable option.  
 
-The following section covers using cmake to build XCode project files. However, we do not recommend using executables built by XCode for "production use" due to the aforementioned bugs in the XCode compilers.
+The following section covers using cmake to build Xcode project files. However, we do not recommend using executables built by Xcode for "production use" due to the aforementioned bugs in the Xcode compilers.
 
-To make XCode project files (for Mac OS X only):
+To make Xcode project files (for Mac OS X only):
 
     cmake -G Xcode [dir] 
 
-Where [dir] is the path to the root of the destination binary tree. If the path '.' is used, then the binary and source tree will be the same (i.e. an in-source build). You may then load the SEAStAR project file into XCode to build, debug, etc.
+Where [dir] is the path to the root of the destination binary tree. If the path '.' is used, then the binary and source tree will be the same (i.e. an in-source build). You may then load the SEAStAR project file into Xcode to build, debug, etc.
 
 Alternatively, an xcode project may be built on the command line as (choosing Debug or Release as appropriate):
 
     xcodebuild -alltargets -configuration [Debug|Release] 
 
-A word of Warning: once the project is imported into XCode, the destination tree will not be backed-up by Time Machine on OS X. For in-source builds, the binary and source trees are the same directory, so Time Machine will not back up your source code changes if you develop and build within the source tree. For this reason, it is highly advisable to do out-of-source builds when developing in XCode, unless you back up your local git repository via a mechanism other than Time Machine.
+A word of Warning: once the project is imported into Xcode, the destination tree will not be backed-up by Time Machine on OS X. For in-source builds, the binary and source trees are the same directory, so Time Machine will not back up your source code changes if you develop and build within the source tree. For this reason, it is highly advisable to do out-of-source builds when developing in Xcode, unless you back up your local git repository via a mechanism other than Time Machine.
 
