@@ -105,11 +105,11 @@ typedef struct seq_st {
     float bit_score;
     float abs_bit_score;    // Only used when length normalized bitscoring is in use. Used to accurately recalculate bit_score
     float org_bit_score;
-    float coverage;
     float gc_percent;
     float mp_insert_mean;
     float mp_insert_stdev;
     unsigned int mp_good_pairs;
+    double coverage;
     double abundance;
     ref_seq_entry *ref_seq;
     UT_hash_handle hh;
@@ -209,7 +209,7 @@ int seq_entry_bitscore_cmp(const void *ptr2, const void *ptr1);
 long unsigned int sam_stream_reader(UT_string *fn, int pipe_fd);
 long unsigned int sam_header_stream_reader(UT_string *fn, int pipe_fd);
 
-int create_catalog_entry(char *seq_id_str, int seq_len, char *ref_seq_id_str,
+int create_catalog_entry(char *seq_id_str, unsigned int seq_len, char *ref_seq_id_str,
                          char *desc_str, exclude_entry **exclude_table,
                          detail_entry **detail_table, seq_entry **seq_table,
                          ref_seq_entry **catalog, int invert_ex,
@@ -893,7 +893,15 @@ int main(const int argc, char *argv[]) {
             
             FILE *R_in = fdopen(pipe1[0],"r");
             
+            int line_cnt = 0;
+            
             while (ss_get_utstring(R_in, str)) {
+
+                line_cnt++; 
+
+                // Tolerate blank lines, including at the end 
+                if (utstring_body(str)[0] == '\n')
+                   continue;  
 
                 char *save_ptr = NULL;
                 char *seq_id_str = strtok_r(utstring_body(str), "\t", &save_ptr);        // Tokenize on tabs;
@@ -901,14 +909,19 @@ int main(const int argc, char *argv[]) {
                 char *ref_seq_id_str = strtok_r(NULL, "\t", &save_ptr);
                 char *desc_str = strtok_r(NULL, "\t", &save_ptr);
                 
-                if (desc_str) {  // Remove the '/n' from the end of the desc string.
+                if (desc_str) {  // Remove the '\n' from the end of the desc string.
                     desc_str[strlen(desc_str)-1] = '\0';
                 }
                 
-                int seq_len = atoi(len_str);
+                if (!len_str) {
+                    fprintf(stderr, "ERROR: Catalog file: Syntax problem, missing sequence length. Line: %d\n", line_cnt);
+                    exit(EXIT_FAILURE);                
+                }
+                
+                unsigned int seq_len = (unsigned int) atoi(len_str);
                 
                 if (seq_len <= 0) {
-                    fprintf(stderr, "ERROR: Catalog file: Sequence length must be greater than 0.\n");
+                    fprintf(stderr, "ERROR: Catalog file: Sequence length must be greater than 0. Line: %d\n", line_cnt);
                     exit(EXIT_FAILURE);
                 }
                 
@@ -987,7 +1000,7 @@ int main(const int argc, char *argv[]) {
                             desc_ptr = seq_id_ptr;
                         }
                         
-                        int seq_len = atoi(len_ptr);
+                        unsigned int seq_len = (unsigned int) atoi(len_ptr);
                         
                         if (seq_len <= 0) {
                             fprintf(stderr, "ERROR: SAM file format error %s: Line %lu  %s\nSequence length (LN:) must be greater than 0.\n",utstring_body(file_name), cnt, input_buf);
@@ -1002,8 +1015,8 @@ int main(const int argc, char *argv[]) {
                         HASH_FIND_STR(catalog, seq_id_ptr, entry);
 
                         if (entry) {
-                            if ((entry->sequences) && (entry->sequences[0].seq_len != seq_len)) {
-                                fprintf(stderr, "ERROR: SAM error %s: Line %lu  %s\nInvalid sequence length (LN:) %d, previous SAM file has inconsistent length: %d\n",utstring_body(file_name), cnt, seq_len, entry->sequences[0].seq_len);
+                            if ((entry->sequences) && (entry->ref_seq_len != seq_len)) {
+                                fprintf(stderr, "ERROR: SAM error %s: Line %lu\nInvalid sequence length (LN:) %d, previous SAM file has inconsistent length: %d\n",utstring_body(file_name), cnt, seq_len, entry->ref_seq_len);
                                 exit(EXIT_FAILURE);
                             }
                         } else {
@@ -4158,7 +4171,7 @@ long unsigned int sam_stream_reader(UT_string *fn, int pipe_fd) {
  create_catalog_entry
 **************************************************************************/
 
-int create_catalog_entry(char *seq_id_str, int seq_len, char *ref_seq_id_str,
+int create_catalog_entry(char *seq_id_str, unsigned int seq_len, char *ref_seq_id_str,
                          char *desc_str, exclude_entry **exclude_table,
                          detail_entry **detail_table, seq_entry **seq_table,
                          ref_seq_entry **catalog, int invert_ex,

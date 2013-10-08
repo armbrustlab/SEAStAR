@@ -1,3 +1,28 @@
+### 0.4.16 ###
+
+- Fixed a crash in ref_select that could occur with a seldom used
+compbination of input parameters. Specifically, if the --split option
+was invoked without providing a catalog file ref_select would segfault
+during preprocessing of the reference_sequence data.
+
+- Fixed an issue in ref_select that could cause inaccurate (too low)
+sequence coverage values to be reported and used in some downstream 
+calculations under specific circumstances. This issue only affected
+contiguous genome-sized (megabase+) reference sequences with very high
+read coverage (1000-fold+). The fix involves a precision change of 
+a variable used in coverage calculations, leading to slightly 
+different results under all circumstances (more significant digits
+of precision), but it should not significantly change results except in 
+the problem cases noted above that lead to underflow in coverage 
+calculations. 
+
+- Fixed a crash in graph_ops when performing certain operations on an
+input graph that contains no edges of a given type (such as output
+from ref_select when run on fragment only alignments that contain no
+mate-pair information).
+
+- Documentation improvements. 
+
 ### 0.4.15 ###
 
 - The graph_ops SELCC command parameters min_nodes, min_seqlen, and

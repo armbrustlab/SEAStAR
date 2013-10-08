@@ -3997,6 +3997,12 @@ file : \"filename.json[.gz]\" -- Specify the name of a JSON format sequence grap
            else
               j = read_buffer
               j.processing ?= []
+              j.nodes ?= {}
+              j.removed_nodes ?= {}
+              j.edges ?= []
+              j.internal_edges ?= []
+              j.shared_seq_edges ?= []
+              j.removed_edges ?= []
               j.processing.push(["$",ss_version,'LOAD',clone_object(args)])
               callback?(null, j)) 
 

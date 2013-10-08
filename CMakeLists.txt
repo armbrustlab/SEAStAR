@@ -105,7 +105,7 @@ if (GIT_VERSION)
 	add_definitions("-D SS_BUILD_VERSION='\"${GIT_VERSION}\"'")
 else (GIT_VERSION)
 	message(WARNING "SEAStAR version not detected from git. ${GIT_VERSION}") 
-	set(GIT_VERSION "v0.4.15")
+	set(GIT_VERSION "v0.4.16")
 	add_definitions("-D SS_BUILD_VERSION='\"${GIT_VERSION}\"'")
 endif (GIT_VERSION)
 

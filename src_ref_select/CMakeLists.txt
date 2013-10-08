@@ -52,6 +52,6 @@ add_test(NAME ref_select_test_data COMMAND bash -c "$<TARGET_FILE:ref_select> --
 
 add_test(NAME ref_select_test_data_no_cat COMMAND bash -c "$<TARGET_FILE:ref_select> --per_base --mp_inserts -m --mp_mate_cnt=10 -r ${CMAKE_BINARY_DIR}/output_test_data/lambda_reads_d90.single.fastq.gz -r ${CMAKE_BINARY_DIR}/output_test_data/lambda_reads_d90.read2.fastq.gz -r ${CMAKE_BINARY_DIR}/output_test_data/lambda_reads_d90.read1.fastq.gz -q ${CMAKE_SOURCE_DIR}/test_data/lambda_reads.read2.fastq.gz_lambda_asm.fasta.sam.gz ${CMAKE_SOURCE_DIR}/test_data/lambda_reads.read1.fastq.gz_lambda_asm.fasta.sam.gz ${CMAKE_SOURCE_DIR}/test_data/lambda_reads.single.fastq.gz_lambda_asm.fasta.sam.gz | tee ${CMAKE_BINARY_DIR}/output_test_data/lambda_asm_no_cat.json | sed 's/\"SEASTAR_tool\":[^}]*},//' | openssl md5")
 
-set_tests_properties(ref_select_test_data PROPERTIES PASS_REGULAR_EXPRESSION "66fdae801b5415eaf719b66b494505c6" TIMEOUT 30)
-set_tests_properties(ref_select_test_data_no_cat PROPERTIES PASS_REGULAR_EXPRESSION "2a19d34c68bbcbde5e9c9622a0e5d895" TIMEOUT 30)
+set_tests_properties(ref_select_test_data PROPERTIES PASS_REGULAR_EXPRESSION "49c3c84716be3120716f48c7ae335906" TIMEOUT 30)
+set_tests_properties(ref_select_test_data_no_cat PROPERTIES PASS_REGULAR_EXPRESSION "39cfeb91807617ca50f2d8c25a8982f2" TIMEOUT 30)
 

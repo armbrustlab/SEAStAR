@@ -4464,6 +4464,24 @@
         if (j.processing == null) {
           j.processing = [];
         }
+        if (j.nodes == null) {
+          j.nodes = {};
+        }
+        if (j.removed_nodes == null) {
+          j.removed_nodes = {};
+        }
+        if (j.edges == null) {
+          j.edges = [];
+        }
+        if (j.internal_edges == null) {
+          j.internal_edges = [];
+        }
+        if (j.shared_seq_edges == null) {
+          j.shared_seq_edges = [];
+        }
+        if (j.removed_edges == null) {
+          j.removed_edges = [];
+        }
         j.processing.push(["$", ss_version, 'LOAD', clone_object(args)]);
         return typeof callback === "function" ? callback(null, j) : void 0;
       }
