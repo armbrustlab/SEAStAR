@@ -1,6 +1,6 @@
 <link href="style.css" media="screen" rel="stylesheet" type="text/css" />
 
-SEAStAR User Guide, version 0.4.16
+SEAStAR User Guide, version 0.4.17
 ==============================
 ####Vaughn Iverson and Chris Berthiaume
 

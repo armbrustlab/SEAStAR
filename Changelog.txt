@@ -1,3 +1,25 @@
+### 0.4.17 ###
+
+- Fixed a bug in ref_select potentially affecting the accuracy of 
+contig %GC calculations when nucleotide reference sequences were
+imported from a FASTA file using the --ref parameter. The bug only
+affects reference sequences containing non-'N' ambiguous nucleotides
+in one or more positions. Imported sequences consisting entirely of 
+[ACGNTacgnt] are not affected, and neither are reconstructed
+sequences (using -q). However, for analyses using --ref and containing
+affected sequences, it is highly recommended to re-run them through 
+ref_select and repeat all downstream analyses that depend on the 
+output %GC values, including most of the calculations done by 
+various graph_ops sub-commands that use mate-pair edge scores.   
+
+- Fixed a bug in the graph_ops GC and GCC commands which caused the
+last completed command to be ommitted from the "Processing steps 
+completed" output. The command history was properly recorded, but 
+the most recent command wasn't being printed by GC/GCC.
+
+- Fixed a crash in the graph_ops SELND command when no valid nodes
+are specified in the input parameters.
+
 ### 0.4.16 ###
 
 - Fixed a crash in ref_select that could occur with a seldom used

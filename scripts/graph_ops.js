@@ -1865,7 +1865,7 @@
       }
     }
     o.write("\nProcessing steps completed (command history for this graph):\n");
-    _ref8 = (_ref7 = j.processing) != null ? _ref7.slice(0, -1) : void 0;
+    _ref8 = (_ref7 = j.processing) != null ? _ref7.slice(0) : void 0;
     for (_m = 0, _len4 = _ref8.length; _m < _len4; _m++) {
       p = _ref8[_m];
       o.write("" + p[0] + "\t" + p[1] + "\t" + p[2] + "\t" + (p[3] ? JSON.stringify(p[3]) : void 0) + "\n");
@@ -1877,7 +1877,7 @@
       for (i = _n = 0, _len5 = stash_stack.length; _n < _len5; i = ++_n) {
         s = stash_stack[i];
         o.write("\nStack position " + (stash_stack.length - i) + " " + (i === 0 ? '[top]' : '') + (i === stash_stack.length - 1 ? '[bottom]' : '') + ":\n\n");
-        _ref10 = (_ref9 = s.processing) != null ? _ref9.slice(0, -1) : void 0;
+        _ref10 = (_ref9 = s.processing) != null ? _ref9.slice(0) : void 0;
         for (_o = 0, _len6 = _ref10.length; _o < _len6; _o++) {
           p = _ref10[_o];
           o.write("" + p[0] + "\t" + p[1] + "\t" + p[2] + "\t" + (p[3] ? JSON.stringify(p[3]) : void 0) + "\n");
@@ -2625,6 +2625,13 @@
           }
         }
       }
+    }
+    if (!args.names) {
+      console.warn("WARN: SELND: No nodes found matching selection criteria");
+      if (typeof callback === "function") {
+        callback(void 0, null);
+      }
+      return;
     }
     if (args.radius == null) {
       args.radius = 0;

@@ -248,9 +248,13 @@ int main(const int argc, char *argv[]) {
     };     
     
     // LUT for transliteration
-    static const char code[] = 
-    "NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN\x01N\x02NNN\x04NNNNNN\x00NNNNN\x08NNNNNNNNNNNN\x01N\x02NNN\x04NNNNNN\x00NNNNN\x08NNNNNNNNNNN";
-    
+    char code[128];
+    memset(code, 0, 128 * sizeof(char));
+    code['A'] = '\x01'; code['a'] = '\x01'; 
+    code['C'] = '\x02'; code['c'] = '\x02'; 
+    code['G'] = '\x04'; code['g'] = '\x04'; 
+    code['T'] = '\x08'; code['t'] = '\x08'; 
+
     // Build table for colorspace decoder ring
     char c2s[128][128];
     memset(c2s, 0, 128*128);

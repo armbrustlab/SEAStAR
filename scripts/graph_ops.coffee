@@ -1590,7 +1590,7 @@ ccdetail : true -- Write connected component details\n
                o.write("\n")
    
    o.write("\nProcessing steps completed (command history for this graph):\n")
-   for p in j.processing?[..-2]
+   for p in j.processing?[..-1]
       o.write("#{p[0]}\t#{p[1]}\t#{p[2]}\t#{JSON.stringify(p[3]) if p[3]}\n")
 
    o.write("\nStash contains #{stash_stack.length} saved graph#{if stash_stack.length isnt 1 then 's' else ''}.\n")
@@ -1599,7 +1599,7 @@ ccdetail : true -- Write connected component details\n
       stash_stack.reverse()
       for s, i in stash_stack
          o.write("\nStack position #{stash_stack.length-i} #{if i is 0 then '[top]' else ''}#{if i is stash_stack.length-1 then '[bottom]' else ''}:\n\n")
-         for p in s.processing?[..-2]
+         for p in s.processing?[..-1]
             o.write("#{p[0]}\t#{p[1]}\t#{p[2]}\t#{JSON.stringify(p[3]) if p[3]}\n")
       stash_stack.reverse() 
    o.end((error) ->
@@ -2405,6 +2405,11 @@ sequences : [<string>, ...] -- Like 'sequence' parameter, but takes a list of se
       for nid, n of j.nodes when seq = n.recon_seq
          if seq.indexOf(args.sequence) isnt -1 or seq.indexOf(revseq) isnt -1
             args.names.push(nid)
+
+   unless args.names
+      console.warn "WARN: SELND: No nodes found matching selection criteria"
+      callback?(undefined, null)
+      return      
 
    args.radius ?= 0
 
