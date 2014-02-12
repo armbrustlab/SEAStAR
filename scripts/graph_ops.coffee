@@ -27,20 +27,20 @@
 # various transformations on that file.  See the documentation or use the HELP
 # command for additional specific information about each transformation.
 #
-# This script is written in Coffeescript (http://coffeescript.org/) and 
-# assumes the node.js (http://nodejs.org/) execution environment. 
+# This script is written in Coffeescript (http://coffeescript.org/) and
+# assumes the node.js (http://nodejs.org/) execution environment.
 #
-# It should be run with additional memory allocated for the V8 javascript engine 
+# It should be run with additional memory allocated for the V8 javascript engine
 # For example:  node --max-old-space-size=8000 --max-new-space-size=8000 ...
-# (The included graph_ops (and nodewrap) scripts do this automatically) 
+# (The included graph_ops (and nodewrap) scripts do this automatically)
 # Also, graph_ops has a highly fragmented memory allocation pattern that benefits
 # greatly from the use of node's --always-compact option, which directs the V8
 # Garbage Collector to compact allocated memory on every global sweep. This leads
-# to improved runtimes and avoidance of GC corner-cases that occasionally may 
+# to improved runtimes and avoidance of GC corner-cases that occasionally may
 # lead to stability issues.
 #
 # Usage: [-h|--help] [<input.json[.gz]>] [<script.go[.gz]>] [<command> ['{parms}']...]
-# 
+#
 # Where: <input.json> is an optional datafile to initially LOAD
 #        <script.go> is an optional command SCRIPT file
 #        <command> is one of the valid commands
@@ -53,10 +53,10 @@
 
 unless process.version.split('.')[1] >= 10   # Require node version v0.x.y to be x >= 10
    console.error("ERROR: nodejs version v0.10.0 or greater required.")
-   process.exit(1) 
+   process.exit(1)
 
 fs = require('fs')       # Node.js built-in filesystem access module
-zlib = require('zlib')   # Node.js built-in zlib (de)compression library 
+zlib = require('zlib')   # Node.js built-in zlib (de)compression library
 path = require('path')   # Node.js built-in filename path parsing library
 repl = require('repl')   # Node.js built-in command line eval loop library
 child_process = require('child_process')   # Node.js built-in process spawning library
@@ -67,7 +67,7 @@ ss_version = "SS_BUILD_VERSION"   # Note, this gets replaced in the build proces
 no_data_str = "No data, ending SCRIPT processing."
 
 ###
-# This array stores the stack of json_graph structures used by the (UN)STASH commands 
+# This array stores the stack of json_graph structures used by the (UN)STASH commands
 ###
 stash_stack = []
 
@@ -79,24 +79,24 @@ resolve_path = (fn) ->
    fn = path.normalize(fn)
 
 ###
-# Helper function to uniformly handle reading from a file, a gzipped file or stdin 
+# Helper function to uniformly handle reading from a file, a gzipped file or stdin
 ###
 read_input_stream = (fn, parse, cb) ->  # fn = Filename, cb = callback passing object or full data buffer
    if fn is '-'                         # '-' indicates STDIN input stream
       input = process.stdin
       input.resume()              # STDIN needs to be "resumed" in node.js (not opened)
-   else 
+   else
       inputfn = resolve_path(fn)  # Get the path into standard form
-      
+
       # Open stream for reading
       if inputfn.slice(-3) == '.gz'  # If gzipped file, then pipe through gunzip
          input = fs.createReadStream(inputfn)
                    .pipe(zlib.createGunzip())
       else
          input = fs.createReadStream(inputfn)
-      
+
    if parse   # Return stream parsed JSON instead of string buffer
-      obj_buffer = null   
+      obj_buffer = null
       input.pipe(JSONStream.parse())
            .on('root', (data) ->
               cb(null, data))
@@ -106,7 +106,7 @@ read_input_stream = (fn, parse, cb) ->  # fn = Filename, cb = callback passing o
    else
       read_buffer = ''   # Initialize read buffer
       # Handlers for events on the the input stream
-      input.on('data', (data) -> 
+      input.on('data', (data) ->
               read_buffer = read_buffer.concat(data))  # Add data to the input buffer
            .on('end', () ->
               cb(null, read_buffer))     # End of data, invoke the callback with the buffer
@@ -120,35 +120,35 @@ read_input_stream = (fn, parse, cb) ->  # fn = Filename, cb = callback passing o
 # between the different output possibilities.
 ###
 open_output_stream = (fn, tag = '') ->   # fn = Filename, returns open stream to write to
-   
+
    out = {}
-   
+
    out.on = (sig, cb) ->
       this.o.on(sig, cb)
-   
+
    out.write = (buf, cb) ->
       this.o.write(buf, cb)
-      
-   out.end = (cb) ->   
+
+   out.end = (cb) ->
       if this.fh?   # Nothing to do for system streams
-         this.o.on("error", (err)->cb(err))  
-         this.fh.on("close", ()->setImmediate(cb,null))  # Wait for actual I/O device file to close  
+         this.o.on("error", (err)->cb(err))
+         this.fh.on("close", ()->setImmediate(cb,null))  # Wait for actual I/O device file to close
          this.o.end()
       else
          cb(null)
-   
+
    if fn  # If there's a filename, then a stream needs to be created
       fn = resolve_path(fn)   # Get the path into standard form
 
-      # The tag functionality substitutes all discrete runs of @ symbols with an optional tag 
+      # The tag functionality substitutes all discrete runs of @ symbols with an optional tag
       # passed in from outside of a script, etc.
       if tag_rep = fn.match(/(@+)/)
          console.warn("INFO: Substituting '#{tag}' for '#{tag_rep[1]}' in file #{fn}")
          fn = fn.replace(/@+/g,tag)
 
-      # The renumber functionality below triggers special file renaming logic when the 
-      # passed name contains one or more '#' characters in a row.  In this case, these 
-      # characters are replaced with an incrementing count, zero-padded to the width of 
+      # The renumber functionality below triggers special file renaming logic when the
+      # passed name contains one or more '#' characters in a row.  In this case, these
+      # characters are replaced with an incrementing count, zero-padded to the width of
       # the number of '#' chars in the original string.
       if renumber = fn.match(/([^#]*)(#+)([^#]*)/)
          inc = 0
@@ -160,35 +160,35 @@ open_output_stream = (fn, tag = '') ->   # fn = Filename, returns open stream to
          console.warn("INFO: Opening numbered file #{fn}")
       else if fs.existsSync(fn)
          console.warn("WARNING: Overwriting file #{fn}")
-      
+
       try
          fout = fs.createWriteStream(fn)  # Create the file
       catch error
          console.error("ERROR: Could not open file; #{fn}")
          return null
 
-      if fout  
+      if fout
          if fn.slice(-3) is '.gz'  # If the filename ends in .gz, then pipe output through gzip
             gz = zlib.createGzip()
             gz.pipe(fout)
             out.o = gz
             out.fh = fout
-         else          
+         else
             out.o = fout
             out.fh = fout
       else
          out = null
-   else  # Otherwise STDOUT is ready to go 
+   else  # Otherwise STDOUT is ready to go
       out.o = process.stdout
-   
+
    out   # Return the output object
 
 ##
-# my_stringify writes JSON output progressively to a stream, avoiding the creation of a 
+# my_stringify writes JSON output progressively to a stream, avoiding the creation of a
 # giant text buffer (saving memory for large objects)
 ##
 
-my_stringify = (j, o, l=2, cb) -> 
+my_stringify = (j, o, l=2, cb) ->
    trav_cnt = 0
    max_buffer = 32000
    max_recurse = 25
@@ -225,7 +225,7 @@ my_stringify = (j, o, l=2, cb) ->
                traverse(stack, o, cb, buf)
          else  # Handle all other cases
             buf = buf + JSON.stringify(work.obj)    # Buffer for performance, but
-            if buf.length > max_buffer or trav_cnt > max_recurse  # guard against excess recursion 
+            if buf.length > max_buffer or trav_cnt > max_recurse  # guard against excess recursion
                o.write(buf, (err) ->
                   if err
                      cb(err)
@@ -233,7 +233,7 @@ my_stringify = (j, o, l=2, cb) ->
                      setImmediate(traverse, stack, o, cb))
             else  # Pass on writing for now
                traverse(stack, o, cb, buf)
-      else  # No more work, so clean up and invoke the callback    
+      else  # No more work, so clean up and invoke the callback
          o.write(buf + '\n', (err) ->
             if err
                cb(err)
@@ -258,7 +258,7 @@ clone_object = (obj) ->
    clone
 
 ###
-# Calc_seq_stats calculates the N50, mean %gc and coverage and contig length statistic 
+# Calc_seq_stats calculates the N50, mean %gc and coverage and contig length statistic
 # for the nodes in the passed-in object. It also returns the total length of all sequences
 ###
 calc_seq_stats = (nodes) ->
@@ -273,19 +273,19 @@ calc_seq_stats = (nodes) ->
       cov += n.cov*n.seq_len
       gc += (n.pct_gc ? 0)*n.seq_len
       seq_list.push(n)   # Push the node to a list for calculating N50
-      
+
    seq_list.sort((a,b) -> b.seq_len-a.seq_len)   # Descending sort
 
    running_total = 0
 
-   for l in seq_list   # Walk the sequence list looking for the point where 50% of the 
-                       # sequence is accounted for 
+   for l in seq_list   # Walk the sequence list looking for the point where 50% of the
+                       # sequence is accounted for
        running_total += l.seq_len
        if running_total >= seq_total/2  # Stop when this point is reached
           break
-          
-   # Half of the sequence is in contigs equal or larger than l  (= N50)     
-   [l.seq_len, seq_total, cov/seq_total, gc/seq_total, seq_list[0].name]  
+
+   # Half of the sequence is in contigs equal or larger than l  (= N50)
+   [l.seq_len, seq_total, cov/seq_total, gc/seq_total, seq_list[0].name]
 
 ###
 # cc_seq_len calculates the total sequence length for all nodes in the provided cc
@@ -294,25 +294,25 @@ cc_seq_len = (j,cc) -> # j = graph object, cc = single connected component, ie. 
    sum_len = 0
    for nid in cc
       sum_len += j.nodes[nid].seq_len
-   sum_len   
+   sum_len
 
 ###
 # Bisect returns a function that when called with an accessor function f,
 # returns a function that takes an array a and a value x, and returns the
-# position in the array where x should be inserted (assuming an ascending 
+# position in the array where x should be inserted (assuming an ascending
 # sorted array).
 ###
 bisect = (f) ->
 
    (a, x, lo, hi) ->
-   
-      lo = 0 if (arguments.length < 3) 
-      hi = a.length if (arguments.length < 4) 
-      while (lo < hi) 
+
+      lo = 0 if (arguments.length < 3)
+      hi = a.length if (arguments.length < 4)
+      while (lo < hi)
          mid = lo + hi >> 1
          if (x < f.call(a, a[mid], mid))
-            hi = mid 
-         else 
+            hi = mid
+         else
             lo = mid + 1
       lo
 ###
@@ -322,18 +322,18 @@ my_bisect = bisect((d) -> d[0].score)
 
 ###
 # heuristic scoring function that biases bitscores toward edges that connect
-# nodes with similar GC% and Coverage. (Mostly for metagenome assembly) 
+# nodes with similar GC% and Coverage. (Mostly for metagenome assembly)
 ###
 
 # Using this the default. It may be (globally) disabled with the "bits" parm of the MST or SST command
-use_heuristic = true   
+use_heuristic = true
 
-heuristic = (a_gc,b_gc,a_cov,b_cov) -> 
+heuristic = (a_gc,b_gc,a_cov,b_cov) ->
    ((0.08*Math.abs(a_gc - b_gc)) + (0.125*Math.abs(Math.log(a_cov,2) - Math.log(b_cov,2))))
 
 ###
-# Setup the internal references between nodes and edges in the graph 
-# This function is necessary because the JSON representation of the assembly graph 
+# Setup the internal references between nodes and edges in the graph
+# This function is necessary because the JSON representation of the assembly graph
 # cannot contain any references between sub-objects of the datastructure
 ###
 build_graph_refs = (j, nf = null, ef = null) ->
@@ -341,7 +341,7 @@ build_graph_refs = (j, nf = null, ef = null) ->
 
    n_out = (for name, n of j.nodes  # Walk through all of the nodes
       n.id = name
-      n.inlinks = []   # These empty arrays are populated below in edge processing 
+      n.inlinks = []   # These empty arrays are populated below in edge processing
       n.outlinks = []
       n.links = []
       nf? n
@@ -356,7 +356,7 @@ build_graph_refs = (j, nf = null, ef = null) ->
          throw "build_graph_refs: Missing node #{e.n2} in edge with #{e.n1}."
 
       # Calculate the edge bitscore, optionally using the %gc and coverage heuristic
-      unless e.score? 
+      unless e.score?
          e.score = e.bits
          if use_heuristic
             if e.src.pct_gc? and e.tar.pct_gc?
@@ -365,9 +365,9 @@ build_graph_refs = (j, nf = null, ef = null) ->
             else
               s_gc = 0
               t_gc = 0
-               
+
             e.score -= e.bits*heuristic(s_gc, t_gc, e.src.cov, e.tar.cov)
-         
+
       e.index = i
       e)
 
@@ -386,7 +386,7 @@ build_graph_refs = (j, nf = null, ef = null) ->
    [n_out, e_out]   # return the node and edge lists (side effects also accessable in j)
 
 ###
-# Setup the internal references between removed nodes and edges in the graph 
+# Setup the internal references between removed nodes and edges in the graph
 # Similar to build_graph_refs above, but works on the "removed" pool of nodes and edges
 # Including connecting them to "selected" nodes
 ###
@@ -417,9 +417,9 @@ build_removed_graph_refs = (j, nf = null, ef = null) ->
          throw "build_removed_graph_refs: Missing node #{e.n1} in removed edge with #{e.n2}."
       unless e.tar = j.nodes[e.n2] or j.removed_nodes[e.n2]
          throw "build_removed_graph_refs: Missing node #{e.n2} in removed edge with #{e.n1}."
-         
-      # Calculate the edge bitscore, optionally using the %gc and coverage heuristic   
-      unless e.score? 
+
+      # Calculate the edge bitscore, optionally using the %gc and coverage heuristic
+      unless e.score?
          e.score = e.bits
          if use_heuristic
             if e.src.pct_gc? and e.tar.pct_gc?
@@ -428,7 +428,7 @@ build_removed_graph_refs = (j, nf = null, ef = null) ->
             else
               s_gc = 0
               t_gc = 0
-               
+
             e.score -= e.bits*heuristic(s_gc, t_gc, e.src.cov, e.tar.cov)
 
       e.index = i
@@ -447,13 +447,13 @@ build_removed_graph_refs = (j, nf = null, ef = null) ->
       ef? e
 
    # return the removed nodes, and removed / shared edge lists (side effects also accessable in j)
-   [n_out, e_out]  
+   [n_out, e_out]
 
-###   
-# Remove the internal references between nodes and edges in the graph 
-# This undoes all of the linking performed by the "build" functions above, leaving the 
+###
+# Remove the internal references between nodes and edges in the graph
+# This undoes all of the linking performed by the "build" functions above, leaving the
 # graph datastructure in a state that can be serialized into JSON
-# This function removes references for both selected and removed nodes 
+# This function removes references for both selected and removed nodes
 ###
 remove_graph_refs = (j, nf = null, ef = null) ->
 # j = graph object, nf = function to run on all nodes, ef = function to run on all edges
@@ -464,9 +464,9 @@ remove_graph_refs = (j, nf = null, ef = null) ->
       delete n.outlinks
       delete n.rem_links
       delete n.rem_inlinks
-      delete n.rem_outlinks      
+      delete n.rem_outlinks
       nf? n
-      
+
    j.edges = (for e in j.edges when e?
       delete e.src
       delete e.tar
@@ -482,9 +482,9 @@ remove_graph_refs = (j, nf = null, ef = null) ->
          delete n.outlinks
          delete n.rem_links
          delete n.rem_inlinks
-         delete n.rem_outlinks      
+         delete n.rem_outlinks
          nf? n
-   
+
    if j.removed_edges?
       j.removed_edges = (for e in j.removed_edges when e?
          delete e.src
@@ -518,7 +518,7 @@ sortby : <string> -- Specify how to sort the resulting list of CCs.  \"nodes\" o
       callback?(null, j)
       return
 
-   # Recalculating ccomps when scaffolds exist is a sign that the graph structure may 
+   # Recalculating ccomps when scaffolds exist is a sign that the graph structure may
    # have changed, invalidating the existing scaffolds (and clusters based on them...)
    if j.scaffolds?
       console.warn("WARNING: Previous operation changed connected component structure, so existing scaffolds and clusters are being removed.\n")
@@ -528,16 +528,16 @@ sortby : <string> -- Specify how to sort the resulting list of CCs.  \"nodes\" o
 
    j.removed_nodes ?= {}
 
-   if args.sortby? and ["nodes","sequences"].indexOf(args.sortby) is -1 
+   if args.sortby? and ["nodes","sequences"].indexOf(args.sortby) is -1
       callback?(new Error('sortby argument must equal either "nodes" or "sequences".'), null)
       return
 
    try
-      [nodes] = build_graph_refs(j) 
+      [nodes] = build_graph_refs(j)
    catch err
       callback?(err, null)
       return
-            
+
    j.connected_comps = []
 
    nodes_avail = {}
@@ -548,36 +548,36 @@ sortby : <string> -- Specify how to sort the resulting list of CCs.  \"nodes\" o
 
    # Execute a breadth first search of all "non-removed" nodes, to assign nodes to CCOMPS
 
-   while n      
+   while n
       delete nodes_avail[n.id]
-      nodes_added.push(n.id)   
+      nodes_added.push(n.id)
 
       # Walk through all of the (sorted) links for this node
       # following only those leading to unvisited nodes
-      for l in n.links when nodes_avail[l[1].id]?  
+      for l in n.links when nodes_avail[l[1].id]?
          edge_cand.push(l)
 
       # Take the first link to an unvisited node (perhaps one from a previously visited
       # node, edge_cand is a stack). nodes_avail is checked again below because this node
-      # may have been visited via another path in the meantime since l was placed on the 
+      # may have been visited via another path in the meantime since l was placed on the
       # stack
-      l = edge_cand.pop()     
+      l = edge_cand.pop()
       while l and not nodes_avail[l[1].id]?
          l = edge_cand.pop()
-               
-      # Choose the next node (either via link, or in another unvisited ccomp)         
+
+      # Choose the next node (either via link, or in another unvisited ccomp)
       if l
          n = l[1]
       else # On to a new component
          # Sort the node ids in the ccomp in descending order by sequence length, then
          # alphabetically by node id with two have the same length
-         nodes_added.sort((a,b) -> 
+         nodes_added.sort((a,b) ->
               lendiff = j.nodes[b].seq_len - j.nodes[a].seq_len
               if lendiff is 0
                  if j.nodes[a].id > j.nodes[b].id
                     return 1
                  else
-                    return -1 
+                    return -1
               else
                  return lendiff
             )
@@ -585,76 +585,76 @@ sortby : <string> -- Specify how to sort the resulting list of CCs.  \"nodes\" o
          nodes_added = []
          n = nodes.pop()
          while n and not nodes_avail[n.id]?
-            n = nodes.pop()   
-   
-   remove_graph_refs(j)   
-  
+            n = nodes.pop()
+
+   remove_graph_refs(j)
+
    if args.sortby is "sequences"
       # Sort connected components in descending order of amount of sequence in nodes
       j.connected_comps.sort((a,b) -> (cc_seq_len(j,b) - cc_seq_len(j,a)))
-   else 
+   else
       # Sort connected components in descending order of number of nodes
       j.connected_comps.sort((a,b) -> (b.length - a.length))
- 
+
    callback?(null, j)
 
 ###
 ## Used to sort out the various types of MP edges and how they orient the underlying contigs
 ###
 
-edge_director = (prev_n, n, e) -> 
+edge_director = (prev_n, n, e) ->
    # prev_n is a node, n is another node, e is the edge that connects them
-   
+
    # The logic coded in this function assumes:
    #
    # -- The prev_n node's orientation relative to the reference strand is known,
-   #    that is, its "ref_st" property is set to the correct value, true if "on the 
+   #    that is, its "ref_st" property is set to the correct value, true if "on the
    #    reference strand", false if not.
-   # 
+   #
    # -- Which node is n1 and which is n2 in the edge "e" is arbitrary at this point
-   # 
+   #
    # -- The relative orientation of the nodes to each other is known:
    #
-   # Meaning of the three possible "e.dir" orientation codes FB, FF and BB 
+   # Meaning of the three possible "e.dir" orientation codes FB, FF and BB
    # (assigned by refselect):
-   # 
-   # F and B refer to whether the connecting mate-pairs point off of the 3' (Forward) 
+   #
+   # F and B refer to whether the connecting mate-pairs point off of the 3' (Forward)
    # or 5' (Backward) end of the node sequence.
    #
    # FB (Forward-Backward) is the correct orientation of two adjacent contigs:
    #
-   #     Mates beginning in contig X:          ----F--->  
+   #     Mates beginning in contig X:          ----F--->
    #                         Contigs:  5' X======>   Y======> 3'
-   #     Mates beginning in contig Y:          <---B---- 
+   #     Mates beginning in contig Y:          <---B----
    #
-   #  NOTE!  This is equivalent to Backward-Forward so there is no code for "BF" 
+   #  NOTE!  This is equivalent to Backward-Forward so there is no code for "BF"
    #         since it would describe same relative orientation (just rev comp'ed).
    #         So the below example is also "FB":
    #
-   #     Mates beginning in contig X:          ----B--->  
+   #     Mates beginning in contig X:          ----B--->
    #                         Contigs:  3' <======X   <======Y 5'
-   #     Mates beginning in contig Y:          <---F---- 
-   # 
+   #     Mates beginning in contig Y:          <---F----
    #
-   # FF (Forward-Forward) is the situation where the nodes face toward each other on  
+   #
+   # FF (Forward-Forward) is the situation where the nodes face toward each other on
    # opposite strands (invariant of ref strand):
    #
-   #     Mates beginning in contig X:          ----F--->  
-   #                         Contigs:     X======>   <======Y 
-   #     Mates beginning in contig Y:          <---F---- 
+   #     Mates beginning in contig X:          ----F--->
+   #                         Contigs:     X======>   <======Y
+   #     Mates beginning in contig Y:          <---F----
    #
    #
-   # BB (Backward-Backward) is the situation where the nodes face away from each other on  
+   # BB (Backward-Backward) is the situation where the nodes face away from each other on
    # opposite strands (invariant of ref strand):
    #
-   #     Mates beginning in contig X:          ----B--->  
-   #                         Contigs:     <======X   Y======> 
-   #     Mates beginning in contig Y:          <---B---- 
+   #     Mates beginning in contig X:          ----B--->
+   #                         Contigs:     <======X   Y======>
+   #     Mates beginning in contig Y:          <---B----
    #
    #
    # Given all of this information, the task of this function is to change around the
-   # parameters of the *edge* only, so that the nodes are properly oriented in the FB 
-   # orientation.  Any necessary reverse complementation of actual sequence will be 
+   # parameters of the *edge* only, so that the nodes are properly oriented in the FB
+   # orientation.  Any necessary reverse complementation of actual sequence will be
    # performed later based on the .ref_str property of each node.
 
    # In this case, this edge is already properly directed so there's no work to do
@@ -664,33 +664,33 @@ edge_director = (prev_n, n, e) ->
    e.org_dir = e.dir      # Save the original direction of this edge.
    e.p1 = Math.abs(e.p1)  # Only want absolute values of positions for below calcs
    e.p2 = Math.abs(e.p2)
-   
-   # This switch statement builds a string out of a list of three parameters because 
-   # there is no testable equivalence of arrays in JavaScript, and comparing strings 
+
+   # This switch statement builds a string out of a list of three parameters because
+   # there is no testable equivalence of arrays in JavaScript, and comparing strings
    # is more efficient anyway.
    switch [e.dir, prev_n.ref_str, e.n2 is n.id].join("_")
 
-      #  Already properly oriented, both on ref strand 
+      #  Already properly oriented, both on ref strand
       #    p==+==> ----> n==+==>   n==+==> ----> p==+==>
       #    (this is what all of the other cases below are working to achieve)
-      when    "FB_true_true",       "FB_true_false"   
+      when    "FB_true_true",       "FB_true_false"
 
-         if not n.ref_str? or n.ref_str 
+         if not n.ref_str? or n.ref_str
             n.ref_str = true   # n is also on the ref_str
             e.dir = "forward"
             e
          else
             null  # Something is wrong!
 
-      #  Already properly oriented, but on wrong strand, so they both need to be reversed 
+      #  Already properly oriented, but on wrong strand, so they both need to be reversed
       #  and swapped in the edge:
       #    p==-==> ----> n==-==>   n==-==> ----> p==-==>
       #      rev     X     rev       rev     X     rev    (rev = reverse node, X = swap positions in edge)
       #    <==+==p <---- <==+==n   <==+==p <---- <==+==n
-      
-      when   "FB_false_true",        "FB_false_false"   
 
-         if not n.ref_str? or not n.ref_str 
+      when   "FB_false_true",        "FB_false_false"
+
+         if not n.ref_str? or not n.ref_str
             # Swap the nodes in the edge, and recalculate the mate-pair positions
             # for when the nodes are reverse complemented
             n.ref_str = false
@@ -709,7 +709,7 @@ edge_director = (prev_n, n, e) ->
       #    p==+==> ----> n==+==>   n==+==> ----> p==+==>    n==+==> ----> p==+==>  p==+==> ----> n==+==>
       when    "FF_true_true",       "FF_false_false",       "BB_true_false",      "BB_false_true"
 
-         if not n.ref_str? or n.ref_str is not prev_n.ref_str 
+         if not n.ref_str? or n.ref_str is not prev_n.ref_str
             n.ref_str = not prev_n.ref_str  #  Nodes are on opposite strands
             if prev_n.ref_str ^ (e.n2 is n.id)  # Determine which node to reverse
                e.p1 = e.src.seq_len-e.p1-1
@@ -720,21 +720,21 @@ edge_director = (prev_n, n, e) ->
          else
             null   # Something is wrong!
 
-      #  Nodes are not properly oriented, but reversing one of them puts them in the 
-      #  wrong orientation within the edge, so they also need to be swapped to achieve 
+      #  Nodes are not properly oriented, but reversing one of them puts them in the
+      #  wrong orientation within the edge, so they also need to be swapped to achieve
       #  a proper FB orientation on the correct strand:
       #    n==-==> ----> <==+==p   p==-==> ----> <==+==n   <==+==p ----> n==-==>   <==+==n ----> p==-==>
       #      rev     X               rev     X                       X     rev               X     rev
       #    <==+==n <---- <==+==p   <==+=== <---- <==+==n   <==+==p <---- <==+===   <==+==n <---- <==+===
       when   "FF_true_false",       "FF_false_true",        "BB_true_true",       "BB_false_false"
 
-         if not n.ref_str? or n.ref_str is not prev_n.ref_str 
+         if not n.ref_str? or n.ref_str is not prev_n.ref_str
             n.ref_str = not prev_n.ref_str  #  Nodes are on opposite strands
             if prev_n.ref_str ^ (e.n2 is n.id)  # Determine which node to reverse
                e.p1 = e.src.seq_len-e.p1-1
             else
-               e.p2 = e.tar.seq_len-e.p2-1   
-            # Swap the nodes in the edge   
+               e.p2 = e.tar.seq_len-e.p2-1
+            # Swap the nodes in the edge
             [e.p1, e.p2] = [e.p2, e.p1]
             [e.n1, e.n2] = [e.n2, e.n1]
             [e.src, e.tar] = [e.tar, e.src]
@@ -742,12 +742,12 @@ edge_director = (prev_n, n, e) ->
             e
          else
             null   # Something is wrong!
-         
+
       else
          null   # Something is wrong!
 
 ###
-# reverse_comp - Reverse complement a sequence 
+# reverse_comp - Reverse complement a sequence
 ###
 
 reverse_comp = (seq) ->
@@ -756,30 +756,30 @@ reverse_comp = (seq) ->
    seq.toUpperCase().split("").reverse().map((b)->rc_tab[b]).join("")
 
 ###
-# Make each connected component a directed graph, properly orienting the 
+# Make each connected component a directed graph, properly orienting the
 # nodes relative to each other
 ###
 
 make_directed = (j) ->
 
-   # This function assumes that the graph is acyclic (in a collection of trees) as 
+   # This function assumes that the graph is acyclic (in a collection of trees) as
    # produced by the MST or SST algorithms
 
    calc_ccomps(j) unless j.connected_comps?  # Make sure there are ccomps
 
    try
-      build_graph_refs(j) 
+      build_graph_refs(j)
    catch err
       callback?(err, null)
       return
 
    # For each connected component
    for cc in j.connected_comps
-   
+
       ccnodes = {}
       edge_cand = []
 
-      # Look for the largest node (by sequence length) 
+      # Look for the largest node (by sequence length)
       max_len = 0
       max_node = null
 
@@ -788,25 +788,25 @@ make_directed = (j) ->
          ccnodes[nid] = n
          if n.seq_len > max_len
             max_node = n
-            max_len = n.seq_len            
-   
+            max_len = n.seq_len
+
       # max_node is now deemed to be the "reference strand"
       n = max_node
       n.ref_str = true
-      
+
       # Walk though all of the nodes in this ccomp
       while n
 
          delete ccnodes[n.id]  # Mark this node as visited (for detecting cycles)
-         
+
          for l in n.links when ccnodes[l[1].id]?    # Walk through all of the links for this node
             l.push(n)
             edge_cand.unshift(l)
 
-         l = edge_cand.pop()  # Next link to traverse (breadth first)    
+         l = edge_cand.pop()  # Next link to traverse (breadth first)
 
          n = null
-         
+
          if l
             if not ccnodes[l[1].id]
                throw new Error("make_directed: Cycle detected at node: #{l[1].id}")
@@ -820,9 +820,9 @@ make_directed = (j) ->
             # Reverse compliment this node's sequence if it's not on the reference strand
             unless n.ref_str or not n.recon_seq?
                n.recon_seq = reverse_comp(n.recon_seq)
-                 
+
    j.digraph = true
-   
+
    remove_graph_refs(j)
 
 ###
@@ -856,12 +856,12 @@ bits : true -- Use raw connection bitscores and not GC% / Coverage adjusted bits
    j.removed_edges ?= []   # initialize a place to keep removed edges in the output
 
    try
-      [nodes, links] = build_graph_refs(j) 
+      [nodes, links] = build_graph_refs(j)
    catch err
       callback?(err, null)
       return
-   
-   # Start the MST 
+
+   # Start the MST
 
    edges_added = []
 
@@ -873,10 +873,10 @@ bits : true -- Use raw connection bitscores and not GC% / Coverage adjusted bits
       nodes_seen = {}
       edge_cand = []
 
-      # Walk through all of the nodes 
-      while n      
+      # Walk through all of the nodes
+      while n
          # For each link from this node
-         for l in n.links  
+         for l in n.links
             if (not nodes_added[l[1].id]?)
                # If the other node is not reached yet, add this link in sorted order by score
                edge_cand.splice(my_bisect(edge_cand, l[0].score),0,l)
@@ -885,38 +885,38 @@ bits : true -- Use raw connection bitscores and not GC% / Coverage adjusted bits
                l[0].done = true
                j.removed_edges.push(l[0])
 
-         # Find the unvisited node with the highest scoring edge leading to it 
+         # Find the unvisited node with the highest scoring edge leading to it
          next_n = edge_cand.pop()
          while next_n and nodes_added[next_n[1].id]?
             unless next_n[0].done?
                next_n[0].done = true
                j.removed_edges.push(next_n[0])
             next_n = edge_cand.pop()
-         
+
          # if found, keep this edge and setup for the next iteration
          if next_n
             [new_link, n] = next_n
-            nodes_added[n.id] = n  
+            nodes_added[n.id] = n
             edges_added.push(new_link)
             new_link.done = true
          else
             n = null
-            
-   # Keep only the tree edges         
+
+   # Keep only the tree edges
    j.edges = edges_added
 
-   remove_graph_refs(j, null, ((ed) -> delete ed.done))   
+   remove_graph_refs(j, null, ((ed) -> delete ed.done))
 
    try
       make_directed(j)
    catch err
       callback?(err, null)
       return
-   
+
    callback?(null, j)
 
 ###
-# Scaffolding spanning tree processing, strives to minimize parallel branches when 
+# Scaffolding spanning tree processing, strives to minimize parallel branches when
 # nodes are short relative to pairing insert size
 ###
 scaffold_spanning_tree = (j, args = {}, callback) ->
@@ -931,7 +931,7 @@ scaffold_spanning_tree = (j, args = {}, callback) ->
 \n
         NOTE: This command is generally preferable to the MST command when median contig\n
         length is less than the mean distance between paired reads. That is, when a\n
-        relatively large insert size was selected.\n 
+        relatively large insert size was selected.\n
 \n
 Parameters:\n
 \n
@@ -950,36 +950,36 @@ bits : true -- Use raw connection bitscores and not GC% / Coverage adjusted bits
    j.removed_edges ?= []   # initialize a place to keep removed edges in the output
 
    try
-      [nodes, links] = build_graph_refs(j, (n) -> n.int_mp_bits = 0.0) 
+      [nodes, links] = build_graph_refs(j, (n) -> n.int_mp_bits = 0.0)
    catch err
       callback?(err, null)
-      return      
-   
+      return
+
    # Note the strength of internal edges (indicative of nodes longer than paring insert size)
    for e in j.internal_edges when j.nodes[e.n1]?
       j.nodes[e.n1].int_mp_bits = e.bits
 
    # Heuristic function to determine if a node needs to be part of the scaffold backbone
-   # (to effectively reach nodes further down the line) or if it can safely be relegated 
+   # (to effectively reach nodes further down the line) or if it can safely be relegated
    # to a (very short) branch
    new_territory = (node) ->
       next_l = null
       for l in node.links
-         # See if this node has an "unseen" child or (heuristically) if it's a large 
-         # enough contig that it has to be part of the "main" scaffold backbone because 
+         # See if this node has an "unseen" child or (heuristically) if it's a large
+         # enough contig that it has to be part of the "main" scaffold backbone because
          # any links managing to hop over it will be statistically weak
          if not nodes_added[l[1].id]? and (not nodes_seen[l[1].id]? or (l[1].int_mp_bits / l[1].links[0][0].bits > 0.02))
             next_l = l
             break
       next_l
 
-   # Start the SST 
+   # Start the SST
 
    edges_added = []
 
    # Walk through each ccomp
    for c in j.connected_comps
-   
+
       n = j.nodes[c[0]]
       nodes_added = {}
       nodes_added[n.id] = n
@@ -989,15 +989,15 @@ bits : true -- Use raw connection bitscores and not GC% / Coverage adjusted bits
       next_n = true
 
       # For each node in this ccomp
-      while next_n      
+      while next_n
          next_n = null
          new_link = null
-         
+
          if n  # Skip this step if this node has had its links discarded
-            for l in n.links  
+            for l in n.links
                if (not nodes_added[l[1].id]?) and (not (nodes_seen[l[1].id]?) or (l[0].score > nodes_seen[l[1].id][0].score))
                   # If the other node is not reached yet, add this link in sorted order by
-                  # score if this is the strongest link to this node that has been seen 
+                  # score if this is the strongest link to this node that has been seen
                   nodes_seen[l[1].id] = l  # This is now the best link to this node
                   edge_cand.splice(my_bisect(edge_cand,l[0].score),0,l)
                else unless l[0].done?
@@ -1006,7 +1006,7 @@ bits : true -- Use raw connection bitscores and not GC% / Coverage adjusted bits
                   j.removed_edges.push(l[0])
 
          # Find the unvisited node with the highest scoring edge leading to it
-         next_n = edge_cand.pop()       
+         next_n = edge_cand.pop()
          while next_n and nodes_added[next_n[1].id]?
             unless next_n[0].done?
                next_n[0].done = true
@@ -1016,7 +1016,7 @@ bits : true -- Use raw connection bitscores and not GC% / Coverage adjusted bits
          # if found, keep this edge and setup for the next iteration
          if next_n
             [new_link, n] = next_n
-            nodes_added[n.id] = n  
+            nodes_added[n.id] = n
             edges_added.push(new_link)
             new_link.done = true
             # Unless this node reaches "new territory" (unseen nodes), discard all of its other links
@@ -1026,17 +1026,17 @@ bits : true -- Use raw connection bitscores and not GC% / Coverage adjusted bits
                      l[0].done = true
                      j.removed_edges.push(l[0])
                n = null
-   
+
    j.edges = edges_added
 
-   remove_graph_refs(j, ((nd) -> delete nd.int_mp_bits), ((ed) -> delete ed.done))   
+   remove_graph_refs(j, ((nd) -> delete nd.int_mp_bits), ((ed) -> delete ed.done))
 
    try
       make_directed(j)
    catch err
       callback?(err, null)
       return
-   
+
    callback?(null, j)
 
 ###
@@ -1081,16 +1081,16 @@ min_len : <int> -- Minimum length of isolated nodes to keep.\n
 
    j.pluck_iterations ?= 1  # Keep track of home many times PLUCK has been run
 
-   # Number of times to pluck the tree (removing only the ends at each iteration) 
+   # Number of times to pluck the tree (removing only the ends at each iteration)
    for i in [j.pluck_iterations..args.iterate+j.pluck_iterations-1]
 
       try
-         [nodes, edges] = build_graph_refs(j) 
+         [nodes, edges] = build_graph_refs(j)
       catch err
          callback?(err, null)
          return
 
-      # Remove short single node scaffolds in the first iteration only 
+      # Remove short single node scaffolds in the first iteration only
       if i is 1
          # Walk all nodes looking for nodes with zero in or out degree
          for n in nodes when (n.links.length is 0) and (n.seq_len? < args.min_len)
@@ -1104,18 +1104,18 @@ min_len : <int> -- Minimum length of isolated nodes to keep.\n
 
       edges_kept = []
 
-      # Keep only edges connecting the remaining nodes 
+      # Keep only edges connecting the remaining nodes
       for e in edges
          if j.nodes[e.n1]? and j.nodes[e.n2]?
             edges_kept.push(e)
          else
             e.pluck_iteration = i
             j.removed_edges.push(e)
-         
+
       j.edges = edges_kept
-            
-      remove_graph_refs(j)   
-   
+
+      remove_graph_refs(j)
+
    j.pluck_iterations = args.iterate+j.pluck_iterations-1
    callback?(null, j)
 
@@ -1148,39 +1148,39 @@ iterate : <int> -- number of iterations of #{args.help} to run. Each is equivale
       console.warn("WARNING: PUSH called on unPLUCKed graph.")
       callback?(null, j)
       return
-   
-   args.iterate = j.pluck_iterations if args.iterate > j.pluck_iterations   
+
+   args.iterate = j.pluck_iterations if args.iterate > j.pluck_iterations
 
    for i in [j.pluck_iterations..j.pluck_iterations-args.iterate+1]
 
       calc_ccomps(j) unless j.connected_comps?  # Make sure there are ccomps
 
       try
-         build_graph_refs(j) 
+         build_graph_refs(j)
          build_removed_graph_refs(j)
       catch err
          callback?(err, null)
          return
 
       for c in j.connected_comps
-   
+
          # Find the "head" and "tail" nodes for this scaffold
-      
-         try 
+
+         try
             [[head_node], [tail_node]] = find_ends(j, c, true)
          catch err
             remove_graph_refs(j, null, ((e) -> delete e.pluck_iteration))
             callback?(err, null)
             return
-            
+
          unless head_node.no_push
-            for e in head_node.rem_inlinks when e[0].dir is "forward" and e[0].pluck_iteration is i and not j.nodes[e[0].n1]? 
+            for e in head_node.rem_inlinks when e[0].dir is "forward" and e[0].pluck_iteration is i and not j.nodes[e[0].n1]?
                j.edges.push(e[0])
                j.nodes[e[1].id] = e[1]
                delete j.removed_nodes[e[1].id]
                delete j.removed_edges[e[0].index]
                break
-         
+
          unless tail_node.no_push
             for e in tail_node.rem_outlinks when e[0].dir is "forward" and e[0].pluck_iteration is i and not j.nodes[e[0].n2]?
                j.edges.push(e[0])
@@ -1191,8 +1191,8 @@ iterate : <int> -- number of iterations of #{args.help} to run. Each is equivale
 
       remove_graph_refs(j) unless i is 1
 
-      delete j.connected_comps 
-   
+      delete j.connected_comps
+
    remove_graph_refs(j, null, ((e) -> delete e.pluck_iteration))
    j.pluck_iterations = j.pluck_iterations-args.iterate
    delete j.pluck_iterations if j.pluck_iterations is 0
@@ -1240,8 +1240,8 @@ verbose : true -- output diagnostics on STDERR\n
       return
 
    args.strict ?= false  #  If true, always cut all but the strongest link when there are more than 2 in+out links
-   args.ratio ?= 0.2     #  Determines the ratio of the strongest to next strongest links to trigger strict pruning 
-                         #  e.g. ratio = 0.0 --> always strictly filter.  ratio = 1.0, never strictly filter  
+   args.ratio ?= 0.2     #  Determines the ratio of the strongest to next strongest links to trigger strict pruning
+                         #  e.g. ratio = 0.0 --> always strictly filter.  ratio = 1.0, never strictly filter
                          #  ratio = 0.2 (default) --> don't strictly filter when the score of the highest scoring edge is >= 5x
                          #  greater than the next highest scoring link of the same direction (for both in and outlinks)
 
@@ -1250,7 +1250,7 @@ verbose : true -- output diagnostics on STDERR\n
    j.removed_edges ?= []   # initialize a place to keep removed edges in the output
 
    try
-      [nodes, edges] = build_graph_refs(j) 
+      [nodes, edges] = build_graph_refs(j)
    catch err
       callback?(err, null)
       return
@@ -1259,7 +1259,7 @@ verbose : true -- output diagnostics on STDERR\n
 
    # Walk all nodes looking for nodes with indegree > 1 and/or outdegree > 1
    for n in nodes
-    
+
       if n.inlinks.length > 1
          in_ratio = (n.inlinks[1][0].score / n.inlinks[0][0].score) > args.ratio
          console.warn("Inlinks: #{n.name} #{n.inlinks.length} #{(n.inlinks[1][0].score / n.inlinks[0][0].score)} #{in_ratio}") if args.verbose
@@ -1274,17 +1274,17 @@ verbose : true -- output diagnostics on STDERR\n
          console.warn("Outlinks: #{n.name} #{n.outlinks.length} #{(n.outlinks[1][0].score / n.outlinks[0][0].score)} #{out_ratio}") if args.verbose
          # Mark all but the strongest outlink for removal
          for l in n.outlinks[1..]
-            l[0].remove = true 
+            l[0].remove = true
       else
          out_ratio = false  # If there is only one link, the ratio test is automatically met
 
       # Strictly filter when it is turned on, and both in and out edges exist, and there were originally more than 2 edges, and the ratio test isn't met
       if args.strict and n.inlinks.length and n.outlinks.length and (n.inlinks.length + n.outlinks.length > 2) and (in_ratio or out_ratio)
-         n.no_push = true  # Prevent nodes from being pushed onto this one, since we don't know what is correct.  
+         n.no_push = true  # Prevent nodes from being pushed onto this one, since we don't know what is correct.
          if n.inlinks[0][0].score > n.outlinks[0][0].score
             n.outlinks[0][0].remove = true
             console.warn("Strictly Removing #{n.outlinks[0][0].n1} --> #{n.outlinks[0][0].n2}")
-         else    
+         else
             n.inlinks[0][0].remove = true
             console.warn("Strictly Removing #{n.inlinks[0][0].n1} --> #{n.inlinks[0][0].n2}")
 
@@ -1293,30 +1293,30 @@ verbose : true -- output diagnostics on STDERR\n
       if e.remove?
          j.removed_edges.push(e)
          delete e.remove
-      else 
+      else
          edges_kept.push(e)
-            
+
    j.edges = edges_kept
 
-   remove_graph_refs(j)   
-   
+   remove_graph_refs(j)
+
    callback?(null, j)
 
 ###
 ## Returns the nodes at the beginning and end of a linear scaffold chain [head, tail] by ccomp
 ###
-find_ends = (j, ccomp, strict = false)->  
+find_ends = (j, ccomp, strict = false)->
       head_nodes = []
       tail_nodes = []
-      for cn in ccomp 
+      for cn in ccomp
          if j.nodes[cn].inlinks.length is 0
             head_nodes.push(j.nodes[cn])
          if j.nodes[cn].outlinks.length is 0
-            tail_nodes.push(j.nodes[cn])            
+            tail_nodes.push(j.nodes[cn])
 
       if strict and (head_nodes.length isnt 1 or tail_nodes.length isnt 1)
          throw Error("find_ends: multiple head/tail nodes found in scaffolded CC.")
-         
+
       [head_nodes, tail_nodes]
 
 ###
@@ -1325,23 +1325,23 @@ find_ends = (j, ccomp, strict = false)->
 ## restores the global state when done
 ###
 find_all_ends = (j) ->
-   
+
    calc_ccomps(j) unless j.connected_comps?  # Make sure there are ccomps
-   
+
    try
-      build_graph_refs(j) 
+      build_graph_refs(j)
    catch err
       callback?(err, null)
       return
 
    output_list = (find_ends(j,c) for c in j.connected_comps)
-   
+
    remove_graph_refs(j)
-   
+
    output_list
 
 ###
-# heuristically remove edges in a linear ccomp that span coverage and/or GC 
+# heuristically remove edges in a linear ccomp that span coverage and/or GC
 # discontinuities
 ###
 check_connections = (j, args={}, callback) ->
@@ -1362,7 +1362,7 @@ Parameters:\n
 \n
 thresh : <float> -- Threshold used to determine whether or not to break a connection\n
 \n
-        Example: #{args.help} '{\"thresh\":0.5}' -- Default. Medium strength heuristic\n 
+        Example: #{args.help} '{\"thresh\":0.5}' -- Default. Medium strength heuristic\n
         score based on GC% / Coverage statistics of a scaffold on either side of a given\n
         contigs connection edge. The lower the threshold, the more sensitive the filter\n
         is to such discontinuities.\n
@@ -1373,11 +1373,11 @@ thresh : <float> -- Threshold used to determine whether or not to break a connec
    args.thresh ?= 0.5
 
    split = true
-   
+
    while split
 
       split = false
-      
+
       calc_ccomps(j) unless j.connected_comps?  # Make sure there are ccomps
 
       j.removed_edges ?= []   # initialize a place to keep removed edges in the output
@@ -1385,13 +1385,13 @@ thresh : <float> -- Threshold used to determine whether or not to break a connec
       edges_kept = []
 
       try
-         build_graph_refs(j) 
+         build_graph_refs(j)
       catch err
          callback?(err, null)
          return
 
       for c in j.connected_comps
-   
+
          # Find the "head" node
          try
             [[head_node]] = find_ends(j, c, true)
@@ -1399,20 +1399,20 @@ thresh : <float> -- Threshold used to determine whether or not to break a connec
             remove_graph_refs(j)
             callback?(err, null)
             return
-      
+
          l = head_node.outlinks[0]
          cnodes = [head_node]
          cedges = []
-      
+
          # Make arrays of nodes and edges in-order
          while l
             cnodes.push(l[1])
             cedges.push(l[0])
             l = l[1].outlinks[0]
-      
+
          # Make arrays of cumulative cov and gc statistics up and down the scaffold
 
-         tot = 0.0      
+         tot = 0.0
          len_up = (tot += n.seq_len for n in cnodes)
          tot = 0.0
          gc_up = ((tot += (n.pct_gc ? 0)*n.seq_len)/len_up[i] for n,i in cnodes)
@@ -1429,30 +1429,30 @@ thresh : <float> -- Threshold used to determine whether or not to break a connec
 
          gc_down.reverse()
          cov_down.reverse()
-      
+
          edge_heuristics = (heuristic(gc_up[i],gc_down[i+1],cov_up[i],cov_down[i+1]) for i in [0...cedges.length])
 
          max_edge_idx = -1
          max_heur = -1
-      
+
          # Find the maximum edge heuristic value and position
          for eh, i in edge_heuristics when eh > max_heur
             max_heur = eh
             max_edge_idx = i
-        
+
          # If this maximum exceeds the given thresh, then remove this edge
          if max_heur > args.thresh
             split = true
             j.removed_edges.push(cedges.splice(max_edge_idx,1)[0])
 
          edges_kept = edges_kept.concat(cedges)
-           
+
       j.edges = edges_kept
 
       remove_graph_refs(j)
 
       delete j.connected_comps   # This invalidates the cached ccomps
-   
+
    callback?(null, j)
 
 ###
@@ -1487,17 +1487,17 @@ thresh : <float> -- Bitscore threshold\n
    edges_kept = []
 
    # Walk all edges
-   for e in j.edges 
+   for e in j.edges
       # Remove those that don't meet the threshold
       if e.bits < args.thresh
          j.removed_edges.push(e)
-      else 
+      else
          edges_kept.push(e)
-            
+
    j.edges = edges_kept
-   
+
    callback?(null, j)
-   
+
 ###
 ## Output statistics about current graph
 ###
@@ -1528,7 +1528,7 @@ ccdetail : true -- Write connected component details\n
       return
 
    o = open_output_stream(args.file, args.tag)
-   
+
    # Handle error opening file
    unless o
       callback?(new Error("open_output_stream could not open file '#{args.file}' for output."), null)
@@ -1539,19 +1539,21 @@ ccdetail : true -- Write connected component details\n
          callback?(err, null))
 
    calc_ccomps(j) unless j.connected_comps?  # Make sure there are ccomps
-   
-   o.write("Nodes: #{Object.keys(j.nodes).length}\n")
-   o.write("Edges: #{j.edges.length}\n") 
+
+   num_nodes = Object.keys(j.nodes).length
+
+   o.write("Nodes: #{num_nodes}\n")
+   o.write("Edges: #{j.edges.length}\n")
    o.write("Internal Edges: #{j.internal_edges.length}\n")
    o.write("Shared Sequence Edges: #{j.shared_seq_edges.length}\n")
    o.write("Removed Nodes: #{Object.keys(j.removed_nodes).length}\n") if j.removed_nodes?
    o.write("Removed Edges: #{j.removed_edges.length}\n") if j.removed_edges?
-   
-   [n50, seq_tot, cov, gc] = calc_seq_stats(j.nodes)
-   
-   o.write("Total sequence length: #{seq_tot}  N50: #{n50}\n")
-   o.write("Mean coverage: #{cov.toFixed(1)}  GC content: #{gc.toFixed(1)}%\n")
-   
+
+   if num_nodes
+      [n50, seq_tot, cov, gc] = calc_seq_stats(j.nodes)
+      o.write("\nTotal sequence length: #{seq_tot}  N50: #{n50}\n")
+      o.write("Mean coverage: #{cov.toFixed(1)}  GC content: #{gc.toFixed(1)}%\n")
+
    if j.clusters? and j.scaffolds?
       o.write("\nScaffold Clusters: #{j.clusters.length}\n")
       if args.ccdetail?
@@ -1563,32 +1565,32 @@ ccdetail : true -- Write connected component details\n
             [n50, seq_tot, cov, gc, max_node] = calc_seq_stats(j.nodes[nid] for nid in n_ids)
             o.write("#{ii}\t#{cl.length}\t#{n_ids.length}\t#{seq_tot}\t#{cov.toFixed(1)}\t#{gc.toFixed(1)}%\t#{n50}\t#{max_node}\n")
             o.write("\n\tScaffold details:\n\tccnum\tnodes\tseqlen\tcov\t%GC\tn50\tlongest contig\tname\n")
-            
+
             for cc in cl
-               [n50, seq_tot, cov, gc, max_node] = calc_seq_stats(j.nodes[nid] for nid in j.scaffolds[cc].nodes)   
+               [n50, seq_tot, cov, gc, max_node] = calc_seq_stats(j.nodes[nid] for nid in j.scaffolds[cc].nodes)
                o.write("\t#{j.scaffolds[cc].ccnum}\t#{j.scaffolds[cc].nodes.length}\t#{seq_tot}\t#{cov.toFixed(1)}\t#{gc.toFixed(1)}%\t#{n50}\t#{max_node}\t#{cc}\n")
-            o.write("\n")   
-   
+            o.write("\n")
+
    if j.connected_comps?
       o.write("\nConnected components: #{j.connected_comps.length}\n")
       if args.ccdetail?
          o.write("\nConnected component details:\nccnum\tnodes\tseqlen\tcov\t%GC\tn50\tlongest contig")
-         if j.scaffolds? 
+         if j.scaffolds?
             o.write("\tscaffold name\n")
             scafnames = []
-            for sn, s of j.scaffolds 
+            for sn, s of j.scaffolds
                scafnames[s.ccnum] = sn
-         else 
+         else
             o.write("\n")
 
          for c, i in j.connected_comps
-            [n50, seq_tot, cov, gc, max_node] = calc_seq_stats(j.nodes[nid] for nid in c)         
+            [n50, seq_tot, cov, gc, max_node] = calc_seq_stats(j.nodes[nid] for nid in c)
             o.write("#{i}\t#{c.length}\t#{seq_tot}\t#{cov.toFixed(1)}\t#{gc.toFixed(1)}%\t#{n50}\t#{max_node}")
             if scafnames?[i]?
                o.write("\t#{scafnames[i]}\n")
-            else   
+            else
                o.write("\n")
-   
+
    o.write("\nProcessing steps completed (command history for this graph):\n")
    for p in j.processing?[..-1]
       o.write("#{p[0]}\t#{p[1]}\t#{p[2]}\t#{JSON.stringify(p[3]) if p[3]}\n")
@@ -1601,13 +1603,13 @@ ccdetail : true -- Write connected component details\n
          o.write("\nStack position #{stash_stack.length-i} #{if i is 0 then '[top]' else ''}#{if i is stash_stack.length-1 then '[bottom]' else ''}:\n\n")
          for p in s.processing?[..-1]
             o.write("#{p[0]}\t#{p[1]}\t#{p[2]}\t#{JSON.stringify(p[3]) if p[3]}\n")
-      stash_stack.reverse() 
+      stash_stack.reverse()
    o.end((error) ->
          if error
             callback?(error, null)
          else
             callback?(null, j))
-   
+
 ###
 ## Print graph statistics with CC detail and other details
 ## Shortcut equivalent to:  GC {"ccdetail":true}
@@ -1642,9 +1644,9 @@ file : \"filename.txt[.gz]\" -- name of txt format file to write statistics to\n
 # Write DOT output file from active nodes and edges.
 #
 # There is a fair amount of default "style" applied here with a few options.
-#  
+#
 # To change styles (or provide alternatives), don't add a lot of code here,
-# rather you should look into the "gvpr" language that comes with the graphviz 
+# rather you should look into the "gvpr" language that comes with the graphviz
 # tools... It is purpose built for re-styling DOT files, etc before rendering.
 ###
 export_dot = (j, args = {}, callback) ->
@@ -1707,11 +1709,11 @@ colored_edges : true -- Draw edges colored by the GC% of the connected contigs\n
           console.error("ERROR: open_output_stream could not write to file '#{args.file}'.")
           callback?(err, null))
    try
-      build_graph_refs(j) 
+      build_graph_refs(j)
    catch err
-      callback?(err, null) 
+      callback?(err, null)
       return
-   
+
    args.arrowtype ?= "normal"
    args.pen_scale ?= 0.1
 
@@ -1720,7 +1722,7 @@ colored_edges : true -- Draw edges colored by the GC% of the connected contigs\n
    if j.SEASTAR_version?
       o.write "di" if j.digraph
       o.write("graph \"#{args.file ? 'Unnamed'}\" {\n")
-      o.write("graph 
+      o.write("graph
 [K = 0.5,
  repulsiveforce = 1.5,
  overlap = \"prism\",
@@ -1729,16 +1731,16 @@ colored_edges : true -- Draw edges colored by the GC% of the connected contigs\n
 
       unless args.detail
          o.write("node [shape=\"point\"];\n")
-      else    
+      else
          o.write("node [style=\"filled\"];\n")
-         
+
       o.write("edge [arrowhead=\"#{args.arrowtype}\"];\n")
-         
+
       for name, node of j.nodes
           h = ((node.pct_gc ? 0) - 30.0) / 30.0
           h = 0.0 if h < 0.0
           h = 1.0 if h > 1.0
-          o.write("\"#{name}\" 
+          o.write("\"#{name}\"
 [bits = #{(node.bits ? 0).toFixed(4)},
  rel_ab = #{(node.rel_ab ? 0).toFixed(15)},
  cov = #{(node.cov ? 0).toFixed(4)},
@@ -1759,7 +1761,7 @@ colored_edges : true -- Draw edges colored by the GC% of the connected contigs\n
  color = \"#{h},1.0,0.5\"
  label = \"#{(if ((args.detail is 2) and (node.desc?)) then node.desc else name)}\"
  #{if node.contig_problems? then doublecircle else ""}
-];\n") 
+];\n")
 
       for edge in j.edges
           edge_type = if edge.dir is "pos" or edge.dir is "forward" then "->" else "--"
@@ -1769,7 +1771,7 @@ colored_edges : true -- Draw edges colored by the GC% of the connected contigs\n
  dir = #{edge.dir},
  penwidth = #{(args.pen_scale*Math.sqrt((if ((not args.const_edge) and (edge.score > 0)) then edge.score else 5)))},
  color = red
-];\n")          
+];\n")
           else unless args.colored_edges
              o.write("\"#{edge.n1}\" #{edge_type} \"#{edge.n2}\"
  [type = MP,
@@ -1781,7 +1783,7 @@ colored_edges : true -- Draw edges colored by the GC% of the connected contigs\n
  penwidth = #{(args.pen_scale*Math.sqrt((if ((not args.const_edge) and (edge.score > 0)) then edge.score else 1)))},
  arrowsize = #{0.1*(Math.log((if ((not args.const_edge) and (edge.score > 0)) then edge.score else 1), 2))},
  color = black
-];\n") 
+];\n")
           else
              h = ((((edge.src.pct_gc ? 0) + (edge.tar.pct_gc ? 0)) / 2) - 30.0) / 30.0
              h = 0.0 if h < 0.0
@@ -1796,7 +1798,7 @@ colored_edges : true -- Draw edges colored by the GC% of the connected contigs\n
  penwidth = #{(args.pen_scale*Math.sqrt((if ((not args.const_edge) and (edge.score > 0)) then edge.score else 1)))},
  arrowsize = #{0.1*(Math.log((if ((not args.const_edge) and (edge.score > 0)) then edge.score else 1), 2))},
  color = \"#{h},1.0,0.5\"
-];\n")  
+];\n")
 
          o.write("}\n")
 
@@ -1811,7 +1813,7 @@ colored_edges : true -- Draw edges colored by the GC% of the connected contigs\n
 ###
 # FASTA file output
 ###
-export_fasta = (j, args={"verbose":false}, callback) -> 
+export_fasta = (j, args={"verbose":false}, callback) ->
 # j = json graph object, args = arguments from command, callback = function to call when done
 
    if args.help?
@@ -1856,9 +1858,9 @@ abundance : true -- append relative abundance values to the FASTA sequence IDs\n
       callback?(null, j)
       return
 
-   if args.no_merge_scaffs 
+   if args.no_merge_scaffs
       args.scaff = true
-      
+
    if args.scaff and not j.scaffolds?
       callback?(new Error("Can't write scaffolded sequence before the SCAFF command has been run."), null)
       return
@@ -1867,7 +1869,7 @@ abundance : true -- append relative abundance values to the FASTA sequence IDs\n
       o = open_output_stream(args.file, args.tag)
    else
       o = args.stream   # This is a special internal case, passing in a stream to write to
-      
+
    # Handle error opening file
    unless o
       callback?(new Error("open_output_stream could not open file '#{args.file}' for output."), null)
@@ -1899,7 +1901,7 @@ abundance : true -- append relative abundance values to the FASTA sequence IDs\n
       calc_ccomps(j) unless j.connected_comps?  # Make sure there are ccomps
 
       try
-         build_graph_refs(j) 
+         build_graph_refs(j)
       catch err
          callback?(err, null)
          return
@@ -1908,12 +1910,12 @@ abundance : true -- append relative abundance values to the FASTA sequence IDs\n
       write_scaffolds = (out) ->
 
          for scaf_name, scaf of j.scaffolds
-            for nid in scaf.nodes 
+            for nid in scaf.nodes
                node = j.nodes[nid]
                if node.recon_seq?
                   out.write(">#{node.id} #{scaf_name}\n")
                   out.write("#{node.recon_seq}\n")
-      
+
       # In this case the stream is a file
       if args.no_merge_scaffs
          write_scaffolds(o)
@@ -1927,28 +1929,28 @@ abundance : true -- append relative abundance values to the FASTA sequence IDs\n
       # layout, test for overlaps between neighboring contigs, and adjust
       # the number of 'N's in gaps to avoid disrupting the longest ORF that
       # spans each gap.  E.g. seq_scaffold
-      # Note, that this functionality, currently written in gawk, should be 
+      # Note, that this functionality, currently written in gawk, should be
       # ported forward to coffeescript and more tightly integrated here.
       else
          # Decide whether to go with the default options or use the provided arg string
          if typeof(args.scaff) is 'string'
             options = args.scaff.split(/\s+/)
             options.push('-')
-         else   
+         else
             options = ['-']
-            
+
          scaf = child_process.spawn('seq_scaffold',options,{})
-         
-         scaf.stdout.setEncoding('ascii')      
+
+         scaf.stdout.setEncoding('ascii')
          scaf.stderr.setEncoding('ascii')
 
          scaf.stdout.on('data', (data) ->
             o.write(data)
-         ) 
-    
+         )
+
          scaf.stderr.on('data', (data) ->
             process.stderr.write(data)
-         ) 
+         )
 
          scaf.stdout.on('end', () ->
             o.end((error) ->
@@ -1958,18 +1960,18 @@ abundance : true -- append relative abundance values to the FASTA sequence IDs\n
                   callback?(null, j)))
 
          scaf.on('exit', (code)->
-            if (code) 
+            if (code)
                console.error('ERROR: ' + code)
                callback?(new Error('SEAStAR script "seq_scaffold" could not be executed. Please check that this file is in your PATH.'), null)
          )
-         
+
          write_scaffolds(scaf.stdin)
-         scaf.stdin.end()   
+         scaf.stdin.end()
 
       remove_graph_refs(j)
-      
+
       # No callback here because it happens a few lines above in the 'end' event handler
-   
+
 ###
 # old ref_select style table output
 #
@@ -2018,7 +2020,7 @@ header : true -- write a header row with labels for each column\n
       return
 
    o = open_output_stream(args.file, args.tag)
-   
+
    # Handle error opening file
    unless o
       callback?(new Error("open_output_stream could not open file '#{args.file}' for output."), null)
@@ -2027,7 +2029,7 @@ header : true -- write a header row with labels for each column\n
       o.on("error", (err)->
           console.error("ERROR: open_output_stream could not write to file '#{args.file}'.")
           callback?(err, null))
-   
+
    if args.header
       o.write("id\t
 bitscore\t
@@ -2041,7 +2043,7 @@ pct_gc\t
 name\t
 desc\n
 ")
-   
+
    for name, node of j.nodes
       o.write("#{name}\t
 #{node.bits}\t
@@ -2083,17 +2085,17 @@ execute_selection = (j, nodes) ->
       for e in n.inlinks
          if nodes[e[1].id]?
             edges_kept.push(e[0])
-            
+
       for e in n.links
          unless nodes[e[1].id]?
             removed_edges_kept.push(e[0])
             removed_nodes_kept[e[1].id] = e[1]
-            
+
       for e in n.rem_inlinks
          if nodes[e[1].id]?
             removed_edges_kept.push(e[0])
-         
-      for e in n.rem_links   
+
+      for e in n.rem_links
          unless nodes[e[1].id]?
             removed_edges_kept.push(e[0])
             removed_nodes_kept[e[1].id] = e[1]
@@ -2107,10 +2109,10 @@ execute_selection = (j, nodes) ->
    j.edges = edges_kept
    j.removed_edges = removed_edges_kept
    j.removed_nodes = removed_nodes_kept
-    
+
    j.shared_seq_edges = (e for e in j.shared_seq_edges when nodes[e.n1]? or nodes[e.n2]? or removed_nodes_kept[e.n1]? or removed_nodes_kept[e.n2]?)
    j.internal_edges = (e for e in j.internal_edges when nodes[e.n1]? or removed_nodes_kept[e.n1]?)
-   
+
    j
 
 ###
@@ -2122,10 +2124,10 @@ execute_selection = (j, nodes) ->
 #     ccnum = number of a cc to select
 #     ccrange = start and end ccnums to select a range e.g. [0,10] or [1,-1]
 #     ccnums = list of numbers of ccs to select
-#     shift = select all but the first ccomp, like [1,-1] 
+#     shift = select all but the first ccomp, like [1,-1]
 #     min_nodes = minimum number of nodes in cc
 #     min_seqlen = minimum amount of sequence in nodes in cc
-#     sequence = sequence to search for 
+#     sequence = sequence to search for
 #
 ###
 grab_ccomps = (j, args={}, callback) ->
@@ -2164,7 +2166,7 @@ ccrange : [<int1>,<int2>] -- Select the connected components numbered in the ran
         <int1>..<int2> (inclusive). See also: 'shift' option below.\n
 \n
         NOTE: <int> may be negative, indicating positions at the end of the list of\n
-        connected components.\n 
+        connected components.\n
 \n
         Example: #{args.help} {\"ccrange\":[0,5]} -- Select the first 6 connected\n
         components\n
@@ -2218,14 +2220,14 @@ sequences : [<string>, ...] -- Like 'sequence' parameter, but takes a list of se
    calc_ccomps(j) unless j.connected_comps?  # Make sure there are ccomps
 
    try
-      build_graph_refs(j) 
+      build_graph_refs(j)
    catch err
       callback?(err, null)
       return
 
    if args.shift
       args.ccrange=[1,-1]
-   
+
    if args.ccrange? # Select a range of CComps by number
       args.ccrange[0] = (j.connected_comps.length + args.ccrange[0]) if args.ccrange[0] < 0
       args.ccrange[1] = (j.connected_comps.length + args.ccrange[1]) if args.ccrange[1] < 0
@@ -2234,7 +2236,7 @@ sequences : [<string>, ...] -- Like 'sequence' parameter, but takes a list of se
       for c, i in j.connected_comps when c.indexOf(args.ccname) != -1
          args.ccnums = [i]
          break
-   else if args.ccnames? # Find all CComps with nodes with these names 
+   else if args.ccnames? # Find all CComps with nodes with these names
       args.ccnums = []
       for id in args.ccnames
          for c, i in j.connected_comps when c.indexOf(id) isnt -1 and args.ccnums.indexOf(i) is -1
@@ -2245,7 +2247,7 @@ sequences : [<string>, ...] -- Like 'sequence' parameter, but takes a list of se
 
    if args.sequence
       args.sequences = [ args.sequence ]
-      
+
    if args.sequences
       ccnums = args.ccnums ? [0...j.connected_comps.length]
       args.ccnums = []
@@ -2271,13 +2273,13 @@ sequences : [<string>, ...] -- Like 'sequence' parameter, but takes a list of se
 
    unless args.ccnums?  # Default to ccnum 0
       args.ccnums = [0]
-   
-   unless args.ccnums.length  # Default parameter type is list of ccnums 
+
+   unless args.ccnums.length  # Default parameter type is list of ccnums
       remove_graph_refs(j)
       console.warn "WARN: SELCC: No connected components found matching selection criteria"
       callback?(undefined, null)
       return
-   
+
    nodes = {}
    new_cclist = []
    for cc in args.ccnums
@@ -2291,26 +2293,26 @@ sequences : [<string>, ...] -- Like 'sequence' parameter, but takes a list of se
       new_cclist.push(j.connected_comps[cc])
       for nid in j.connected_comps[cc]
          nodes[nid] = j.nodes[nid]
-         
+
    execute_selection(j, nodes)
-   
+
    j.connected_comps = new_cclist  # Set new connected components
-   
-   if j.scaffolds?  # Maintain the current mapping of scaffolds to ccomps 
+
+   if j.scaffolds?  # Maintain the current mapping of scaffolds to ccomps
       j.connected_comps = new_cclist  # Set new connected components
       new_scaffs = {}                 # Build a new scaffold object
       for sn, sc of j.scaffolds       # Walk the current scaffold object and rematch scaffs to ccomps
          nid = sc.nodes[0]            # Choose a node in this scaffold
          # Find a ccomp containing this node
-         for cc, ci in j.connected_comps when cc.indexOf(nid) isnt -1  
-            sc.ccnum = ci             # The ccnumber has changed, so correct it 
+         for cc, ci in j.connected_comps when cc.indexOf(nid) isnt -1
+            sc.ccnum = ci             # The ccnumber has changed, so correct it
             new_scaffs[sn] = sc       # Copy in the scaffold (keeping the same name)
             break                     # Done processign this scaffold
       j.scaffolds = new_scaffs        # Commit the new scaffold list
       delete j.clusters               # Clusters don't survive this.
-   
-   remove_graph_refs(j) 
-   
+
+   remove_graph_refs(j)
+
    callback?(null, j)
 
 ###
@@ -2358,7 +2360,7 @@ names : [\"contig_name1\",\"contig_name2\",...] -- Use multiple contigs by name\
 \n
 radius : <int> -- Size of the neighborhood of contigs to select\n
 \n
-        Example: #{args.help} {\"radius\":2} -- Select all neighbors and neighbors of\n        
+        Example: #{args.help} {\"radius\":2} -- Select all neighbors and neighbors of\n
         neighbors\n
 \n
         Example: #{args.help} {\"radius\":0} -- Default. Select only the named contig(s)\n
@@ -2370,7 +2372,7 @@ sequence : <string> -- Select contig(s) found to contain the provided DNA sequen
         reverse complement of the provided sequence is also searched.\n
 \n
         Example: #{args.help} {\"sequence\":\"AGACTAGCAGATATACGATAACGATACGATACGAT\"}\n
-        Select contig(s) containing the provided sequence (or its reverse complement).\n        
+        Select contig(s) containing the provided sequence (or its reverse complement).\n
 \n
 sequences : [<string>, ...] -- Like 'sequence' parameter, but takes a list of sequences.\n
 \n
@@ -2382,19 +2384,19 @@ sequences : [<string>, ...] -- Like 'sequence' parameter, but takes a list of se
       return
 
    try
-      build_graph_refs(j) 
+      build_graph_refs(j)
    catch err
       callback?(err, null)
       return
 
-   args.names = [args.name] if args.name? 
+   args.names = [args.name] if args.name?
 
    if args.sequence
       args.sequences = [ args.sequence ]
    if args.sequences
       args.names = []
       all_seqs = args.sequences.map(reverse_comp).concat(args.sequences)
-      for nid, n of j.nodes when seq = n.recon_seq 
+      for nid, n of j.nodes when seq = n.recon_seq
          for s in all_seqs when seq.indexOf(s) isnt -1
             args.names.push(nid)
             break
@@ -2409,39 +2411,41 @@ sequences : [<string>, ...] -- Like 'sequence' parameter, but takes a list of se
    unless args.names
       console.warn "WARN: SELND: No nodes found matching selection criteria"
       callback?(undefined, null)
-      return      
+      return
 
    args.radius ?= 0
 
    nodes = {}
    for name in args.names
-      for nid in find_neighbors(j.nodes[name], args.radius) 
+      for nid in find_neighbors(j.nodes[name], args.radius)
          nodes[nid] = j.nodes[nid]
-        
-   execute_selection(j, nodes)
-   
-   remove_graph_refs(j, (n)->delete n.seen) 
 
-   delete j.connected_comps 
-   
+   execute_selection(j, nodes)
+
+   remove_graph_refs(j, (n)->delete n.seen)
+
+   delete j.connected_comps
+   delete j.scaffolds if j.scaffolds?
+   delete j.clusters if j.clusters?
+
    callback?(null, j)
 
 ###
-# Functions for finding connections between scaffold ends 
+# Functions for finding connections between scaffold ends
 ###
 find_direct_connection = (head, tail, thresh = 0) ->
 
-   try_dir_links = (h,t) -> 
+   try_dir_links = (h,t) ->
       e = null
       if h and t
          for l in h.rem_links
-            if l[1].id is t.id and (e = edge_director(t, h, l[0])) and t.id is e.n1 
+            if l[1].id is t.id and (e = edge_director(t, h, l[0])) and t.id is e.n1
                break
-            else 
+            else
                e = null
       if e
          [e]
-      else 
+      else
          null
 
    select_edge = null
@@ -2453,33 +2457,33 @@ find_direct_connection = (head, tail, thresh = 0) ->
       select_tail = tail
       select_edge = edge
       thresh = edge[0].bits
-      
+
    if (edge = try_dir_links(head.outlinks[0]?[1], tail)) and edge[0]?.bits > thresh
       select_head = head.outlinks[0][1]
       select_tail = tail
       select_edge = edge
       thresh = edge[0].bits
-      
+
    if (edge = try_dir_links(head, tail.inlinks[0]?[1])) and edge[0]?.bits > thresh
       select_head = head
       select_tail = tail.inlinks[0][1]
       select_edge = edge
       thresh = edge[0].bits
-   
+
    if (edge = try_dir_links(head.outlinks[0]?[1], tail.inlinks[0]?[1])) and edge[0]?.bits > thresh
-      select_head = head.outlinks[0][1]         
+      select_head = head.outlinks[0][1]
       select_tail = tail.inlinks[0][1]
       select_edge = edge
       thresh = edge[0].bits
-         
+
    [select_edge, select_head, select_tail, thresh]
 
 ###
 # Look for indirect connections (via another node not part of either scaffold)
 ###
 find_indirect_connection = (head, tail, thresh = 0) ->
-  
-   try_indir_links = (h,t) -> 
+
+   try_indir_links = (h,t) ->
       et = null
       eh = null
       if h and t
@@ -2491,34 +2495,34 @@ find_indirect_connection = (head, tail, thresh = 0) ->
             if (et = edge_director(t, l[1], l[0])) and (t.id is et.n1) and
                (eh = edge_director(hnodes[l[1].id][1], h, hnodes[l[1].id][0])) and (h.id is eh.n2)
                   break
-            else 
+            else
                   et = null
                   eh = null
-               
+
          if (et and eh) then [et, eh] else null
-   
+
    select_result = null
    select_head = null
    select_tail = null
-   
+
    if (result = try_indir_links(head.outlinks[0]?[1], tail.inlinks[0]?[1])) and result?[0]?.bits > thresh and result?[1]?.bits > thresh
-      select_head = head.outlinks[0][1]         
+      select_head = head.outlinks[0][1]
       select_tail = tail.inlinks[0][1]
       select_result = result
       thresh = Math.min(result[0].bits, result[1].bits)
-   
+
    if (result = try_indir_links(head, tail.inlinks[0]?[1])) and result?[0]?.bits > thresh and result?[1]?.bits > thresh
       select_head = head
       select_tail = tail.inlinks[0][1]
       select_result = result
       thresh = Math.min(result[0].bits, result[1].bits)
-   
+
    if (result = try_indir_links(head.outlinks[0]?[1], tail)) and result?[0]?.bits > thresh and result?[1]?.bits > thresh
-      select_head = head.outlinks[0][1]         
+      select_head = head.outlinks[0][1]
       select_tail = tail
       select_result = result
       thresh = Math.min(result[0].bits, result[1].bits)
-   
+
    if (result = try_indir_links(head, tail)) and result?[0]?.bits > thresh and result?[1]?.bits > thresh
       select_head = head
       select_tail = tail
@@ -2532,9 +2536,9 @@ find_indirect_connection = (head, tail, thresh = 0) ->
 ###
 find_connection = (head, tail, thresh = 0) ->
    direct = find_direct_connection(head, tail, thresh)
-   
+
    thresh = direct[3] if direct[0]
-   
+
    indirect = find_indirect_connection(head, tail, thresh)
 
    if indirect[0]
@@ -2545,7 +2549,7 @@ find_connection = (head, tail, thresh = 0) ->
 ###
 # Scaffold end-link
 ###
-scaff_link = (j, args={}, callback) -> 
+scaff_link = (j, args={}, callback) ->
 # j = json graph object, args = arguments from command, callback = function to call when done
 
    if args.help?
@@ -2564,18 +2568,18 @@ thresh : <float> -- Bitscore threshold\n
 ")
       callback?(null, j)
       return
-   
+
    args.thresh ?= 1000.0
-   
-   calc_ccomps(j) unless j.connected_comps?  # Make sure there are ccomps  
-   
+
+   calc_ccomps(j) unless j.connected_comps?  # Make sure there are ccomps
+
    try
-      build_graph_refs(j) 
+      build_graph_refs(j)
       build_removed_graph_refs(j)
    catch err
       callback?(err, null)
       return
-   
+
    # Add ccnums to nodes for later reference
    for c, i in j.connected_comps
       for n in c
@@ -2584,42 +2588,42 @@ thresh : <float> -- Bitscore threshold\n
    # Try all pairs of scaffolds
    for c, i in j.connected_comps
       for cc, ii in j.connected_comps when ii >= i
-   
+
          # Find the "head" and "tail" nodes for these scaffold
-         
+
          try
             [[h1], [t1]] = find_ends(j, c, true)
             [[h2], [t2]] = find_ends(j, cc, true)
          catch err
-            remove_graph_refs(j, ((n) -> delete n.ccnum)) 
+            remove_graph_refs(j, ((n) -> delete n.ccnum))
             callback?(err, null)
             return
-            
+
          [e1] = find_connection(h1, t2, args.thresh)
 
-         if e1         
+         if e1
             if e1.length is 1   # Direct connection (one edge)
                unless e1[0].interscaffold
                   e1[0].interscaffold = true
                   j.edges.push(e1[0])
                   delete j.removed_edges[e1[0].index]
-                  
+
                console.warn("Scaffold #{ii} #{e1[0].n1} --> Scaffold #{i} #{e1[0].n2} -- #{e1[0].bits} bits")
-               
+
             else # Indirect connection (two edges and an inbetween node)
                unless e1[0].interscaffold
                   e1[0].interscaffold = true
                   j.edges.push(e1[0])
                   delete j.removed_edges[e1[0].index]
-               unless e1[1].interscaffold   
+               unless e1[1].interscaffold
                   e1[1].interscaffold = true
                   j.edges.push(e1[1])
                   delete j.removed_edges[e1[1].index]
-                  
-               unless j.nodes[e1[1].n1]?   
+
+               unless j.nodes[e1[1].n1]?
                   j.nodes[e1[1].n1] = e1[1].src
                   delete j.removed_nodes[e1[1].n1]
-                  
+
                console.warn("Scaffold #{ii} #{e1[0].n1} --> Scaffold #{e1[1].src.ccnum} #{e1[1].n1} --> Scaffold #{i} #{e1[1].n2} -- #{e1[0].bits} + #{e1[1].bits} bits")
 
          unless i == ii
@@ -2631,26 +2635,30 @@ thresh : <float> -- Bitscore threshold\n
                      e2[0].interscaffold = true
                      j.edges.push(e2[0])
                      delete j.removed_edges[e2[0].index]
-                     
+
                   console.warn("Scaffold #{i} #{e2[0].n1} --> Scaffold #{ii} #{e2[0].n2} -- #{e2[0].bits} bits")
                else
                   unless e2[0].interscaffold
                      e2[0].interscaffold = true
                      j.edges.push(e2[0])
                      delete j.removed_edges[e2[0].index]
-                  unless e2[1].interscaffold   
+                  unless e2[1].interscaffold
                      e2[1].interscaffold = true
                      j.edges.push(e2[1])
                      delete j.removed_edges[e2[1].index]
 
-                  unless j.nodes[e2[1].n1]?   
+                  unless j.nodes[e2[1].n1]?
                      j.nodes[e2[1].n1] = e2[1].src
                      delete j.removed_nodes[e2[1].n1]
 
                   console.warn("Scaffold #{i} #{e2[0].n1} --> Scaffold #{e2[1].src.ccnum} #{e2[1].n1} --> Scaffold #{ii} #{e2[1].n2} -- #{e2[0].bits} + #{e2[1].bits} bits")
 
-   remove_graph_refs(j, ((n) -> delete n.ccnum)) 
-   
+   remove_graph_refs(j, ((n) -> delete n.ccnum))
+
+   delete j.connected_comps
+   delete j.scaffolds if j.scaffolds?
+   delete j.clusters if j.clusters?
+
    callback?(null, j)
 
 ###
@@ -2739,31 +2747,31 @@ problems : true -- Restore all connections to contigs that are marked with poten
    calc_ccomps(j) unless j.connected_comps?  # Make sure there are ccomps
 
    try
-      build_graph_refs(j) 
+      build_graph_refs(j)
       build_removed_graph_refs(j)
    catch err
       callback?(err, null)
       return
-      
+
    node_list = {}
 
    if args.ccname?
       args.ccnames = [args.ccname]
-      
+
    if args.ccnames?
       args.names ?= []
       for id in args.ccnames
          for c in j.connected_comps when c.indexOf(id) != -1
-            args.names = args.names.concat(c)            
+            args.names = args.names.concat(c)
 
    if args.name?
       args.names = [args.name]
 
    if args.radius and args.names?
       for name in args.names
-        for nid in find_neighbors(j.nodes[name], args.radius) 
-           node_list[nid] = j.nodes[nid]  
-   
+        for nid in find_neighbors(j.nodes[name], args.radius)
+           node_list[nid] = j.nodes[nid]
+
    if args.names?
       for id in args.names
          node_list[id] = j.nodes[id]
@@ -2777,16 +2785,16 @@ problems : true -- Restore all connections to contigs that are marked with poten
 
 # This loop tries to add removed edges connecting removed nodes to scaffold nodes.
 # They are only selected if the mate-pairing gives the proper orientation for the node.
-   
+
    unless args.existing
-   
+
       for id, n of node_list
          for e in n.rem_links when j.removed_nodes[e[1].id]? and edge = edge_director(n, e[1], e[0]) and e[0].score >= args.thresh
             if id is edge.n1
-               out_nodes_added[e[1].id] ?= [] 
+               out_nodes_added[e[1].id] ?= []
                out_nodes_added[e[1].id].push(e[0])
-            else 
-               in_nodes_added[e[1].id] ?= [] 
+            else
+               in_nodes_added[e[1].id] ?= []
                in_nodes_added[e[1].id].push(e[0])
 
       for id, edge_list of in_nodes_added
@@ -2797,11 +2805,11 @@ problems : true -- Restore all connections to contigs that are marked with poten
          nodes_added[id] = j.removed_nodes[id]
 
 # This code adds properly directed edges between previously removed nodes.
-      for e in j.removed_edges when (e? and (nodes_added[e.n1]? and nodes_added[e.n2]?)) and e.score >= args.thresh                        
-         if (edge = edge_director(e.src, e.tar, e)) 
+      for e in j.removed_edges when (e? and (nodes_added[e.n1]? and nodes_added[e.n2]?)) and e.score >= args.thresh
+         if (edge = edge_director(e.src, e.tar, e))
             edges_added.push(edge)
 
-# This code optionally adds additional removed edges between existing scaffold nodes 
+# This code optionally adds additional removed edges between existing scaffold nodes
    if args.complete or args.existing
       for id, n of node_list
          if (not args.ends) or (n.links.length is 1)
@@ -2821,13 +2829,15 @@ problems : true -- Restore all connections to contigs that are marked with poten
       delete j.removed_edges[e.index]
 
    delete j.connected_comps
+   delete j.scaffolds if j.scaffolds?
+   delete j.clusters if j.clusters?
 
-   remove_graph_refs(j, (n)->delete n.seen) 
-   
+   remove_graph_refs(j, (n)->delete n.seen)
+
    callback?(null, j)
 
 ###
-# Full Ordering -- This is like Relink above, but it inserts extra dependency edges 
+# Full Ordering -- This is like Relink above, but it inserts extra dependency edges
 # between added nodes based on mate-pair mapping positions in scaffold nodes
 ###
 full_order = (j, args={"verbose":false}, callback) ->
@@ -2887,7 +2897,7 @@ verbose : true -- output diagnostics on STDERR\n
    calc_ccomps(j) unless j.connected_comps?  # Make sure there are ccomps
 
    try
-      build_graph_refs(j) 
+      build_graph_refs(j)
       build_removed_graph_refs(j)
    catch err
       callback?(err, null)
@@ -2903,17 +2913,17 @@ verbose : true -- output diagnostics on STDERR\n
 
    if args.ccname?
       args.ccnames = [args.ccname]
-      
+
    if args.ccnames?
       for id in args.ccnames
          for c, i in j.connected_comps when c.indexOf(id) != -1
-            cc_list.push(i)            
+            cc_list.push(i)
    else
       cc_list = [0...j.connected_comps.length]
 
    nodes_added = {}
    edges_added = []
-   
+
    cc_chain_levels = []
 
 # This loop walks through the CCs, and for each CC, walks through scaffolded nodes in
@@ -2926,20 +2936,20 @@ verbose : true -- output diagnostics on STDERR\n
       shared_seq_nodes = {}
       in_idx = {}
       out_idx = {}
-   
+
       c = j.connected_comps[idx]
-      
+
       try
          [[head], [tail]] = find_ends(j, c, true)
       catch err
          remove_graph_refs(j)
          callback?(err, null)
          return
-         
+
       chain_levels = []
       n = head
       i = 1
-      
+
       while n
          chain_levels[i-1] = n
          n.chain_idx = i
@@ -2947,19 +2957,19 @@ verbose : true -- output diagnostics on STDERR\n
          n.cclen = c.length
          i++
          n = n.outlinks[0]?[1]
-      
+
       cc_chain_levels.push(chain_levels)
-      
+
       calc_mers = (k, seq, mers = {}) ->
          for c in [0..seq.length-k]
             mers[seq[c...c+k]] = true
-         mers 
+         mers
 
       shared_mers = (ref_mers, query_mers) ->
          q_mers = Object.keys(query_mers)
          total = 0
          total++ for q in q_mers when ref_mers[q]?
-         total / q_mers.length             
+         total / q_mers.length
 
       mers_shared = 0.0
       all_mers_shared = 0.0
@@ -2971,7 +2981,7 @@ verbose : true -- output diagnostics on STDERR\n
          unless Object.keys(all_mers).length
             console.warn("INSERT parameter dup_kmer = #{args.dup_kmer} but graph has no sequence. Disabling INSERT kmer checking.") if args.verbose
             args.dup_kmer = 0
-      
+
       for n, l in chain_levels
          for e in n.rem_links when j.removed_nodes[e[1].id]? and edge = edge_director(n, e[1], e[0])
 
@@ -2980,42 +2990,42 @@ verbose : true -- output diagnostics on STDERR\n
             if args.dup_kmer and e[1].recon_seq?.length >= args.dup_kmer
                contig_mers = calc_mers(args.dup_kmer, e[1].recon_seq)
                all_mers_shared = shared_mers(all_mers, contig_mers)
-            
-            if all_mers_shared > args.dup_thresh 
+
+            if all_mers_shared > args.dup_thresh
                shared_seq_nodes[other] ?= []
                shared_seq_nodes[other].push(n.id)
                console.warn("Shared sequence variant node #{other} rejected from #{n.id} #{args.dup_kmer}_mers shared: #{all_mers_shared}") if args.verbose
-            else 
-               if n.id is edge.n1 
-                  out_nodes_added[e[1].id] ?= [] 
+            else
+               if n.id is edge.n1
+                  out_nodes_added[e[1].id] ?= []
                   out_nodes_added[e[1].id].push(e[0])
                   out_idx[e[1].id] ?= []
                   out_idx[e[1].id].push(n.chain_idx)
-               else 
-                  in_nodes_added[e[1].id] ?= [] 
+               else
+                  in_nodes_added[e[1].id] ?= []
                   in_nodes_added[e[1].id].push(e[0])
                   in_idx[e[1].id] ?= []
                   in_idx[e[1].id].push(n.chain_idx)
-            
-      # Completely remove candidate nodes/edges that are shared sequence variants with 
+
+      # Completely remove candidate nodes/edges that are shared sequence variants with
       # nodes of the existing scaffold backbone, as they cannot be properly inserted in
       # any gap without causing artifactual repeats.
-      for id of shared_seq_nodes  
+      for id of shared_seq_nodes
          delete in_nodes_added[id]
          delete in_idx[id]
          delete out_nodes_added[id]
          delete out_idx[id]
-         
+
       # Remove candidate nodes / edges that don't have both in and out edges from the existing scaffold
       # Only consider nodes with both in and out edges to the scaffold nodes
-      for id, edge_list of in_nodes_added when not out_nodes_added[id]? 
+      for id, edge_list of in_nodes_added when not out_nodes_added[id]?
          delete in_nodes_added[id]
          delete in_idx[id]
-      for id, edge_list of out_nodes_added when not in_nodes_added[id]? 
-         delete out_nodes_added[id] 
+      for id, edge_list of out_nodes_added when not in_nodes_added[id]?
+         delete out_nodes_added[id]
          delete out_idx[id]
-   
-      chain_minmax = {}   
+
+      chain_minmax = {}
       for id of in_idx
 
          # Detect if this node is the smaller contig of a self-linking pair
@@ -3024,16 +3034,16 @@ verbose : true -- output diagnostics on STDERR\n
          for [e,n] in j.removed_nodes[id].rem_links when in_idx[n.id]?
             check_list[n.id] ?= 0
             check_list[n.id]++
-         die = false   
-         for nid, cnt of check_list when cnt > 1 and j.removed_nodes[id].seq_len < j.removed_nodes[nid].seq_len 
+         die = false
+         for nid, cnt of check_list when cnt > 1 and j.removed_nodes[id].seq_len < j.removed_nodes[nid].seq_len
             die = true
             console.warn("Circular variant node #{id} rejected") if args.verbose
             break
-         
+
          break if die
-   
+
          dup = false
-   
+
          if nodes_added[id]?
             j.removed_nodes[id].dup ?= 0
             j.removed_nodes[id].dup++
@@ -3044,16 +3054,16 @@ verbose : true -- output diagnostics on STDERR\n
             node.name = node_id
             node.id = node_id
             dup = true
-         else 
+         else
             node_id = id
             node = j.removed_nodes[id]
-            
+
          # Calulate the min and max chain_indices for both the incoming and outgoing edge scaffold nodes
-         chain_minmax = 
-            ins : 
+         chain_minmax =
+            ins :
                min : Math.min.apply(null,out_idx[id])
                max : Math.max.apply(null,out_idx[id])
-            outs : 
+            outs :
                min : Math.min.apply(null,in_idx[id])
                max : Math.max.apply(null,in_idx[id])
 
@@ -3063,16 +3073,16 @@ verbose : true -- output diagnostics on STDERR\n
             node.slot = [chain_minmax.ins.min, chain_minmax.outs.max]
             node.ccnum = idx
          else if (not (tail.terminal) and
-                  (chain_minmax.ins.min > chain_minmax.outs.max) and 
-                  (chain_minmax.outs.max - chain_minmax.outs.min < 4) and 
-                  (chain_minmax.ins.max - chain_minmax.ins.min < 4) and 
+                  (chain_minmax.ins.min > chain_minmax.outs.max) and
+                  (chain_minmax.outs.max - chain_minmax.outs.min < 4) and
+                  (chain_minmax.ins.max - chain_minmax.ins.min < 4) and
                   (chain_minmax.ins.min - chain_minmax.outs.max > j.connected_comps[idx].length - 7))    # Nodes entirely "between" the scaffold ends
             edges_added = edges_added.concat(out_nodes_added[id])  # Only add edges from the tail end
             nodes_added[node_id] = node
             node.slot = [chain_minmax.ins.min, Number.MAX_VALUE]
             node.ccnum = idx
-         else if ((chain_minmax.outs.min < chain_minmax.ins.min <= chain_minmax.ins.max < chain_minmax.outs.max) and 
-                  (chain_minmax.ins.max - chain_minmax.ins.min < 4) and 
+         else if ((chain_minmax.outs.min < chain_minmax.ins.min <= chain_minmax.ins.max < chain_minmax.outs.max) and
+                  (chain_minmax.ins.max - chain_minmax.ins.min < 4) and
                   (chain_minmax.outs.max - chain_minmax.outs.min > j.connected_comps[idx].length - 7))  # Node is within tail end, but reaches across to head
             new_out_edges = (e for e in in_nodes_added[id] when e.tar.chain_idx > chain_minmax.ins.max)
             new_out_idx = (e.tar.chain_idx for e in new_out_edges)
@@ -3080,19 +3090,19 @@ verbose : true -- output diagnostics on STDERR\n
             nodes_added[node_id] = node
             node.slot = [chain_minmax.ins.min, Math.max.apply(null,new_out_idx)]
             node.ccnum = idx
-         else if ((chain_minmax.ins.min < chain_minmax.outs.min <= chain_minmax.outs.max < chain_minmax.ins.max) and 
-                  (chain_minmax.outs.max - chain_minmax.outs.min < 4) and 
+         else if ((chain_minmax.ins.min < chain_minmax.outs.min <= chain_minmax.outs.max < chain_minmax.ins.max) and
+                  (chain_minmax.outs.max - chain_minmax.outs.min < 4) and
                   (chain_minmax.ins.max - chain_minmax.ins.min > j.connected_comps[idx].length - 7))   # Node is within head end, but reaches across from tail
             new_in_edges = (e for e in out_nodes_added[id] when e.src.chain_idx < chain_minmax.outs.min)
             new_in_idx = (e.src.chain_idx for e in new_in_edges)
             edges_added = edges_added.concat(in_nodes_added[id]).concat(new_in_edges)  # Only add edges from the tail end
-            nodes_added[node_id] = node           
+            nodes_added[node_id] = node
             node.slot = [Math.min.apply(null,new_in_idx), chain_minmax.outs.max]
             node.ccnum = idx
          else  # Strange case, reject the node and all edges
             console.warn("Node rejected: #{node_id}") if args.verbose
 
-         # Fix up the a duplicated node name in the edges now that it hasn't been rejected 
+         # Fix up the a duplicated node name in the edges now that it hasn't been rejected
          if nodes_added[node_id]? and dup
             for e in out_nodes_added[id]
                e.n2 = node_id
@@ -3100,12 +3110,12 @@ verbose : true -- output diagnostics on STDERR\n
                e.n1 = node_id
 
 # This code adds properly directed edges between previously removed nodes.
-   for e in j.removed_edges when (e? and (nodes_added[e.n1]? and nodes_added[e.n2]?))                         
-      if ((edge = edge_director(e.src, e.tar, e)) and 
-           (edge.src.slot[0] <= edge.tar.slot[0]) and 
+   for e in j.removed_edges when (e? and (nodes_added[e.n1]? and nodes_added[e.n2]?))
+      if ((edge = edge_director(e.src, e.tar, e)) and
+           (edge.src.slot[0] <= edge.tar.slot[0]) and
            (edge.src.slot[1] <= edge.tar.slot[1]) and
            ((edge.tar.slot[0] - edge.src.slot[1]) < 7) and
-           (edge.src.ccnum is edge.tar.ccnum))  
+           (edge.src.ccnum is edge.tar.ccnum))
          edges_added.push(edge)
 
 # Commit to new nodes.
@@ -3121,31 +3131,31 @@ verbose : true -- output diagnostics on STDERR\n
    unless args.no_mp_pos_links?
 
       remove_graph_refs(j)
-      
+
       try
-         build_graph_refs(j, 
-            ((n) -> 
+         build_graph_refs(j,
+            ((n) ->
                n.out_nodes = {}
-               n.in_nodes = {}), 
-            ((e) -> 
+               n.in_nodes = {}),
+            ((e) ->
                e.src.out_nodes[e.n2] = e
                e.tar.in_nodes[e.n1] = e))
       catch err
          callback?(err, null)
          return
-         
+
       dep_edges_added = []
-   
+
       add_dep_edges = (rank_list) ->
          rank_list.sort((a,b)->(a[0]-b[0]))
          new_tail = null
          for [pos, new_head] in rank_list
-            if (new_tail and 
-                  not new_tail.out_nodes[new_head.id]? and 
+            if (new_tail and
+                  not new_tail.out_nodes[new_head.id]? and
                   not new_tail.in_nodes[new_head.id]? and
                   pos - prev_pos > args.min_pos_diff)
                dep_edges_added.push(
-                  n1  :  new_tail.id 
+                  n1  :  new_tail.id
                   n2  :  new_head.id
                   dir :  "pos"
                   pos_diff : pos - prev_pos
@@ -3154,43 +3164,43 @@ verbose : true -- output diagnostics on STDERR\n
             prev_pos = pos
 
       for idx in cc_list
-         
+
          chain_levels = cc_chain_levels[idx]
-         
+
          for n, l in chain_levels
-   
+
             base_p = 0
             base_n = 0
-            
+
             cur_lev = {}
             pos_rank = []
-    
+
             prev = chain_levels?[l-1]?.id
             next = chain_levels?[l+1]?.id
-   
+
             if prev
                base_p = n.in_nodes[prev].p1
                for [edge, node] in j.nodes[prev].outlinks
                   cur_lev[edge.n2] = [edge]
-   
+
             if next
                base_n = n.out_nodes[next].p2
                for [edge, node] in j.nodes[next].inlinks
                   cur_lev[edge.n1] ?= []
                   cur_lev[edge.n1][1] = edge
-                     
+
             for id, [e_p, e_n] of cur_lev
                if e_p and e_n and (e_p.bits + e_n.bits > args.thresh)
-                  pos = (((e_p.bits/(e_p.bits+e_n.bits))*(e_p.p1-base_p)) + 
+                  pos = (((e_p.bits/(e_p.bits+e_n.bits))*(e_p.p1-base_p)) +
                          ((e_n.bits/(e_p.bits+e_n.bits))*(e_n.p2-base_n)))
-                  pos_rank.push([pos, e_p.tar]) 
+                  pos_rank.push([pos, e_p.tar])
                else if e_p and (e_p.bits > args.thresh) and not (j.nodes[next]?.out_nodes?[e_p.tar.id]?)
                   pos = e_p.p1-base_p
-                  pos_rank.push([pos, e_p.tar])   
+                  pos_rank.push([pos, e_p.tar])
                else if e_n and (e_n.bits > args.thresh) and not (j.nodes[prev]?.in_nodes?[e_n.src.id]?)
                   pos = e_n.p2-base_n
-                  pos_rank.push([pos, e_n.src]) 
-   
+                  pos_rank.push([pos, e_n.src])
+
             add_dep_edges(pos_rank)
 
       # Check added edges for inconsistencies
@@ -3204,11 +3214,11 @@ verbose : true -- output diagnostics on STDERR\n
          unless edge_obj["#{e.n2}_#{e.n1}"] or --edge_obj["#{e.n1}_#{e.n2}"]
             # Check for 3-edge cycles made by a dependency edge
             good = true
-         
+
             for [edge, node] in j.nodes[e.n2].outlinks when node.out_nodes[e.n1]
                   good = false
                   break
-         
+
             j.edges.push(e) if good
 
    remove_graph_refs(j, (n) -> (
@@ -3217,10 +3227,12 @@ verbose : true -- output diagnostics on STDERR\n
       delete n.ccnum
       delete n.cclen
       delete n.chain_idx
-      delete n.slot)) 
+      delete n.slot))
 
    delete j.connected_comps
-   
+   delete j.scaffolds if j.scaffolds?
+   delete j.clusters if j.clusters?
+
    callback?(null, j)
 
 ###
@@ -3244,8 +3256,8 @@ Parameters: NONE.\n
 
    if j.scaffolds?
       delete j.scaffolds
-      if j.clusters?
-         delete j.clusters
+   if j.clusters?
+      delete j.clusters
 
    calc_ccomps(j) unless j.connected_comps?  # Make sure there are ccomps
 
@@ -3255,18 +3267,18 @@ Parameters: NONE.\n
    catch err
       callback?(err, null)
       return
-   
+
    all_tsort = []
    all_scaffs = []
    in_scaffs = {}
-   
+
    for [source_nodes, sink_nodes], cci in ccomp_ends
 
-      # Generate Topological Sort of nodes 
+      # Generate Topological Sort of nodes
       tsort = []
       for n in source_nodes
          n.in_edges = {}
-         
+
       while n = source_nodes.pop()
          tsort.push(n.id)
          for e in n.outlinks
@@ -3276,8 +3288,8 @@ Parameters: NONE.\n
          # Try to rescue a graph with a dependent edge cycle
          if not args.no_rescue and (source_nodes.length is 0) and (tsort.length isnt j.connected_comps[cci].length)
             # Walk all of the nodes in the CCOMP not in the tsort and with one remaining in_edge
-            remove_cands = ([j.nodes[id], j.nodes[in_keys[0]]] for id in j.connected_comps[cci] when ((tsort.indexOf(id) is -1) and 
-                                                  ((in_keys = Object.keys(j.nodes[id].in_edges)).length is 1) and 
+            remove_cands = ([j.nodes[id], j.nodes[in_keys[0]]] for id in j.connected_comps[cci] when ((tsort.indexOf(id) is -1) and
+                                                  ((in_keys = Object.keys(j.nodes[id].in_edges)).length is 1) and
                                                   (j.nodes[id].in_edges[in_keys[0]].pos_diff?)))
 
             if remove_cands.length
@@ -3291,46 +3303,46 @@ Parameters: NONE.\n
                   break
                delete in_node.in_edges[out_node.id]
                source_nodes.push(in_node)
-         
+
       all_tsort.push(tsort)
-      
+
       len_to = {}
-      
+
       unless tsort.length
          callback?(new Error("SCAFF: No nodes in topological sort list. Circular scaffold?"), null)
          return
-      
+
       max_id = tsort[0]
       max_len = j.nodes[max_id].seq_len
-      
+
       # Calculate the longest sequence path along the topo sorted nodes
       for id in tsort
          n = j.nodes[id]
          len_to[id] ?= { len : n.seq_len, edge : null }
-            
+
          for [e,n2] in n.outlinks when ((not len_to[n2.id]?) or (len_to[n2.id].len < len_to[id].len + n2.seq_len))
-            len_to[n2.id] = { len : len_to[id].len + n2.seq_len, edge : e } 
+            len_to[n2.id] = { len : len_to[id].len + n2.seq_len, edge : e }
             if len_to[n2.id].len > max_len
-               max_id = n2.id 
+               max_id = n2.id
                max_len = len_to[n2.id].len
 
       longest_chain = [j.nodes[max_id]]
       len_to[max_id].edge?.keep = true
       prev = len_to[max_id]
-      
+
       while prev.edge?
          longest_chain.unshift(prev.edge.src)
          prev.edge.keep = true
          prev = len_to[prev.edge.src.id]
- 
+
       for n, i in longest_chain
          all_scaffs.push(n.id)
          in_scaffs[n.id] = i
-      
+
       if (sink_nodes.indexOf(longest_chain[longest_chain.length-1]) is -1)
          end_id = longest_chain[longest_chain.length-1].id
-         console.warn("Scaffold Warning: CCOMP #{cci} was not completely traversed. #{end_id} #{(100.0*(tsort.length/j.connected_comps[cci].length)).toFixed(1)}% #{(100.0*(longest_chain.length/j.connected_comps[cci].length)).toFixed(1)}% ")    
-      
+         console.warn("Scaffold Warning: CCOMP #{cci} was not completely traversed. #{end_id} #{(100.0*(tsort.length/j.connected_comps[cci].length)).toFixed(1)}% #{(100.0*(longest_chain.length/j.connected_comps[cci].length)).toFixed(1)}% ")
+
    for e in j.edges when not e?.keep?
       j.removed_edges.push(e)
       delete j.edges[e.index]
@@ -3339,39 +3351,41 @@ Parameters: NONE.\n
       j.removed_nodes[id] = n
       delete j.nodes[id]
 
-   remove_graph_refs(j, 
+   remove_graph_refs(j,
       (n) -> (
          delete n.in_edges
          delete n.saved_outlinks),
       (e) -> (
          delete e.keep
       ))
-         
+
    calc_ccomps(j)
-   
+
    try
-      build_graph_refs(j) 
+      build_graph_refs(j)
    catch err
       callback?(err, null)
       return
-   
+
    # Build the scaffolds data structure
    j.scaffolds = {}
    for c, i in j.connected_comps
       scaf_name = "Scaffold_#{i}"
       j.scaffolds[scaf_name] = {"ccnum":i,"nodes":[]}
-      
+
       try
          [[node]] = find_ends(j,c,true)
       catch err
          remove_graph_refs(j)
          callback?(err, null)
          return
-         
+
       while node
          if node.recon_seq?
             j.scaffolds[scaf_name].nodes.push(node.id)
-         node = node.outlinks[0]?[1] 
+         node = node.outlinks[0]?[1]
+
+   delete j.clusters if j.clusters?
 
    remove_graph_refs(j)
 
@@ -3380,7 +3394,7 @@ Parameters: NONE.\n
 ###
 # Make explicit edits to the current assembly graph
 ###
-perform_edits = (j, args={}, callback) -> 
+perform_edits = (j, args={}, callback) ->
 # j = json graph object, args = arguments from command, callback = function to call when done
 
    if args.help?
@@ -3427,7 +3441,7 @@ add_edges : [\"contig1\",[\"contig2\",...]] -- Add back the specified connection
       return
 
    try
-      build_graph_refs(j) 
+      build_graph_refs(j)
       build_removed_graph_refs(j)
    catch err
       callback?(err, null)
@@ -3466,7 +3480,7 @@ add_edges : [\"contig1\",[\"contig2\",...]] -- Add back the specified connection
          console.warn("EDIT: Removing edge #{e[0].n1} --> #{e[0].n2} Index: #{e[0].index} #{j.edges[e[0].index].n1} --> #{j.edges[e[0].index].n2}")
          delete j.edges[e[0].index]
          e[0].index = j.removed_edges.push(e[0]) - 1
-         
+
       j.removed_nodes[nid] = j.nodes[nid]
       delete j.nodes[nid]
 
@@ -3476,16 +3490,16 @@ add_edges : [\"contig1\",[\"contig2\",...]] -- Add back the specified connection
          console.warn("EDIT: Removing edge #{e[0].n1} --> #{e[0].n2} Index: #{e[0].index} #{j.edges[e[0].index].n1} --> #{j.edges[e[0].index].n2}")
          delete j.edges[e[0].index]
          e[0].index = j.removed_edges.push(e[0]) - 1
-         
 
-   remove_graph_refs(j) 
+
+   remove_graph_refs(j)
 
    callback?(null, j)
 
 ###
 # create new nodes from parts of the given nodes
 ###
-cut_node = (j, args={}, callback) -> 
+cut_node = (j, args={}, callback) ->
 # j = json graph object, args = arguments from command, callback = function to call when done
 
    if args.help?
@@ -3508,13 +3522,13 @@ new_name : \"new_contig_name\" -- Name for the newly created contig node\n
 \n
 include : [\"contig_name1\", ...] -- Move mate-pair edges from the listed contigs.\n
 \n
-        Example: #{args.help} {\"name\":\"NODE_1234\",\"include\":[\"NODE_567\",\"NODE_234\"]}\n 
+        Example: #{args.help} {\"name\":\"NODE_1234\",\"include\":[\"NODE_567\",\"NODE_234\"]}\n
         -- Edges between NODE_1234 and the included contigs will be moved to the new cut\n
         and copied version of NODE_1234.\n
 \n
 auto_include : true -- Automatically move mate-pair edges falling within the cut sequence.\n
 \n
-        Example: #{args.help} {\"name\":\"NODE_1234\",\"auto_include\":true}\n 
+        Example: #{args.help} {\"name\":\"NODE_1234\",\"auto_include\":true}\n
         -- All selected edges between NODE_1234 and any other contigs will be moved to the\n
          new cut and copied version of NODE_1234. Note that currently removed edges will\n
          not be moved. To accomplish this, the node needs to be RELINKed first.
@@ -3551,7 +3565,7 @@ end : <int> -- Ending sequence coordinate for the new node within the original\n
    # Maintain compatability with "start" instead of "begin"
    if args.start? and not args.begin?
       console.warn("CUTND: Warning: 'start' parameter is deprecated. Use 'begin' instead.")
-      args.begin = args.start 
+      args.begin = args.start
 
    args.begin ?= 0
    args.end ?= node.seq_len - 1
@@ -3565,7 +3579,7 @@ end : <int> -- Ending sequence coordinate for the new node within the original\n
       args.end = node.seq_len + args.end
 
    if args.begin < 0
-      args.begin = 0  
+      args.begin = 0
 
    if args.end >= node.seq_len
       args.end = node.seq_len - 1
@@ -3575,22 +3589,22 @@ end : <int> -- Ending sequence coordinate for the new node within the original\n
       return
 
    try
-      build_graph_refs(j) 
+      build_graph_refs(j)
       build_removed_graph_refs(j)
    catch err
       console.warn "build_graph_refs error in CUTND"
-      callback?(err, null) 
+      callback?(err, null)
       return
-   
+
    k = 1
    args.new_name ?= (while j.nodes[node.name + "_Cut_" + k]?
                         k++
                      node.name + "_Cut_" + k)
 
    j.nodes[args.new_name] = new_node
-   
+
    console.warn("CUTND: Adding #{args.new_name} from #{args.begin} - #{args.end} of #{node.name}")
-   
+
    for p of node  # Copy parameters
       new_node[p] = node[p]
 
@@ -3598,9 +3612,9 @@ end : <int> -- Ending sequence coordinate for the new node within the original\n
    new_node.name = args.new_name
    new_node.id = args.new_name
    new_node.seq_len = args.end - args.begin + 1
-   
+
    delete new_node.contig_problems
-      
+
    if new_node.per_nt_cov?
       new_node.per_nt_cov = new_node.per_nt_cov.slice(args.begin,args.end)
 
@@ -3627,7 +3641,7 @@ end : <int> -- Ending sequence coordinate for the new node within the original\n
       else
          e[0].p2 = e[0].p2 - args.begin
 
-   for e in new_node.outlinks when args.include?.indexOf(e[1].id) isnt -1 
+   for e in new_node.outlinks when args.include?.indexOf(e[1].id) isnt -1
       console.warn("CUTND: Moving edge #{e[0].n1} --> #{e[0].n2} to #{args.new_name}")
       e[0].n1 = args.new_name
       if e[0].p1 < args.begin
@@ -3637,7 +3651,7 @@ end : <int> -- Ending sequence coordinate for the new node within the original\n
       else
          e[0].p1 = e[0].p1 - args.begin
 
-   remove_graph_refs(j) 
+   remove_graph_refs(j)
 
    callback?(null, j)
 
@@ -3700,28 +3714,28 @@ detail : true -- Provide extra per contig detail\n
                   for x in [problem.end...problem.start] when node.per_nt_phys_cov[x] < min
                      min = node.per_nt_phys_cov[x]
                      pos = x
-               o.write("\t#{problem.type}\t#{problem.start}\t#{problem.end}\t#{pos}\n") 
+               o.write("\t#{problem.type}\t#{problem.start}\t#{problem.end}\t#{pos}\n")
             else
-               o.write("\t#{problem.type}\t#{problem.start}\t#{problem.end}\n") 
-   
+               o.write("\t#{problem.type}\t#{problem.start}\t#{problem.end}\n")
+
    o.write("\nProblem nodes: #{node_cnt}\n")
    o.write("Total problems: #{total}\n")
    o.write("Problem breakdown:\n")
    for type, count of prob_types
       o.write("\t#{type}: #{count}\n")
-   
+
    o.end((error) ->
          if error
             callback?(error, null)
          else
             callback?(null, j))
-   
+
 ###
 # Invoke tetracalc on current scaffolds, gather results
 ###
 tetracalc = (j, args={}, callback) ->
 # j = json graph object, args = arguments from command, callback = function to call when done
-     
+
    if args.help?
       console.warn("
 #{args.help} -- Cluster scaffolds using the tetracalc tool
@@ -3743,36 +3757,36 @@ options : <string> -- Command line options for the tetracalc tool. Otherwise def
 ")
       callback?(null, j)
       return
-   
-   unless j.scaffolds?
+
+   unless j.connected_comps? and j.scaffolds?
       callback?(new Error("No valid scaffolds found. Run SCAFF first."), null)
-      return   
+      return
 
    unless Object.keys(j.scaffolds).length > 1
       callback?(new Error("There must be at least two scaffolds to run CLUST."), null)
-      return   
+      return
 
    console.warn("CLUST: invoking tetracalc tool")
-      
+
    cluster_json = ""
-   
+
    if args.options
       options = args.options.split(/\s+/)
       options.push('-')
-   else   
+   else
       options = ['-']
-      
+
    tet = child_process.spawn('tetracalc',options,{})
-   tet.stdout.setEncoding('ascii')      
-   tet.stderr.setEncoding('ascii')      
+   tet.stdout.setEncoding('ascii')
+   tet.stderr.setEncoding('ascii')
 
    tet.stdout.on('data', (data) ->
-      cluster_json = cluster_json.concat(data) 
-   ) 
-      
+      cluster_json = cluster_json.concat(data)
+   )
+
    tet.stderr.on('data', (data) ->
       process.stderr.write(data)
-   )   
+   )
 
    tet.stdout.on('end', () ->
       try
@@ -3780,18 +3794,18 @@ options : <string> -- Command line options for the tetracalc tool. Otherwise def
       catch err
          callback?(new Error("Failed to parse output of tetracalc program. #{err.message}"), null)
          return
-            
+
       callback?(null, j)
    )
 
-   tet.on('exit', (code) -> 
-         if (code) 
+   tet.on('exit', (code) ->
+         if (code)
             console.error('ERROR: ' + code)
             callback?(new Error('SEAStAR program "tetracalc" could not be executed. Please ensure that it is in your PATH'), null)
    )
-   
+
    export_fasta(j, {"scaff":true,"stream":tet.stdin,"verbose":args.verbose})
-   
+
 ###
 # Select clusters for output or further processing
 #
@@ -3799,7 +3813,7 @@ options : <string> -- Command line options for the tetracalc tool. Otherwise def
 #
 # clustnum : Choose a cluster by number
 # clustnums : Choose a list of clusters
-# clustrange : Choose multiple clusters by a range of numbers 
+# clustrange : Choose multiple clusters by a range of numbers
 # shift : Remove the first cluster
 #
 ###
@@ -3848,12 +3862,12 @@ exclusive : true -- Remove all scaffolds outside of the selected clusters\n
       callback?(null, j)
       return
 
-   unless j.clusters?  # Make sure there are clusters
+   unless j.connected_comps? and j.scaffolds? and j.clusters?  # Make sure there are clusters
       callback?(new Error("No valid scaffold clusters found. Run CLUST first."), null)
       return
 
    try
-      build_graph_refs(j) 
+      build_graph_refs(j)
    catch err
       callback?(err, null)
       return
@@ -3869,11 +3883,11 @@ exclusive : true -- Remove all scaffolds outside of the selected clusters\n
         args.clustnums = [args.clustrange[0]..args.clustrange[1]]
    else
       args.clustnums ?= [0]
-   
+
    new_cclist = []
    new_clusts = []
    new_scaffs = {}
-   
+
    for cl in args.clustnums
       unless j.clusters[cl]?
          remove_graph_refs(j)
@@ -3882,22 +3896,22 @@ exclusive : true -- Remove all scaffolds outside of the selected clusters\n
          else
             callback?(new Error("Invalid selected clustnum: #{cl}. clustnums are zero-based and there are only #{j.clusters.length} clusters in this graph."), null)
          return
-      new_clusts.push(j.clusters[cl])   
+      new_clusts.push(j.clusters[cl])
       for scaf_id in j.clusters[cl]
-         if args.exclusive 
+         if args.exclusive
             new_cclist.push(j.scaffolds[scaf_id].ccnum)
          new_scaffs[scaf_id] = j.scaffolds[scaf_id]
-         
-   if args.exclusive      
+
+   if args.exclusive
       grab_ccomps(j,{"ccnums" : new_cclist})
 
    j.clusters = new_clusts
    j.scaffolds = new_scaffs
- 
-   remove_graph_refs(j) 
-   
+
+   remove_graph_refs(j)
+
    callback?(null, j)
-   
+
 ###
 # DUMP -- Output current JSON structure to a file
 #
@@ -3934,13 +3948,13 @@ file : \"filename.json[.gz]\" -- Specify a file name to write the JSON format se
         my_assembly_000.json (first time this is run)\n
 \n
         Example: #{args.help} {\"file\":\"my_assembly_###.json\"} -- Run again, write data\n
-        to the file: my_assembly_001.json\n 
+        to the file: my_assembly_001.json\n
 ")
       callback?(null, j)
       return
 
    o = open_output_stream(args.file, args.tag)
-   
+
    # Handle error opening file
    unless o
       callback?(new Error("open_output_stream could not open file '#{args.file}' for output."), null)
@@ -3950,10 +3964,16 @@ file : \"filename.json[.gz]\" -- Specify a file name to write the JSON format se
           console.error("ERROR: open_output_stream could not write to file '#{args.file}'.")
           callback?(err, null))
 
+   # Check if there are scaffolds / clusters but no ccomps. If so, remove them.
+   unless j.connected_comps?
+      delete j.scaffolds if j.scaffolds?
+   unless j.scaffolds?
+      delete j.clusters if j.clusters?
+
    my_stringify(j, o, 2, (err) ->
       if err
          callback?(err, null)
-      else       
+      else
          o.end((error) ->
             if error
                callback?(error, null)
@@ -3961,7 +3981,7 @@ file : \"filename.json[.gz]\" -- Specify a file name to write the JSON format se
                callback?(null, j)))
 
 ###
-# read_json -- 
+# read_json --
 #
 # args:
 #
@@ -3994,7 +4014,7 @@ file : \"filename.json[.gz]\" -- Specify the name of a JSON format sequence grap
       callback?(null, j)
       return
 
-   read_input_stream(args.file, true, (error, read_buffer) -> 
+   read_input_stream(args.file, true, (error, read_buffer) ->
            if error or not read_buffer
                  console.error("ERROR: Empty buffer returned for file: #{args.file}")
                  callback?(error or new Error("Empty buffer returned for file: #{args.file}"), null)
@@ -4009,10 +4029,10 @@ file : \"filename.json[.gz]\" -- Specify the name of a JSON format sequence grap
               j.shared_seq_edges ?= []
               j.removed_edges ?= []
               j.processing.push(["$",ss_version,'LOAD',clone_object(args)])
-              callback?(null, j)) 
+              callback?(null, j))
 
 ###
-# command_file -- Implementation of the SCRIPT command 
+# command_file -- Implementation of the SCRIPT command
 ###
 command_file = (j, args={}, callback) ->
 # j = json graph object, args = arguments from command, callback = function to call when done
@@ -4053,18 +4073,18 @@ tag : \"filename_part\" -- Part of a filename to include in files written from t
       return
 
    queue_commands = (error, read_buffer) ->
-   
+
       if error or not read_buffer
          callback?(error or new Error("empty read_buffer after reading SCRIPT file."), null)
          return
-      
+
       lines = read_buffer.split("\n")
       script_cmds = []
       for l in lines
-         [cmd, argstr] = l.trim().replace(/\t/," ").split(" ",2)   
+         [cmd, argstr] = l.trim().replace(/\t/," ").split(" ",2)
          cmd = cmd.toUpperCase()
          if typeof(commands[cmd]) is 'function'
-            if argstr        
+            if argstr
                try
                   cmd_args = JSON.parse(argstr)
                catch err
@@ -4072,52 +4092,52 @@ tag : \"filename_part\" -- Part of a filename to include in files written from t
                   callback?(err, null)
                   return
             else
-               cmd_args = null               
-            
+               cmd_args = null
+
             if cmd_args?.file? and args.tag? and not (cmd is 'LOAD')
-               cmd_args.tag ?= args.tag 
-               
-            if (cmd is 'SCRIPT') and not cmd_args?.file? 
+               cmd_args.tag ?= args.tag
+
+            if (cmd is 'SCRIPT') and not cmd_args?.file?
                callback?(new Error("Invalid command: You may not launch an interactive SCRIPT session from within a SCRIPT."), null)
                return
-            else 
+            else
                script_cmds.push([commands[cmd], cmd_args, cmd])
          else if cmd and cmd[0] isnt '#'
             callback?(new Error("Invalid command: '#{cmd}'"), null)
-            return 
+            return
 
       read_buffer = null
 
       script_next_cmd = (err, return_j) ->
          if err
             err_str = "SCRIPT aborted due to error in command execution."
-            unless err.message is no_data_str  # Ignore, it will be regenerated below if necessary 
+            unless err.message is no_data_str  # Ignore, it will be regenerated below if necessary
                unless err.message is err_str
                   console.error("ERROR terminating SCRIPT processing: #{err.message}\n")
                   err = Error(err_str)
                callback?(err, null)
                return
-   
+
          if (script_cmds.length)  # If there are commands remaining to process
             [cmd_func, cmd_args, cmd] = script_cmds.shift()    # Prepare the next command
 
             unless return_j?.nodes? or cmd is 'LOAD' or cmd is 'SCRIPT' or cmd is 'UNSTASH' or cmd is 'HELP'
                callback?(new Error(no_data_str), {"processing" : (j?.processing or [])})  # Empty JSON object, except preserve command history
-               return   
+               return
 
-            # Record history of this command in the graph object   
-            return_j?.processing?.push([args.file, ss_version, cmd, clone_object(cmd_args)]) unless cmd is 'HELP'  
+            # Record history of this command in the graph object
+            return_j?.processing?.push([args.file, ss_version, cmd, clone_object(cmd_args)]) unless cmd is 'HELP'
             console.warn("Executing (#{args.file}) #{cmd} #{JSON.stringify(cmd_args)}")  # Output progress to stderr
             setImmediate(cmd_func, return_j, cmd_args, script_next_cmd)  # Invoke the command with the graph object, args, and callback function
          else
             callback?(null, return_j)
 
-      script_next_cmd(null, j) 
+      script_next_cmd(null, j)
 
    if args.file?
       read_input_stream(args.file, false, queue_commands)
    else
-      unless process.stderr._type? and process.stderr._type is 'tty'  
+      unless process.stderr._type? and process.stderr._type is 'tty'
          console.log("ERROR: Interactive use of the SCRIPT command requires that STDERR not be redirected.\n")
          callback?(new Error("Interactive use of the SCRIPT command requires that STDERR not be redirected."), null)
          return
@@ -4125,10 +4145,10 @@ tag : \"filename_part\" -- Part of a filename to include in files written from t
       console.warn("\nEntering interactive SCRIPT mode, SEAStAR Version: #{ss_version}\nFor general help, quit and rerun with the -h option. Type 'HELP' for help with commands.\nType '.save <filename>' to save commands from this session to an output file.\nPress <Ctrl-D> to quit.\n")
       if process.stdout._type? and process.stdout._type isnt 'tty'
          console.warn("NOTE: You appear to be redirecting the output of this session, no interactive command results will be visible.\n")
-      
+
       repl.start({prompt:">> ", output:process.stderr, input:process.stdin, terminal:true, ignoreUndefined:true, eval:(l,cx,fn,cb) ->
          [cmd, argstr...] = l[1..-2].trim().replace(/\t|\n/," ").split(" ")
-         argstr = argstr.join(' ').replace(/^['"]|["']$/g,"") 
+         argstr = argstr.join(' ').replace(/^['"]|["']$/g,"")
          cmd = cmd.toUpperCase()
          if cmd is 'HELP'
             cmd_func = commands[cmd]
@@ -4142,10 +4162,10 @@ tag : \"filename_part\" -- Part of a filename to include in files written from t
                setImmediate(cmd_func, j, arg_json, (j) -> cb(null, undefined))
             else
                setImmediate(cmd_func, j, {'topic':argstr}, (j) -> cb(null, undefined))
-            
+
          else if typeof(commands[cmd]) is 'function'
 
-            if argstr        
+            if argstr
                try
                   args = JSON.parse(argstr)
                catch err
@@ -4154,7 +4174,7 @@ tag : \"filename_part\" -- Part of a filename to include in files written from t
                   return
             else
                args = null
-            
+
             if (cmd is 'SCRIPT') and not args?.file?
                console.warn("\nInvalid command: You may not launch nested interactive SCRIPT sessions.\n")
                cb(null, undefined)
@@ -4164,7 +4184,7 @@ tag : \"filename_part\" -- Part of a filename to include in files written from t
             else
                cmd_func = commands[cmd]
                setImmediate(cmd_func, j, args, (err, return_j) ->
-                  if err 
+                  if err
                      console.error("ERROR: #{err.message}\n")
                      console.warn("\nCommand failed: Please examine the above error messages and try again.\n")
                   else unless return_j
@@ -4175,11 +4195,11 @@ tag : \"filename_part\" -- Part of a filename to include in files written from t
                      j?.processing?.push([">>", ss_version, cmd, clone_object(args)])
                   cb(null, undefined)
                )
-         else 
+         else
             console.warn("\nInvalid command: '#{cmd}'\n") if cmd
             cb(null, undefined)
-         
-      }).on('exit',() -> 
+
+      }).on('exit',() ->
                console.warn("\n")
                callback?(null, j))
 
@@ -4241,12 +4261,12 @@ cmd_line : true -- Provide detailed help for UNIX shell command line use.\n
          cmd_list()
          for c of commands
             if typeof(commands[c]) is 'function'
-               console.warn('==========================================================================================\n')        
+               console.warn('==========================================================================================\n')
                commands[c](j,{'help':c,'detailed_help':true})
-      else 
+      else
          console.warn("\nCommand '#{args.topic}' not found, please select a valid command from below:\n")
          cmd_list()
-   else if args.cmd_line?  
+   else if args.cmd_line?
          console.warn("
 #{commands['prelude1']}
 \n
@@ -4260,7 +4280,7 @@ where: <input.json[.gz]> is an optional datafile to initially LOAD\n
 Multiple commands with optional parameters may be provided in succession for execution.\n
 \n
 Running this program without any options will launch an interactive mode,\n
-equivalent to:  graph_ops SCRIPT\n  
+equivalent to:  graph_ops SCRIPT\n
 \n
 For a list of valid commands: use: graph_ops HELP\n
 \n
@@ -4270,11 +4290,11 @@ SEAStAR Version: #{ss_version}\n
 ")
       else
          cmd_list()
-         
+
    callback?(null, j)
 
 ###
-# push_stash -- 
+# push_stash --
 ###
 push_stash = (j, args={}, callback) ->
 # j = json graph object, args = arguments from command, callback = function to call when done
@@ -4295,17 +4315,17 @@ Parameters:  None.\n
 
    console.warn("#{stash_stack.length} graph#{if stash_stack.length isnt 1 then 's' else ''} in stash.")
 
-   callback?(null, j) 
+   callback?(null, j)
 
 ###
-# pop_stash -- 
+# pop_stash --
 ###
 pop_stash = (j, args={}, callback) ->
 # j = json graph object, args = arguments from command, callback = function to call when done
 
    if args.help?
       console.warn("
-#{args.help} -- Restore (pop) the current graph from the top of the stack (undo changes) 
+#{args.help} -- Restore (pop) the current graph from the top of the stack (undo changes)
 ")
       if args.detailed_help?
          console.warn("
@@ -4327,14 +4347,14 @@ free : true -- Free the graph at the top of the stack without restoring its stat
 
       if args.free
          stash_stack.pop()  # Don't restore state
-      else 
+      else
          hist = j.processing or []  # Preserve history across UNSTASH
          j = undefined
          j = stash_stack.pop()
          j.processing = hist  # Restore history
-      
+
       console.warn("#{stash_stack.length} graph#{if stash_stack.length isnt 1 then 's' else ''} remain#{if stash_stack.length is 1 then 's' else ''} in stash.")
-      callback?(null, j) 
+      callback?(null, j)
 
 ###
 # ************************************************************************
@@ -4343,15 +4363,15 @@ free : true -- Free the graph at the top of the stack without restoring its stat
 # All functions below implement the same calling interface:
 #
 # function(j, args, callback), where:
-# 
+#
 # j        :  the JSON graph object to work on
-# args     :  an object of arguments to this command  
+# args     :  an object of arguments to this command
 # callback :  a function to call when the operation is complete
 #
 ###
 
 # Lower case attributes below can't be executed
-commands = 
+commands =
    'prelude1'  : '\n
 This program reads json format data files produced by the SEAStAR ref_select program.\n
 It implements a variety of commands for manipulating this data for assembly,\n
@@ -4403,7 +4423,7 @@ For examples and/or detailed help with specific commands, type:  HELP <command>\
    'SCRIPT'   : command_file
    'HELP'     : output_help
 
-###   
+###
 # This function gets called once the entire JSON data structure is available
 # It parses the commandline options and builds a callback_list that is used
 # to chain command calls together in an 'event driven' friendly manner.
@@ -4412,28 +4432,28 @@ For examples and/or detailed help with specific commands, type:  HELP <command>\
 process_commands = (callback_list) ->
    json = {}
 
-   # This function is used to pass control to the next command as a callback 
+   # This function is used to pass control to the next command as a callback
    call_next_cmd = (err, j) ->
-      
+
       if err
          console.error("ERROR: #{err.message}\n")
          process.exit(1)
-      
+
       if (callback_list.length)  # If there are commands remaining to process
          [cmd_func, cmd_args, cmd] = callback_list.shift()  # Prepare the next command
-         unless j?.nodes? or cmd is 'LOAD' or cmd is 'SCRIPT' or cmd is 'UNSTASH' or cmd is 'HELP' 
+         unless j?.nodes? or cmd is 'LOAD' or cmd is 'SCRIPT' or cmd is 'UNSTASH' or cmd is 'HELP'
             console.error("ERROR: No data, ending command line processing.\n")
             process.exit(1)
-            
+
          # Record history of this command in the graph object
-         j?.processing?.push(["$", ss_version, cmd, clone_object(cmd_args)]) unless cmd is 'HELP'  
+         j?.processing?.push(["$", ss_version, cmd, clone_object(cmd_args)]) unless cmd is 'HELP'
          console.warn("Executing #{cmd} #{JSON.stringify(cmd_args)}")  # Output progress to stderr
          setImmediate(cmd_func, j, cmd_args, call_next_cmd)  # Invoke the command with the graph object, args, and callback function
 
    # Make the initial call with an empty graph object
    # The callback list is available via closure in the call_next_cmd function above
    call_next_cmd(null, json)
-      
+
 ###
 # Handle commandline args
 ###
@@ -4442,9 +4462,9 @@ cmds = []  # Initialize the command list
 callback_list = [] # Initialize the callback_list
 
 # If no parameters, drop into interactive SCRIPT mode
-if process.argv.length < 3  
+if process.argv.length < 3
       callback_list.push([commands['SCRIPT'], {}, 'SCRIPT'])
-      
+
 # Special case for HELP (or some common variant thereof) is first parameter on command line
 else if (process.argv[2].toUpperCase() is 'HELP')
    if process.argv[3]?
@@ -4467,9 +4487,9 @@ else   # In this case, the first argument is a filename, which triggers an impli
       if process.argv[start_arg].match(/.+\.go(\.gz)?$/) # Does this look like a SCRIPT file?
          callback_list.push([commands['SCRIPT'], {'file':process.argv[start_arg]}, 'SCRIPT'])
          start_arg++  # Next (maybe still first) arg is a SCRIPT filename, so skip it below
-      
-   prev_cmd = false   
-   # Loop through the command line arguments, building up a command string to pass to the control loop   
+
+   prev_cmd = false
+   # Loop through the command line arguments, building up a command string to pass to the control loop
    for cmd in process.argv[start_arg..-1]
       if prev_cmd and cmd.match(/{.*}/)    # If this looks like a JSON string, it's a parameter, so add it to the previous command
          try
@@ -4478,14 +4498,14 @@ else   # In this case, the first argument is a filename, which triggers an impli
             console.error("ERROR: Could not parse JSON arguments '#{cmd}' to #{callback_list[-1..][0][2]} command")
             process.exit(1)
          prev_cmd = false
-      else if typeof(commands[cmd.toUpperCase()]) is 'function' 
-         # If this is a valid command string, then add 
-         cmd = cmd.toUpperCase() 
+      else if typeof(commands[cmd.toUpperCase()]) is 'function'
+         # If this is a valid command string, then add
+         cmd = cmd.toUpperCase()
          callback_list.push([commands[cmd], null, cmd])
          prev_cmd = true
       else # Don't know what this is, so die.
          console.error("ERROR: Invalid command line command: '#{cmd}'\n")
          process.exit(1)
-   
+
 # Start running commands
 process_commands(callback_list)

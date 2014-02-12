@@ -22,7 +22,7 @@
 # along with SEAStAR.  If not, see <http://www.gnu.org/licenses/>.
 # -------------------------------------------------------------------------- #
 
-# CMake file for full SEASTAR build 
+# CMake file for full SEASTAR build
 cmake_minimum_required (VERSION 2.8)
 
 # Debug option
@@ -77,7 +77,7 @@ if(NOT CMAKE_GENERATOR STREQUAL "Xcode")
 				message(WARNING "An error was encountered while testing OpenMP support in the available compiler: ${CMAKE_C_COMPILER} -- ${OPENMP_TEST_OUTPUT}")
 				string(REGEX MATCH "[Aa]bort" OPENMP_TEST_ABORT ${OPENMP_TEST_OUTPUT})
 				if(OPENMP_TEST_ABORT)
-					message(FATAL_ERROR "The default Apple provided compiler on your system has OpenMP bugs.\n You need to install gcc (version 4.4 or later) from MacPorts. See README file for more details.")
+					message(FATAL_ERROR "The default Apple provided compiler on your system has OpenMP bugs.\n You need to install gcc (version 4.2 or later) from MacPorts. See README file for more details.")
 				endif(OPENMP_TEST_ABORT)
 			else(OPENMP_TEST_RESULT)
 				SET(DARWIN_OPENMP_VERIFIED TRUE CACHE BOOL "Darwin OpenMP passed?")
@@ -87,12 +87,19 @@ if(NOT CMAKE_GENERATOR STREQUAL "Xcode")
 		message (FATAL_ERROR "OpenMP support is required")
 	endif(OPENMP_FOUND)
 else(NOT CMAKE_GENERATOR STREQUAL "Xcode")
+	# Determine Xcode version
+	message (STATUS "Xcode version ${XCODE_VERSION} detected.")
+
+    if(XCODE_VERSION VERSION_GREATER 4)
+		message (FATAL_ERROR "Xcode version 5 or greater detected. Unfortunately this version of Xcode does not support GCC/OpenMP which are required to build SEAStAR. Try using Xcode 4.x instead.")
+    endif(XCODE_VERSION VERSION_GREATER 4)
+
 	if(CMAKE_C_COMPILER_ID MATCHES "Clang")
 		message (FATAL_ERROR "Clang compiler detected. GCC must be used because OpenMP is required.")
 	endif(CMAKE_C_COMPILER_ID MATCHES "Clang")
 
 	if(${CMAKE_SYSTEM_NAME} STREQUAL "Darwin")
-		message(WARNING "XCode compilers as of XCode 4.2.1 on OS X Lion 10.7.2 contain known bugs making OpenMP code intermittantly unstable. If \"Abort trap: 6\" errors are encountered, please recompile using the Cmake makefile generator.")
+		message(WARNING "Xcode compilers as of Xcode 4.2.1 on OS X Lion 10.7.2 contain known bugs making OpenMP code intermittantly unstable. If \"Abort trap: 6\" errors are encountered, please recompile using the Cmake makefile generator.")
 	endif(${CMAKE_SYSTEM_NAME} STREQUAL "Darwin")
 	set(CMAKE_XCODE_ATTRIBUTE_GCC_VERSION "com.apple.compilers.llvmgcc42")
 	set(CMAKE_XCODE_ATTRIBUTE_ENABLE_OPENMP_SUPPORT YES)
@@ -104,8 +111,8 @@ execute_process(COMMAND bash -c "cd ${CMAKE_SOURCE_DIR}; git describe --match 'v
 if (GIT_VERSION)
 	add_definitions("-D SS_BUILD_VERSION='\"${GIT_VERSION}\"'")
 else (GIT_VERSION)
-	message(WARNING "SEAStAR version not detected from git. ${GIT_VERSION}") 
-	set(GIT_VERSION "v0.4.17")
+	message(WARNING "SEAStAR version not detected from git. ${GIT_VERSION}")
+	set(GIT_VERSION "v0.4.18")
 	add_definitions("-D SS_BUILD_VERSION='\"${GIT_VERSION}\"'")
 endif (GIT_VERSION)
 
@@ -127,7 +134,7 @@ set(COMMON_LIBS "m" "seastar_shared" "argtable2" "z")
 file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/output_test_data)
 file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/bin)
 
-# Note, it's important to keep these in this order for CTest because 
+# Note, it's important to keep these in this order for CTest because
 # the outputs of some tools' tests are used as the inputs of others.
 add_subdirectory(src_solid2fastq)
 add_subdirectory(src_fastq_nodup)

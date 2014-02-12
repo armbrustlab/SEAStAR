@@ -1,20 +1,40 @@
+### 0.4.18 ###
+
+- Fixed a formatting bug in the --z_stats option of the tetracalc
+tool. Also added documentation for the file format of the output
+of this option.
+
+- Added checks to be more proactive about deleting scaffolds and
+clusters of scaffolds when an operation invalidates the connected
+component structure of the connection graph. Also tightened-up
+checking for the presence of scaffolds and/or clusters for
+operations that require them.
+
+- Fixed a crash in the graph_ops GC and GCC commands when there
+are zero selected nodes.
+
+- Changed recommended compiler to GCC 4.7 and added cmake error
+when attempting to build under Xcode 5.
+
+- Documentation improvements.
+
 ### 0.4.17 ###
 
-- Fixed a bug in ref_select potentially affecting the accuracy of 
+- Fixed a bug in ref_select potentially affecting the accuracy of
 contig %GC calculations when nucleotide reference sequences were
 imported from a FASTA file using the --ref parameter. The bug only
 affects reference sequences containing non-'N' ambiguous nucleotides
-in one or more positions. Imported sequences consisting entirely of 
+in one or more positions. Imported sequences consisting entirely of
 [ACGNTacgnt] are not affected, and neither are reconstructed
 sequences (using -q). However, for analyses using --ref and containing
-affected sequences, it is highly recommended to re-run them through 
-ref_select and repeat all downstream analyses that depend on the 
-output %GC values, including most of the calculations done by 
-various graph_ops sub-commands that use mate-pair edge scores.   
+affected sequences, it is highly recommended to re-run them through
+ref_select and repeat all downstream analyses that depend on the
+output %GC values, including most of the calculations done by
+various graph_ops sub-commands that use mate-pair edge scores.
 
 - Fixed a bug in the graph_ops GC and GCC commands which caused the
-last completed command to be ommitted from the "Processing steps 
-completed" output. The command history was properly recorded, but 
+last completed command to be ommitted from the "Processing steps
+completed" output. The command history was properly recorded, but
 the most recent command wasn't being printed by GC/GCC.
 
 - Fixed a crash in the graph_ops SELND command when no valid nodes
@@ -23,27 +43,27 @@ are specified in the input parameters.
 ### 0.4.16 ###
 
 - Fixed a crash in ref_select that could occur with a seldom used
-compbination of input parameters. Specifically, if the --split option
+combination of input parameters. Specifically, if the --split option
 was invoked without providing a catalog file ref_select would segfault
 during preprocessing of the reference_sequence data.
 
 - Fixed an issue in ref_select that could cause inaccurate (too low)
-sequence coverage values to be reported and used in some downstream 
+sequence coverage values to be reported and used in some downstream
 calculations under specific circumstances. This issue only affected
 contiguous genome-sized (megabase+) reference sequences with very high
-read coverage (1000-fold+). The fix involves a precision change of 
-a variable used in coverage calculations, leading to slightly 
+read coverage (1000-fold+). The fix involves a precision change of
+a variable used in coverage calculations, leading to slightly
 different results under all circumstances (more significant digits
-of precision), but it should not significantly change results except in 
-the problem cases noted above that lead to underflow in coverage 
-calculations. 
+of precision), but it should not significantly change results except in
+the problem cases noted above that lead to underflow in coverage
+calculations.
 
 - Fixed a crash in graph_ops when performing certain operations on an
 input graph that contains no edges of a given type (such as output
 from ref_select when run on fragment only alignments that contain no
 mate-pair information).
 
-- Documentation improvements. 
+- Documentation improvements.
 
 ### 0.4.15 ###
 
@@ -51,17 +71,17 @@ mate-pair information).
 sequence/sequences now work as proper selection filters, acting on
 either all connected components, or a subset defined by one of the
 selection parameters (e.g. ccnum, names). These filter parameters
-may also now be combined, resulting in a conjunctive (AND) 
-relationship (ie. to be selected, a connected component must be 
-selected by all of the filters.) 
+may also now be combined, resulting in a conjunctive (AND)
+relationship (ie. to be selected, a connected component must be
+selected by all of the filters.)
 
-- Fixed problems in the graph_ops SELCC and SELCLUST commands that 
+- Fixed problems in the graph_ops SELCC and SELCLUST commands that
 could require SCAFF to be re-run after selecting a subset of scaffolds.
 Existing scaffolds are now properly remapped when a subset of them are
 selected via SELCC and SELCLUST. Note that scaffold clusters are still
 lost when using SELCC, which is intentional.
 
-- Fixed problems in the graph_ops MST, SST, SCAFF and SCRIPT commands 
+- Fixed problems in the graph_ops MST, SST, SCAFF and SCRIPT commands
 that could lead to crashes in several unusual corner cases.
 
 - Fixed a bug in ref_select that could lead to problems reading SAM files
@@ -83,15 +103,15 @@ when run on a graph that contains no reconstructed sequence.
 - Fixed a bug that could cause the graph_ops SCAFLNK command to find and
 report suboptimal scaffold connections.
 
-- Fixed a bug in the graph_ops CUTND command that could lead to 
-unintentional movement of mate-pair edges when the "include" parameter is 
-omitted.  Also removed a previous limitation in CUTND that silently 
+- Fixed a bug in the graph_ops CUTND command that could lead to
+unintentional movement of mate-pair edges when the "include" parameter is
+omitted.  Also removed a previous limitation in CUTND that silently
 prohibited moving edges to newly created nodes when the mean mate-pair
 position of the edge didn't fall within the region of the new node.
 
-- Added a new feature to graph_ops CUTND: the 'auto_include' parameter, 
+- Added a new feature to graph_ops CUTND: the 'auto_include' parameter,
 which will automatically move all selected mate-pair edges with positions
-that fall within the cut sequence, as though they had been individually 
+that fall within the cut sequence, as though they had been individually
 named in an 'include' parameter.
 
 - Changed the name of the graph_ops CUTND parameter 'start' to 'begin'.
@@ -108,7 +128,7 @@ makes the defaults of these complementary operations match each other.
 
 ### 0.4.13 ###
 
-- Fixed a bug in ref_select that could cause the program to hang when 
+- Fixed a bug in ref_select that could cause the program to hang when
 writing FASTQ output files on systems with only 1 or 2 processor cores, or
 when the option --num_threads=2 was used.
 
@@ -121,11 +141,11 @@ plucked away.
 
 ### 0.4.12 ###
 
-- Fixed bug that could cause crashes in graph_ops after use of the SELND 
-command. 
+- Fixed bug that could cause crashes in graph_ops after use of the SELND
+command.
 
-- Fixed bug in graph_ops that caused PLUCK PLUCK PUSH PUSH to produce 
-unintended behavior different from PLUCK {iterate:2} PUSH {iterate:2}. 
+- Fixed bug in graph_ops that caused PLUCK PLUCK PUSH PUSH to produce
+unintended behavior different from PLUCK {iterate:2} PUSH {iterate:2}.
 
 - Fixed a bug in ref_select that caused iterative reconstructions of the
 same reference sequence to be shifted in position by one base per iteration.
@@ -134,29 +154,29 @@ same reference sequence to be shifted in position by one base per iteration.
 the base number of 'n's (ambiguous bases) to insert into remaining gaps
 between contigs within a scaffold. The default remains unchanged at 15nt.
 
-- Formerly, the graph_ops PLUCK command would remove both contigs of a two 
+- Formerly, the graph_ops PLUCK command would remove both contigs of a two
 node "scaffold", since each is technically a leaf. PLUCK would also remove
 a single, unconnected contig on multiple PLUCK iterations. It no longer does
 these things because they can lead to valid scaffolds with low contig counts
-being "eroded away" and lost from subsequent analyses. 
+being "eroded away" and lost from subsequent analyses.
 
-- A new parameter was added to graph_ops PLUCK: "min_len" prevents PLUCK from 
+- A new parameter was added to graph_ops PLUCK: "min_len" prevents PLUCK from
 removing unconnected nodes containing more than a minimum amount of sequence,
-even on the first iteration. 
+even on the first iteration.
 
 - Added the 'sequences' parameter to the SELND and SELCC graph_ops commands.
-This option is the same as the prior 'sequence' parmeter, except that it 
+This option is the same as the prior 'sequence' parmeter, except that it
 accepts a list of sequences to match, (rather than just one).
 
-- The graph_ops CUTND command now accepts negative indices for 'start' and 
+- The graph_ops CUTND command now accepts negative indices for 'start' and
 'end' parameters, representing offsets from the end of the sequence, rather
 than the start. It is also more permissive with the provided coordaintes,
 allowing negative start positions before the start of the sequence and end
 positions after the end. This allows for trimming sequences to a maximum
-length from either end without regard for sequence length. 
+length from either end without regard for sequence length.
 
-- The graph_ops SCRIPT command CLI is now more permissive about the formatting 
-of the JSON parameter lists given for commands. They may now be quoted (to 
+- The graph_ops SCRIPT command CLI is now more permissive about the formatting
+of the JSON parameter lists given for commands. They may now be quoted (to
 permit cut/paste from bash command lines) and they may contain whitespace
 between the JSON elements (which is permitted in quoted bash parameters).
 
@@ -164,36 +184,36 @@ between the JSON elements (which is permitted in quoted bash parameters).
 
 ### 0.4.11 ###
 
-- The graph_ops INSERT command now has two new parameters which are enabled by 
+- The graph_ops INSERT command now has two new parameters which are enabled by
 default. dup_kmer and dup_thresh control the k-mer length and a fractional
-threshold used to determine if a contig about to be inserted between to 
+threshold used to determine if a contig about to be inserted between to
 pre-existing scaffold contigs contains any substantial duplications (e.g. it is
 a variant assembly) of contigs already in the scaffold.  This can be a problem
-for metagenomic assemblies where a few variant SNPs occurring near the end of a 
+for metagenomic assemblies where a few variant SNPs occurring near the end of a
 contig can cause the contig assembler to produce an alternate assembly for that
-region. In this case, the mate pairing information may incorrectly direct that 
+region. In this case, the mate pairing information may incorrectly direct that
 sequence into the gap nearest to where the other variant is already integrated
-in an existing contig. These changes to INSERT detect and avoid most such 
+in an existing contig. These changes to INSERT detect and avoid most such
 situations.
 
 - The graph_ops SELND command now has the same "sequence" selection parameter
 that was previously added to the SELCC command.
 
 - seq_scaffold now attempts to find direct sequence overlaps to fill the gap
-between neighboring contigs before attempting to heal the gap using contigs 
-from an alternate assembly. This change causes seq_scaffold to avoid some 
-situations where an erroneous alternate assembly can cause sequence 
+between neighboring contigs before attempting to heal the gap using contigs
+from an alternate assembly. This change causes seq_scaffold to avoid some
+situations where an erroneous alternate assembly can cause sequence
 duplication into a gap that could be filled via a simple end-overlap.
 
-- Improved the diagnostic (--verbose) output of seq_scaffold for gaps "healed" 
+- Improved the diagnostic (--verbose) output of seq_scaffold for gaps "healed"
 with sequence from alternate assembly contigs.
 
 - Fixed a bug that caused seq_scaffold to crash when all input scaffold
 sequences are largely ambiguous.
 
-- In ref_select, combination of --per_base and --mate_pair now implicitly 
+- In ref_select, combination of --per_base and --mate_pair now implicitly
 turn on --mp_inserts functionality; previously this needed to be done
-manually, even though the above combination depends on enabling --mp_inserts 
+manually, even though the above combination depends on enabling --mp_inserts
 to work correctly.
 
 - Improved the test_data set and included a script to regenerate the lambda
@@ -215,19 +235,19 @@ reconstruction and matching/non-matching read output.
 
 - Added a new parameter to ref_select and changed the default behavior when
 determining which potential edges to write to the assembly graph. Previously,
-only edges scoring 250.0 bits or greater were written by default. A new 
-parameter: --mp_mate_cnt has been introduced to complement the existing 
+only edges scoring 250.0 bits or greater were written by default. A new
+parameter: --mp_mate_cnt has been introduced to complement the existing
 parameter --mp_mate_lim. It has a default value of 2, and it is the
 minimum number of read-pairs that must be represented in an edge for it
-to be written (regardless of bitscore). With this change, the default value 
+to be written (regardless of bitscore). With this change, the default value
 of --mp_mate_lim is now 0.0. Many more edges will now be output by default,
 although scripts written to use --mp_mate_lim will continue to work correctly,
 with the slight change that they will no longer receive edges that are backed
 by only a single read-pair. The exact previous behavior can be obtained by
-adding --mp_mate_cnt=1 to the ref_select parameters. 
+adding --mp_mate_cnt=1 to the ref_select parameters.
 
-- In conjuction with the above change, the JSON assembly graph file now  
-includes the read count for each output edge recorded in a new member called 
+- In conjuction with the above change, the JSON assembly graph file now
+includes the read count for each output edge recorded in a new member called
 "num".
 
 - Fixed a bug in seq_scaffold that could cause it to crash when a contig
@@ -238,32 +258,32 @@ with fewer than 20 unambiguous bases was encountered.
 ### 0.4.8 ###
 
 - Added the new "shift" option to the graph_ops SELCC and SELCLUST commands
-to enable smoother iterative constucts in script.go files. This provides a 
-shorthand way to keep all but the first clust or cc, (like range [1,-1], 
-but without generating an error when called with only one clust or cc 
+to enable smoother iterative constucts in script.go files. This provides a
+shorthand way to keep all but the first clust or cc, (like range [1,-1],
+but without generating an error when called with only one clust or cc
 remaining.
 
 - Added a new "sequence" option to the graph_ops SELCC command that allows
 selecting one or more connected components based on the present of an exact
-matching DNA subsequence (or its reverse compliment) 
+matching DNA subsequence (or its reverse compliment)
 
-- Added a feature in graph_ops allowing scaffolds to survive use of SELCLUST 
-command with the "exclusive" option set to "true". Previously, rerunning 
+- Added a feature in graph_ops allowing scaffolds to survive use of SELCLUST
+command with the "exclusive" option set to "true". Previously, rerunning
 the SCAFF command was necessary in this case.
 
-- Fixed a bug in the graph_ops SCRIPT command option "tag" which prevented 
+- Fixed a bug in the graph_ops SCRIPT command option "tag" which prevented
 the tag value from propagating into recursive SCRIPT commands as intended.
 
-- Fixed a bug in graph_ops that could cause crashes in the RELINK command 
-when invoked with the "complete" option set to true. 
+- Fixed a bug in graph_ops that could cause crashes in the RELINK command
+when invoked with the "complete" option set to true.
 
-- Fixed bugs in graph_ops that caused corruption of STASHed graphs when an 
+- Fixed bugs in graph_ops that caused corruption of STASHed graphs when an
 invalid range of values was provided to the SELCC or SELCLUST commands.
 
-- Fixed a bug in the graph_ops CLUST command that caused tetracalc to fail 
+- Fixed a bug in the graph_ops CLUST command that caused tetracalc to fail
 when multiple commandline options were provided via the "options" parameter.
 
-- Fixed a bug in the graph_ops FASTA command that could cause additional 
+- Fixed a bug in the graph_ops FASTA command that could cause additional
 problems if filesystem errors were encountered in writing the output data.
 
 - Fixed a bug in seq_scaffold that would cause an error at the end of writing
@@ -279,8 +299,8 @@ to stdout on some platforms.
 ### 0.4.7 ###
 
 - Added the "tag" parameter to the graph_ops SCRIPT command, allowing for .go
-script files to be more easily reused, by enabling them to write output files 
-with different filenames and/or into different directory paths. 
+script files to be more easily reused, by enabling them to write output files
+with different filenames and/or into different directory paths.
 
 - Fixed a bug in RDP_tree_dev.coffee that did not properly handle pre-existing
 incertae_sedis nodes.
@@ -291,18 +311,18 @@ limit was already set before running the script.
 - nodejs version 0.10 or higher is now required to run graph_ops, seq_scaffold
 and other SEAStAR tools requiring command-line Javascript support.
 
-- Fixed a bug that occasionally produced truncated files when using gzip 
+- Fixed a bug that occasionally produced truncated files when using gzip
 compressed output in graph_ops when run using nodejs version 0.10.x.
 
 - Fixed assorted typos in help strings and documentation.
 
 ### 0.4.6 ###
 
-- Fixed bugs in graph_ops that on rare occasions led to "stack overflow" errors 
+- Fixed bugs in graph_ops that on rare occasions led to "stack overflow" errors
 and/or invalid JSON output files when using the DUMP command with very large
 sequence graph datasets.
 
-- Adjusted the "Garbage Collection" settings used with nodejs to improve 
+- Adjusted the "Garbage Collection" settings used with nodejs to improve
 performance and work around a rare case where memory fragmentation caused node
 to allocate far more memory than required and become unstable.
 
@@ -312,29 +332,29 @@ to allocate far more memory than required and become unstable.
 reads were provided that lacked /1 or /2 suffixes on the read ids. This affects
 Illumina reads and SOLiD reads prepared using solid2fastq with the -x option.
 
-- Fixed issues in graph_ops which could cause poor performance or out of memory 
-errors when loading or saving very large JSON files, even when there is plenty 
-of memory available. With this change, it is recommended for performance reasons 
+- Fixed issues in graph_ops which could cause poor performance or out of memory
+errors when loading or saving very large JSON files, even when there is plenty
+of memory available. With this change, it is recommended for performance reasons
 that SEAStAR be run with node.js version 0.10 or higher.
 
 - Misc documentation fixes and enhancements
 
 ### 0.4.4 ###
 
-- Added new options to trimfastq supporting the output of FASTA format files and 
+- Added new options to trimfastq supporting the output of FASTA format files and
 adding more flexibility to the --mates_file output functionality. Also optimized
 the case where -p = 0.0, to enable very efficient file format conversion using
 --fasta and --mate_file when no additional trimming is desired.
 
 - Fixed bug in fastq_nodup which led to corruption of the read headers in .single
-output files for colorspace reads. 
+output files for colorspace reads.
 
 - All *.awk scripts in the /bin directory now have correct shebang lines, so they
-may be located and run through the PATH. 
+may be located and run through the PATH.
 
 - Added new script fastq_merge_csfasta.awk to pull modified csfasta read data back
-into the originating fastq file. This is useful when using the SAET read error 
-correction tool, which only supports csfasta format files.  
+into the originating fastq file. This is useful when using the SAET read error
+correction tool, which only supports csfasta format files.
 
 - Documentation fixes and updates reflecting the above changes.
 
@@ -362,18 +382,18 @@ correction tool, which only supports csfasta format files.
 - Added this change log.
 
 ### 0.4.0 ###
-- solid2fastq: Reversed the meaning of "read1" and "read2" file names for 
-mate-pairs.  "read1" is the first read in a pair and "read2" is the second 
+- solid2fastq: Reversed the meaning of "read1" and "read2" file names for
+mate-pairs.  "read1" is the first read in a pair and "read2" is the second
 read, 5' to 3'.
 
-- solid2fastq: Added support for new native SOLiD file read type "F5-RNA" and 
+- solid2fastq: Added support for new native SOLiD file read type "F5-RNA" and
 variations on "QV" placement in quality files.
 
 - solid2fastq: Added -x parameter to turn of read ID suffix of "/1" and "/2".
 
-- trimfastq:  Removed -c parameter.  This parameter toggled dinucleotide error 
-probability calculation.  Now trimfastq automatically detects if a read set is 
-colorspace or nucleotide and chooses the appropriate error probability 
+- trimfastq:  Removed -c parameter.  This parameter toggled dinucleotide error
+probability calculation.  Now trimfastq automatically detects if a read set is
+colorspace or nucleotide and chooses the appropriate error probability
 calculation method.
 
 - fastq_nodup: Fixed bug where index lengths of 32 would cause a segfault.
@@ -381,4 +401,4 @@ calculation method.
 - fastq_nodup: Fixed bug where too many singlets were removed.
 
 - Added new programs ref_select, tetracalc, graph_ops, and many other utility
-scripts.  
+scripts.

@@ -41,10 +41,10 @@ The SEAStAR package has dependencies on a small number of software packages that
 
 ####Required Tools:
  
-* [gcc](http://gcc.gnu.org) -- version 4.4 or newer, supporting [OpenMP](http://openmp.org). 
+* [gcc](http://gcc.gnu.org) -- version 4.2 or newer, supporting [OpenMP](http://openmp.org) (version 4.7.3 recommended) 
 * [cmake](http://www.cmake.org) -- version 2.8 or newer
 * [node.js](http://nodejs.org) -- version 0.10 or newer
-* [gawk](http://www.gnu.org/software/gawk/) -- version 3.1.5 or newer (version 4.0 or newer recommended))
+* [gawk](http://www.gnu.org/software/gawk/) -- version 3.1.5 or newer (version 4.0.2 recommended)
 
 Additional instructions are available below for fulfilling these requirements for Mac OS X, and for programmers wishing to make modifications to the included source code.
 
@@ -86,15 +86,15 @@ Then run the following commands to install the required packages:
     sudo port install cmake
     sudo port install node
     sudo port install gawk
-    sudo port install gcc44
+    sudo port install gcc47
 
-Note, it is possible to use a newer version of gcc (such as gcc47) if you already have it installed or for some other reason. However, most of our OS X testing has been performed with gcc version 4.4.
+Note, it is possible to use other versions of gcc (versions 4.2 or newer) if you already have it installed or for some other reason. However, most of our OS X testing has been performed with gcc version 4.7.
 
 It may be possible to use [HomeBrew](http://mxcl.github.com/homebrew/) instead of Macports to install these packages, but we haven't tested it.
 
 You will need to define an environment variable to explicitly tell cmake which compiler to use. Note that this must be done each time you start a command line session where you wish to run cmake again (or add it to your shell startup file, e.g. .bashrc in your home directory).  For example:
  
-    export CC=/opt/local/bin/gcc-mp-4.4  # change this if you are using a different version!
+    export CC=/opt/local/bin/gcc-mp-4.7  # change this if you are using a different version!
 
 ####An important note about compilers on Mac OS X (starting with Xcode 4.2 on OS X 10.7 and later versions):
 

@@ -387,7 +387,7 @@ int main(const int argc, char *argv[]) {
     struct arg_lit *h = arg_lit0("h","help","Request help.");
  	struct arg_lit *version = arg_lit0("v","version","Print the build version and exit.");
     struct arg_lit *v = arg_lit0(NULL,"verbose","Print detailed status to stderr during run. [FALSE]");
-    struct arg_str *detail = arg_strn("d","detail","<seq_id>",0,100,"Only produce per-base statistics and reconstructed seqeunce for listed seq ids. [ALL SEQS]");
+    struct arg_str *detail = arg_strn("d","detail","<seq_id>",0,100,"Only produce per-base statistics and reconstructed sequence for listed seq ids. [ALL SEQS]");
     struct arg_file *detail_file = arg_file0(NULL,"detail_file","<detail_file>","Filename of file containing sequence ids to treat as in --detail [NULL]");
     struct arg_lit *seq_recon = arg_lit0("q","recon_seq","Reconstruct sequences from input reads [NULL]");
     struct arg_file *seq_ref = arg_file0(NULL,"ref","<ref_file>","Filename of file containing reference sequences which will be output in place of reconstructed sequence [NULL]");

@@ -37,7 +37,7 @@ if(CMAKE_GENERATOR STREQUAL "Xcode")
     add_custom_command(
         TARGET tetracalc
         POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E remove -f ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/tetracalc 
+        COMMAND ${CMAKE_COMMAND} -E remove -f ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/tetracalc
         COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:tetracalc> ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/tetracalc
 )
 endif(CMAKE_GENERATOR STREQUAL "Xcode")

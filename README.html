@@ -32,10 +32,10 @@
 <p>The SEAStAR package has dependencies on a small number of software packages that you (or your system administrator) may need to install or update. The process described in the next section will notify you if your system is missing any of these components.</p>
 <h4>Required Tools:</h4>
 <ul>
-<li><a href="http://gcc.gnu.org">gcc</a> -- version 4.4 or newer, supporting <a href="http://openmp.org">OpenMP</a>. </li>
+<li><a href="http://gcc.gnu.org">gcc</a> -- version 4.2 or newer, supporting <a href="http://openmp.org">OpenMP</a> (version 4.7.3 recommended) </li>
 <li><a href="http://www.cmake.org">cmake</a> -- version 2.8 or newer</li>
 <li><a href="http://nodejs.org">node.js</a> -- version 0.10 or newer</li>
-<li><a href="http://www.gnu.org/software/gawk/">gawk</a> -- version 3.1.5 or newer (version 4.0 or newer recommended))</li>
+<li><a href="http://www.gnu.org/software/gawk/">gawk</a> -- version 3.1.5 or newer (version 4.0.2 recommended)</li>
 </ul>
 <p>Additional instructions are available below for fulfilling these requirements for Mac OS X, and for programmers wishing to make modifications to the included source code.</p>
 <p>Once you have the above packages: To build SEAStAR using Unix style command line tools, run the following commands from the directory where all files generated in the build process should be placed (including executables). This is your &quot;destination tree&quot;. </p>
@@ -62,11 +62,11 @@ make</code></pre>
 sudo port install cmake
 sudo port install node
 sudo port install gawk
-sudo port install gcc44</code></pre>
-<p>Note, it is possible to use a newer version of gcc (such as gcc47) if you already have it installed or for some other reason. However, most of our OS X testing has been performed with gcc version 4.4.</p>
+sudo port install gcc47</code></pre>
+<p>Note, it is possible to use other versions of gcc (versions 4.2 or newer) if you already have it installed or for some other reason. However, most of our OS X testing has been performed with gcc version 4.7.</p>
 <p>It may be possible to use <a href="http://mxcl.github.com/homebrew/">HomeBrew</a> instead of Macports to install these packages, but we haven&#39;t tested it.</p>
 <p>You will need to define an environment variable to explicitly tell cmake which compiler to use. Note that this must be done each time you start a command line session where you wish to run cmake again (or add it to your shell startup file, e.g. .bashrc in your home directory).  For example:</p>
-<pre><code>export CC=/opt/local/bin/gcc-mp-4.4  # change this if you are using a different version!</code></pre>
+<pre><code>export CC=/opt/local/bin/gcc-mp-4.7  # change this if you are using a different version!</code></pre>
 <h4>An important note about compilers on Mac OS X (starting with Xcode 4.2 on OS X 10.7 and later versions):</h4>
 <p>There are known bugs in OpenMP (multi-core processor support) in the gcc compiler Apple supplies with Xcode 4.x on OS X 10.7+ (gcc support has been completely dropped in Xcode 5). Xcode&#39;s default Clang-based compiler does not support OpenMP; this is why we specify above that you must install the gcc compiler using MacPorts. The cmake script provided checks OS X systems to see if the OpenMP support is working correctly with the default (or specified) C compiler. If you receive an error when trying to build that says &quot;You need to install gcc (version 4.4 or later) from MacPorts&quot; it is because our build system is attempting to use the Xcode gcc compiler, and not the one you installed from MacPorts.</p>
 <h3>For Developers</h3>
