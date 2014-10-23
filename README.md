@@ -1,4 +1,5 @@
 <link href="style.css" media="screen" rel="stylesheet" type="text/css" />
+[![Build Status](https://travis-ci.org/armbrustlab/SEAStAR.svg?branch=master)](https://travis-ci.org/armbrustlab/SEAStAR)
 
 SEAStAR - A framework for the analysis of next-generation metagenomes (and more)
 ------------------------------
