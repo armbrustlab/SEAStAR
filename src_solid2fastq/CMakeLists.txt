@@ -1,6 +1,6 @@
 # -------------------------------------------------------------------------- #
 # Center for Environmental Genomics
-# Copyright (C) 2009-2012 University of Washington.
+# Copyright (C) 2009-2014 University of Washington.
 #
 # Authors:
 # Vaughn Iverson
@@ -23,7 +23,7 @@
 # -------------------------------------------------------------------------- #
 
 # CMake file for solid2fastq
-cmake_minimum_required (VERSION 2.8)
+cmake_minimum_required (VERSION 2.8.5)
 
 project (solid2fastq C)
 
@@ -60,7 +60,8 @@ add_test(NAME solid2fastq_test_no_suffix COMMAND bash -c "$<TARGET_FILE:solid2fa
 set_tests_properties(solid2fastq_test_no_suffix PROPERTIES PASS_REGULAR_EXPRESSION "791734e70eb0c93f6db4fa21daf2a263" TIMEOUT 30)
 
 # Create unsynced input fastq to test solid2fastq sorting.  These reads are 
-# colorspace, but it's ok to treat them as nucleotide for testing.
-add_test(NAME solid2fastq_nt_input_test_data COMMAND bash -c "gzip -dc ${CMAKE_BINARY_DIR}/output_test_data/lambda_reads.read1.fastq.gz | ${GAWK_EXEC} -v EVERY=4 -v HEADSTART=@ -v F3=_F3 -v R3=_R3 'line == 4 {x=0; line=0} NR % 4 == 1 {cnt++;sub(/^[^:]+:/, HEADSTART);sub(/\\/2$/, F3);sub(/\\/1$/, R3)} cnt % EVERY == 0 {x=1} x == 1 {line++; next} {print}' | gzip >${CMAKE_BINARY_DIR}/output_test_data/lambda_reads_unsync_default_R3.fastq.gz; gzip -dc ${CMAKE_BINARY_DIR}/output_test_data/lambda_reads.read2.fastq.gz | ${GAWK_EXEC} -v EVERY=3 -v HEADSTART=@ -v F3=_F3 -v R3=_R3 'line == 4 {x=0; line=0} NR % 4 == 1 {cnt++;sub(/^[^:]+:/, HEADSTART);sub(/\\/1$/, R3);sub(/\\/2$/, F3)} cnt % EVERY == 0 {x=1} x == 1 {line++; next} {print}' | gzip >${CMAKE_BINARY_DIR}/output_test_data/lambda_reads_unsync_default_F3.fastq.gz; $<TARGET_FILE:solid2fastq> -b default -z --prefix=lambda_tst ${CMAKE_BINARY_DIR}/output_test_data/lambda_reads_unsync ${CMAKE_BINARY_DIR}/output_test_data/lambda_reads_sync; gunzip -c ${CMAKE_BINARY_DIR}/output_test_data/lambda_reads_sync.{read1,read2,single}.fastq.gz | openssl md5")
+# colorspace, but it's ok to treat them as nucleotide for testing.  To unsync
+# R3 (read1) and F3 (read2) skip every fourth R3 read and every third F3 read
+add_test(NAME solid2fastq_nt_input_test_data COMMAND bash -c "gzip -dc ${CMAKE_BINARY_DIR}/output_test_data/lambda_reads.read1.fastq.gz | ${GAWK_EXEC} -v EVERY=4 -v HEADSTART=@ -v F3=_F3 -v R3=_R3 'line == 4 {x=0; line=0} NR % 4 == 1 {cnt++;sub(/^[^:]+:/, HEADSTART);sub(/\\/2$/, F3);sub(/\\/1$/, R3)} cnt % EVERY == 0 {x=1} x == 1 {line++; next} {print}' | gzip >${CMAKE_BINARY_DIR}/output_test_data/lambda_reads_nt_unsync_default_R3.fastq.gz; gzip -dc ${CMAKE_BINARY_DIR}/output_test_data/lambda_reads.read2.fastq.gz | ${GAWK_EXEC} -v EVERY=3 -v HEADSTART=@ -v F3=_F3 -v R3=_R3 'line == 4 {x=0; line=0} NR % 4 == 1 {cnt++;sub(/^[^:]+:/, HEADSTART);sub(/\\/1$/, R3);sub(/\\/2$/, F3)} cnt % EVERY == 0 {x=1} x == 1 {line++; next} {print}' | gzip >${CMAKE_BINARY_DIR}/output_test_data/lambda_reads_nt_unsync_default_F3.fastq.gz; $<TARGET_FILE:solid2fastq> -b default -z --prefix=lambda_tst ${CMAKE_BINARY_DIR}/output_test_data/lambda_reads_nt_unsync ${CMAKE_BINARY_DIR}/output_test_data/lambda_reads_nt; gunzip -c ${CMAKE_BINARY_DIR}/output_test_data/lambda_reads_nt.{read1,read2,single}.fastq.gz | openssl md5")
 
 set_tests_properties(solid2fastq_nt_input_test_data PROPERTIES PASS_REGULAR_EXPRESSION "5c85d2f526c9cc9fb28068e6d33b9283" TIMEOUT 30)

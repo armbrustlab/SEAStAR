@@ -26,24 +26,25 @@
 
 #
 # fastq_sub.coffee -- Coffeescript fastq subdivider
-# 
+#
 # Arguments: <input filename> <number of parts> <part number to produce>
 #
 
-unless process.version.split('.')[1] >= 10   # Require node version v0.x.y to be x >= 10
+ver = process.version[1..].split('.')
+unless ver[1] >= 10 or ver[0] > 0   # Require node version >= 0.10.x
    console.error("ERROR: nodejs version v0.10.0 or greater required.")
-   process.exit(1) 
+   process.exit(1)
 
 fs = require('fs')
 util = require('util')
 
 # Catch exceptions
-process.on 'uncaughtException', (err) -> 
+process.on 'uncaughtException', (err) ->
   process.stderr.write "Caught exception: #{err}\n"
   process.exit 1
 
-# grab command line args:  
-[fn,num_parts,part_num] = process.argv[2..4]  
+# grab command line args:
+[fn,num_parts,part_num] = process.argv[2..4]
 
 # parse integers from cmd line strings
 num_parts = parseInt(num_parts)
@@ -73,10 +74,10 @@ else  # calculate the starting and ending positions
 
 # Opening the stream and parsing it for lines, etc....
 instream = fs.createReadStream(fn,{flags:'r',encoding:'ascii',bufferSize:Math.pow(2,16),start:start})
-             .on('open',(fd) -> 
+             .on('open',(fd) ->
                 process.stderr.write "Stream opened on file descriptor #{fd}\n")
              .on('data', do () ->
-                save = ''         # Store unused characters from last line of previous buffer 
+                save = ''         # Store unused characters from last line of previous buffer
                 save_lines = []   # Store unused lines (parts of a read) from previous buffer
                 data_used = 0     # How much data has been consumed so far
                 return (c) ->     # Function to call when a new data buffer is available
@@ -93,11 +94,11 @@ instream = fs.createReadStream(fn,{flags:'r',encoding:'ascii',bufferSize:Math.po
                        data_used += l.length+1 for l in lines[0..3]
                        # data_used += lines[0..3].reduce(((x,y)->(x+y.length)),4)
                        per_read(lines.splice(0,4))
-                   # decide when to end    
+                   # decide when to end
                    if start+data_used >= end
-                      process.stderr.write ("#{data_used} bytes consumed. Should stop at #{end}\n")   
-                      process.exit 1 
-                   
+                      process.stderr.write ("#{data_used} bytes consumed. Should stop at #{end}\n")
+                      process.exit 1
+
                    save_lines = lines   # Save the remaining lines for next time
                 )
 

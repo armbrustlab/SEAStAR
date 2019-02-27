@@ -1,6 +1,6 @@
 # -------------------------------------------------------------------------- #
 # Center for Environmental Genomics
-# Copyright (C) 2009-2012 University of Washington.
+# Copyright (C) 2009-2014 University of Washington.
 #
 # Authors:
 # Vaughn Iverson
@@ -22,8 +22,8 @@
 # along with SEAStAR.  If not, see <http://www.gnu.org/licenses/>.
 # -------------------------------------------------------------------------- #
 
-# CMake file for seastar_shared 
-cmake_minimum_required (VERSION 2.8)
+# CMake file for seastar_shared
+cmake_minimum_required (VERSION 2.8.5)
 
 project (seastar_shared C)
 

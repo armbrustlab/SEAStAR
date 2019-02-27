@@ -341,7 +341,7 @@ int ss_is_colorspace_fastq(char *fn) {
             
             // Detect colorspace read alignments by the naming convention that preserves the
             // primer base and first color in the header line between '@' and '+'.
-            // e.g.  >TA+49|lambda:1231_1682_1381
+            // e.g.  @TA+49|lambda:1231_1682_1381
             //        ^^
             // This checks syntax and protects against buffer overflow below.
             if (strspn(utstring_body(str), "@+ACGTNacgtn") >= 3) {
@@ -398,6 +398,37 @@ int ss_is_fastq(char *fn) {
     utstring_free(file_name);
     
     return fastq;
+}
+
+/////////////////////////////////////////////////////////////////
+// 
+// ss_check_fastq_files
+//
+// This function checks if files are all colorspace or all nucleotide.
+// If data is mixed colorspace and nucleotide, exit with an error.
+// If data is all colorspace return 1.  If all nucleotide return 0.
+// Files are checked with names as given and with a ".gz" suffix.
+//
+
+int ss_check_fastq_files(char *r1, char *r2, char *s1, char *s2) {
+    // Check if input fastq is colorspace
+    // If some files are colorspace and some are basespace, throw an error
+    int fcount = 0;
+    int cscount = 0;
+    fcount += ss_is_fastq(r1);
+    fcount += ss_is_fastq(r2);
+    fcount += ss_is_fastq(s1);
+    fcount += ss_is_fastq(s2);
+    cscount += (ss_is_fastq(r1) && ss_is_colorspace_fastq(r1));
+    cscount += (ss_is_fastq(r2) && ss_is_colorspace_fastq(r2));
+    cscount += (ss_is_fastq(s1) && ss_is_colorspace_fastq(s1));
+    cscount += (ss_is_fastq(s2) && ss_is_colorspace_fastq(s2));
+
+    if (cscount && (cscount != fcount)) {
+        fprintf(stderr, "Error: Mixed colorspace and basespace FASTQ files detected\n");
+        exit(EXIT_FAILURE);
+    }
+    return cscount ? 1 : 0;  // 1 if colorspace, 0 if nucleotide
 }
 
 /////////////////////////////////////////////////////////////////

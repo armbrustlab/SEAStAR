@@ -75,7 +75,7 @@ double entropy_calc(char *seqdata, int len);
 
 unsigned long int fq_stream_trimmer(UT_string *fq_fn, int pipe_fd, UT_string *out_prefix, int no_pre, int len_pre, unsigned long int *comp_cnt, unsigned long int *org, char split, int fmt_fasta);
 
-void output_read(UT_string *fwd, UT_string *rev, UT_string *tmp, FILE *input, FILE *output, FILE *mates_output, int fmt_fasta);
+void output_read(UT_string *fwd, UT_string *rev, UT_string *tmp, FILE *input, FILE *output, FILE *mates_output, int fmt_fasta, int colorspace);
 
 int keep_read(UT_string *header);
 
@@ -146,6 +146,7 @@ int main(int argc, char *argv[]) {
     struct arg_lit *entropy_strict = arg_lit0(NULL, "entropy_strict", "Reject reads for low entropy overall, not just the retained part after trimming [NULL]");
     struct arg_lit *mates = arg_lit0(NULL, "mates_file", "Produce a Velvet compatible interleaved paired read output file (e.g. <out_prefix>_mates.fastq). [NULL]");
     struct arg_lit *no_rev = arg_lit0(NULL, "no_rev", "By default, the second read in each pair is reversed for colorspace --mate-file output. --no_rev disables reversing. [rev]");
+    struct arg_lit *force_rev = arg_lit0(NULL, "force_rev", "By default, the second read in each pair is not reversed for nucleotide --mate-file output. --force_rev forces reversing. [no rev]");
     struct arg_lit *only_mates = arg_lit0(NULL, "only_mates", "Supress writing .read1 and .read2 outputs. Requires --mates_file. [NULL]");
     struct arg_lit *fasta = arg_lit0(NULL, "fasta", "Write FASTA format files instead of FASTQ for all outputs (e.g. <out_prefix>.<read_type>.fasta). [FASTQ]");
     struct arg_file *input = arg_file1(NULL, NULL, "<in_prefix>", "Input file prefix: (e.g. <in_prefix>_single.fastq [<in_prefix>_read1.fastq <in_prefix>_read2.fastq]) ");
@@ -154,7 +155,7 @@ int main(int argc, char *argv[]) {
     struct arg_lit *h = arg_lit0("h", "help", "Request help.");
     struct arg_end *end = arg_end(20);
     
-    void *argtable[] = {h,version,gzip,inv_singles,num_singles,sing_rem,prob,len,mate_len,fixed_len,pre_read_id,pre_read_len,no_pre,entropy,entropy_strict,mates,no_rev,only_mates,fasta,input,output,end};
+    void *argtable[] = {h,version,gzip,inv_singles,num_singles,sing_rem,prob,len,mate_len,fixed_len,pre_read_id,pre_read_len,no_pre,entropy,entropy_strict,mates,no_rev,force_rev,only_mates,fasta,input,output,end};
     int arg_errors = 0;
         
     ////////////////////////////////////////////////////////////////////////
@@ -301,6 +302,16 @@ int main(int argc, char *argv[]) {
         exit(EXIT_FAILURE);
     }
     
+    if ((force_rev->count) && (!mates->count)) {
+        fprintf(stderr, "--force_rev requires --mates.\n");
+        exit(EXIT_FAILURE);
+    }
+    
+    if ((no_rev->count) && (force_rev->count)) {
+        fprintf(stderr, "--no_rev and --force_rev are mutually exclusive.\n");
+        exit(EXIT_FAILURE);
+    }
+    
     // Check for null string prefixes
     if (!(strlen(input->filename[0]) && strlen(output->filename[0]))) {
         fprintf(stderr, "Error: NULL prefix strings are not permitted.\n");
@@ -350,24 +361,11 @@ int main(int argc, char *argv[]) {
     // singles->count inverts the current singles file input scheme
     singles_flag = (singles_flag ^ inv_singles->count);
     
-    // Check if input fastq is colorspace
-    // If some files are colorspace and some are basespace, throw an error
-    int fcount = 0;
-    int cscount = 0;
-    fcount += ss_is_fastq(utstring_body(in_read1_fq_fn));
-    fcount += ss_is_fastq(utstring_body(in_read2_fq_fn));
-    fcount += ss_is_fastq(utstring_body(in_single1_fq_fn));
-    fcount += ss_is_fastq(utstring_body(in_single2_fq_fn));
-    cscount += (ss_is_fastq(utstring_body(in_read1_fq_fn)) && ss_is_colorspace_fastq(utstring_body(in_read1_fq_fn)));
-    cscount += (ss_is_fastq(utstring_body(in_read2_fq_fn)) && ss_is_colorspace_fastq(utstring_body(in_read2_fq_fn)));
-    cscount += (ss_is_fastq(utstring_body(in_single1_fq_fn)) && ss_is_colorspace_fastq(utstring_body(in_single1_fq_fn)));
-    cscount += (ss_is_fastq(utstring_body(in_single2_fq_fn)) && ss_is_colorspace_fastq(utstring_body(in_single2_fq_fn)));
-    
-    if (cscount && (cscount != fcount)) {        
-        printf("Error: Mixed colorspace and basespace FASTQ files detected\n");
-        exit(EXIT_FAILURE);
-    }
-    colorspace_flag = cscount ? 1 : 0;
+    // Check if colorspace data
+    colorspace_flag = ss_check_fastq_files(utstring_body(in_read1_fq_fn),
+                                           utstring_body(in_read2_fq_fn),
+                                           utstring_body(in_single1_fq_fn),
+                                           utstring_body(in_single2_fq_fn));
     
     // Output filenames
     
@@ -489,7 +487,6 @@ int main(int argc, char *argv[]) {
 #pragma omp section 
         {   // Dispatcher
 
-            
             // Allocate data buffer strings
             
             UT_string *r1_data;
@@ -500,10 +497,9 @@ int main(int argc, char *argv[]) {
             utstring_new(s1_data);
             UT_string *s2_data;
             utstring_new(s2_data);
-            
+
             UT_string *rev_tmp;
             utstring_new(rev_tmp);
-            
             UT_string *rev_data;
             utstring_new(rev_data);
             
@@ -543,35 +539,35 @@ int main(int argc, char *argv[]) {
                         if (mates->count) {
                             if (only_mates->count) {
                                 // Interleaved velvet output only
-                                output_read(r1_data, NULL, NULL, r1_in, NULL, mates_out, fasta->count);
-                                if (no_rev->count || !colorspace_flag) {
-                                    output_read(r2_data, NULL, NULL, r2_in, NULL, mates_out, fasta->count);
+                                output_read(r1_data, NULL, NULL, r1_in, NULL, mates_out, fasta->count, colorspace_flag);
+                                if (no_rev->count || !(colorspace_flag || force_rev->count)) {
+                                    output_read(r2_data, NULL, NULL, r2_in, NULL, mates_out, fasta->count, colorspace_flag);
                                 } else {
-                                    output_read(r2_data, rev_data, rev_tmp, r2_in, NULL, mates_out, fasta->count);
+                                    output_read(r2_data, rev_data, rev_tmp, r2_in, NULL, mates_out, fasta->count, colorspace_flag);
                                 }
                             } else {
                                 // Interleaved velvet output and normal read file output
-                                output_read(r1_data, NULL, NULL, r1_in, r1_out, mates_out, fasta->count);
-                                if (no_rev->count || !colorspace_flag) {
-                                    output_read(r2_data, NULL, NULL, r2_in, r2_out, mates_out, fasta->count);
+                                output_read(r1_data, NULL, NULL, r1_in, r1_out, mates_out, fasta->count, colorspace_flag);
+                                if (no_rev->count || !(colorspace_flag || force_rev->count)) {
+                                    output_read(r2_data, NULL, NULL, r2_in, r2_out, mates_out, fasta->count, colorspace_flag);
                                 } else {
-                                    output_read(r2_data, rev_data, rev_tmp, r2_in, r2_out, mates_out, fasta->count);
+                                    output_read(r2_data, rev_data, rev_tmp, r2_in, r2_out, mates_out, fasta->count, colorspace_flag);
                                 }
                             }
                         } else {
                             // No interleaved velvet output
-                            output_read(r1_data, NULL, NULL, r1_in, r1_out, NULL, fasta->count);
-                            output_read(r2_data, NULL, NULL, r2_in, r2_out, NULL, fasta->count);
+                            output_read(r1_data, NULL, NULL, r1_in, r1_out, NULL, fasta->count, colorspace_flag);
+                            output_read(r2_data, NULL, NULL, r2_in, r2_out, NULL, fasta->count, colorspace_flag);
                         }
                     } else {
                         // Discard read2, output read1 as singlet
-                        output_read(r1_data, NULL, NULL, r1_in, s1_out, NULL, fasta->count);
+                        output_read(r1_data, NULL, NULL, r1_in, s1_out, NULL, fasta->count, colorspace_flag);
                         read1_singlet_cnt++;
                     }
                 } else {
                     if (keep_read(r2_data)) {
                         // Discard read1, output read2 as singlet
-                        output_read(r2_data, NULL, NULL, r2_in, s2_out, NULL, fasta->count);
+                        output_read(r2_data, NULL, NULL, r2_in, s2_out, NULL, fasta->count, colorspace_flag);
                         read2_singlet_cnt++;
                     }
                 }
@@ -582,7 +578,7 @@ int main(int argc, char *argv[]) {
                     if (single1_hungry) {
                         if (ss_get_utstring(s1_in, s1_data)) {
                             if (keep_read(s1_data)) {
-                                output_read(s1_data, NULL, NULL, s1_in, s1_out, NULL, fasta->count);
+                                output_read(s1_data, NULL, NULL, s1_in, s1_out, NULL, fasta->count, colorspace_flag);
                             }
                         } else {
                             single1_hungry = 0;
@@ -591,7 +587,7 @@ int main(int argc, char *argv[]) {
                     if (single2_hungry) {
                         if (ss_get_utstring(s2_in, s2_data)) {
                             if (keep_read(s2_data)) {
-                                output_read(s2_data, NULL, NULL, s2_in, s2_out, NULL, fasta->count);
+                                output_read(s2_data, NULL, NULL, s2_in, s2_out, NULL, fasta->count, colorspace_flag);
                             }
                         } else {
                             single2_hungry = 0;
@@ -604,7 +600,7 @@ int main(int argc, char *argv[]) {
                 if (single1_hungry) {
                     if (ss_get_utstring(s1_in, s1_data)) {
                         if (keep_read(s1_data)) {
-                            output_read(s1_data, NULL, NULL, s1_in, s1_out, NULL, fasta->count);
+                            output_read(s1_data, NULL, NULL, s1_in, s1_out, NULL, fasta->count, colorspace_flag);
                         }
                     } else {
                         single1_hungry = 0;
@@ -613,7 +609,7 @@ int main(int argc, char *argv[]) {
                 if (single2_hungry) {
                     if (ss_get_utstring(s2_in, s2_data)) {
                         if (keep_read(s2_data)) {
-                            output_read(s2_data, NULL, NULL, s2_in, s2_out, NULL, fasta->count);
+                            output_read(s2_data, NULL, NULL, s2_in, s2_out, NULL, fasta->count, colorspace_flag);
                         }
                     } else {
                         single2_hungry = 0;
@@ -796,7 +792,6 @@ double entropy_calc(char *seqdata, int len) {
     return (bits);
 }
 
-
 /////////////////////////////////////////////////////////////////
 // 
 // fq_stream_trimmer
@@ -964,7 +959,7 @@ unsigned long int fq_stream_trimmer(UT_string *fq_fn, int pipe_fd, UT_string *ou
 // this read will be written to mates_output with reversed
 // sequence and quality.
 //
-void output_read(UT_string *fwd, UT_string *rev, UT_string *tmp, FILE *input, FILE *output, FILE *mates_output, int fmt_fasta) {
+void output_read(UT_string *fwd, UT_string *rev, UT_string *tmp, FILE *input, FILE *output, FILE *mates_output, int fmt_fasta, int colorspace) {
     if (mates_output) {
         if (rev) {
             utstring_clear(rev);
@@ -974,7 +969,11 @@ void output_read(UT_string *fwd, UT_string *rev, UT_string *tmp, FILE *input, FI
                 utstring_concat(fwd, tmp);
             }
             ss_trunc_utstring(tmp, 1);     // remove newline
-            ss_rev_utstring(tmp);
+            if (colorspace) {
+                ss_rev_utstring(tmp);
+            } else {
+                ss_rev_comp_utstring(tmp);
+            }
             ss_strcat_utstring(tmp, "\n"); // add newline back
             utstring_concat(rev, tmp);
             if (!fmt_fasta) {

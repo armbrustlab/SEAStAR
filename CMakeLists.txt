@@ -1,6 +1,6 @@
 # -------------------------------------------------------------------------- #
 # Center for Environmental Genomics
-# Copyright (C) 2009-2013 University of Washington.
+# Copyright (C) 2009-2014 University of Washington.
 #
 # Authors:
 # Vaughn Iverson
@@ -23,7 +23,7 @@
 # -------------------------------------------------------------------------- #
 
 # CMake file for full SEASTAR build
-cmake_minimum_required (VERSION 2.8)
+cmake_minimum_required (VERSION 2.8.5)
 
 # Debug option
 option(DEBUG "debug" OFF)
@@ -112,7 +112,7 @@ if (GIT_VERSION)
 	add_definitions("-D SS_BUILD_VERSION='\"${GIT_VERSION}\"'")
 else (GIT_VERSION)
 	message(WARNING "SEAStAR version not detected from git. ${GIT_VERSION}")
-	set(GIT_VERSION "v0.4.18")
+	set(GIT_VERSION "V0.5.0")
 	add_definitions("-D SS_BUILD_VERSION='\"${GIT_VERSION}\"'")
 endif (GIT_VERSION)
 

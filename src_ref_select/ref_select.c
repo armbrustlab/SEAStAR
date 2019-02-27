@@ -108,6 +108,8 @@ typedef struct seq_st {
     float gc_percent;
     float mp_insert_mean;
     float mp_insert_stdev;
+    float mp_insert_pos_stdev;
+    float mp_insert_pos_mean;
     unsigned int mp_good_pairs;
     double coverage;
     double abundance;
@@ -257,7 +259,7 @@ int main(const int argc, char *argv[]) {
 
     // Build table for colorspace decoder ring
     char c2s[128][128];
-    memset(c2s, 0, 128*128);
+    memset(c2s, 0, 128*128*sizeof(char));
     c2s['N']['A'] = 'N'; c2s['N']['C'] = 'N'; c2s['N']['G'] = 'N'; c2s['N']['T'] = 'N'; c2s['N']['N'] = 'N';
     c2s['A']['A'] = 'A'; c2s['A']['C'] = 'C'; c2s['A']['G'] = 'G'; c2s['A']['T'] = 'T';
     c2s['C']['A'] = 'C'; c2s['C']['C'] = 'A'; c2s['C']['G'] = 'T'; c2s['C']['T'] = 'G';
@@ -290,6 +292,11 @@ int main(const int argc, char *argv[]) {
     
     // GC content calc table
     int gc_tab[16] = { 0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }; 
+
+    // character GC content calc table
+    int gc_char[128];
+    memset(gc_char, 0, 128 * sizeof(int));
+    gc_char['c'] = 1; gc_char['g'] = 1; gc_char['C'] = 1; gc_char['G'] = 1;
     
     // Ambiguity code lookup table
     char cc[] = "XACMGRSVTWYHKDBN";
@@ -376,6 +383,7 @@ int main(const int argc, char *argv[]) {
     ss_rand_inst *rnd_state = NULL;
     
     int cov_window = 0;
+    int gc_delta = 0;
     int colorspace_recon = 0;    // Set to one if FASTQ input files are SOLiD data
     
     ///////////////////////////////////
@@ -393,7 +401,7 @@ int main(const int argc, char *argv[]) {
     struct arg_file *seq_ref = arg_file0(NULL,"ref","<ref_file>","Filename of file containing reference sequences which will be output in place of reconstructed sequence [NULL]");
     struct arg_lit *mp_analysis = arg_lit0("m","mate_pair","Perform mate-pair analysis [NULL]");
     struct arg_int *split = arg_int0(NULL,"split","<n>","Split reference sequences into n-base pieces for analysis. [no splitting]");
-    struct arg_lit *sep = arg_lit0(NULL,"separate_strands","Top and bottom stands of reference sequences are considered separately [FALSE]");
+    struct arg_lit *sep = arg_lit0(NULL,"separate_strands","Top and bottom strands of reference sequences are considered separately [FALSE]");
     struct arg_rem *sep_r = arg_rem(NULL, "=== NOTE: --separate_strands is exclusive of mate-pairing (-m), sequence reconstruction (-q) and splitting (--split)");
     struct arg_lit *rollup = arg_lit0(NULL,"rollup","Output reference taxa level summary stats [FALSE]");
     struct arg_int *seed = arg_int0(NULL,"seed","<n>","Seed used by random number generator [12345]");
@@ -419,6 +427,7 @@ int main(const int argc, char *argv[]) {
 
     struct arg_lit *detailed = arg_lit0(NULL,"per_base","Per base statistics will be generated and output for detail sequences [summaries only]");
     struct arg_int *w = arg_int0("w","cov_window","<n>","Assumed read length, used for per position coverage maps [actual read len when available or 49]");
+    struct arg_int *gc_window = arg_int0(NULL,"gc_window","<n>","Enables per position %GC moving average calculation and specifies the window size [FALSE]");
     struct arg_lit *detect_dups = arg_lit0(NULL,"detect_dups","Detect likely collapsed duplications. Assumes uniform coverage (e.g. single genome). [FALSE]");
 
     struct arg_rem *sep4 = arg_rem(NULL, "\n==== Options for sequence reconstruction and read filtering ====\n");
@@ -449,8 +458,8 @@ int main(const int argc, char *argv[]) {
     struct arg_end *end = arg_end(20);
 
     void *argtable[] = {sep1, h, version, v, detail, detail_file, seq_recon, seq_ref, mp_analysis, split, sep, sep_r, rollup, seed, num_threads, sep2, t, frac, t_frac, l, s, r,
-        nt, a, no_rand, sim_frac, exclude, exclude_file, invert_ex, sep3, detailed, w, detect_dups, sep4, ambig_tol, read_out, read_out_nomap, read_out_gz, sep5, mp_share_lim, mp_mate_cnt, mp_mate_lim, mp_strict,
-        mp_inserts, mp_circ, mp_cutoff, sep6, read_files, rev_read_files, f_bwa_samse, c, fr, f, end};
+        nt, a, no_rand, sim_frac, exclude, exclude_file, invert_ex, sep3, detailed, w, gc_window, detect_dups, sep4, ambig_tol, read_out, read_out_nomap, read_out_gz, sep5, mp_share_lim,
+        mp_mate_cnt, mp_mate_lim, mp_strict, mp_inserts, mp_circ, mp_cutoff, sep6, read_files, rev_read_files, f_bwa_samse, c, fr, f, end};
     
     int arg_errors = 0;
     
@@ -721,6 +730,22 @@ int main(const int argc, char *argv[]) {
     if (f_bwa_samse->count && !(c->count)) {
         fprintf(stderr, "ERROR: --old_bwa_samse requires use of a catalog file (-c)\n\n");
         exit(EXIT_FAILURE);
+    }
+    
+    if (gc_window->count) {
+        if (!(seq_recon->count) && !(seq_ref->count)) {
+            fprintf(stderr, "ERROR: --gc_window requires either --recon_seq (-q) or --ref \n\n");
+            exit(EXIT_FAILURE);
+        }
+        if (!detailed->count) {
+            fprintf(stderr, "ERROR: --gc_window requires use of --per_base \n\n");
+            exit(EXIT_FAILURE);
+        }
+        if (gc_window->ival[0] < 1) {
+            fprintf(stderr, "ERROR: --gc_window must be >= 1 \n\n");
+            exit(EXIT_FAILURE);  
+        }  
+        gc_delta = gc_window->ival[0] >> 1;
     }
     
     /////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1018,8 +1043,10 @@ int main(const int argc, char *argv[]) {
                         
                         HASH_FIND_STR(catalog, seq_id_ptr, entry);
 
-                        if (entry) {
-                            if ((entry->sequences) && (entry->ref_seq_len != seq_len)) {
+                        if (entry && entry->sequences) {
+                            if ((sep->count && (entry->ref_seq_len != 2 * seq_len)) || ((! sep->count) && (entry->ref_seq_len != seq_len))) {
+                                // ref seq length is 2 * seq length for separate strand analysis due to
+                                // reverse copy of ref seq.
                                 fprintf(stderr, "ERROR: SAM error %s: Line %lu\nInvalid sequence length (LN:) %d, previous SAM file has inconsistent length: %d\n",utstring_body(file_name), cnt, seq_len, entry->ref_seq_len);
                                 exit(EXIT_FAILURE);
                             }
@@ -2061,6 +2088,10 @@ int main(const int argc, char *argv[]) {
          seq->recon_array[M-2][0..N]  ---> Per-base mate-pair insert size
          seq->recon_array[M-1][0..N]  ---> Per-base physical matepair coverage
          
+         (M += 1) -- When the --gc_window option is used, a row is also allocated to hold %GC 
+         gc_row is set to M-3 or M-1 depending on the value of --mate_pair
+         
+         seq->recon_array[gc_row][0..N] ---> Per base %GC
          
          ***********************************************************************************/
 
@@ -2069,6 +2100,11 @@ int main(const int argc, char *argv[]) {
         if (mp_inserts->count || (detailed->count && mp_analysis->count)) {
             // MP Insert stats are always in the last two arrays (recon_array_size - 1 and recon_array_size - 2)
             recon_array_size = 3;
+        }
+
+        if (gc_window->count) {
+            // %GC stats are either the last, or 3rd to last row (recon_array_size - 1 or recon_array_size - 3)
+            recon_array_size += 1;
         }
 
         if (seq_recon->count) {
@@ -2112,6 +2148,9 @@ int main(const int argc, char *argv[]) {
             }
         }
     }    
+
+    // Determine which row in the recon_array to write %GC stats to...
+    int gc_row = (mp_inserts->count || (detailed->count && mp_analysis->count)) ? recon_array_size-3 : recon_array_size-1;
     
     // Abundance estimation
     // For each read in the sorted table
@@ -3004,6 +3043,53 @@ int main(const int argc, char *argv[]) {
                     } else {
                         seq->gc_percent = 0.0;
                     }
+                    
+                    // This code calculates per position %GC when the --gc_window parameter is used
+                    
+                    if (gc_window->count) {
+                        gc_sum = 0;
+                        gc_cnt = 2*gc_delta+1;
+                        ptr = (char *) &(seq->recon_array[1][0]);
+                       
+                        // Handle special case of seq_len <= gc_cnt
+                        // If the window is larger than the seq, then just write the overall mean %GC for all values
+                        if (seq->seq_len <= gc_cnt) { 
+                            for (int x = 1; x <= seq->seq_len; x++) {
+                                seq->recon_array[gc_row][x] = 100.0 * seq->gc_percent;  
+                            }
+                        } else {
+                            if (mp_circ->count) {  // If the ref_seq is circular, then wrap the window around
+                                // Spin-up (Modulo seq_len arithmetic ahead!)
+                                for (int x = -gc_delta; x <= gc_delta; x++) {
+                                    gc_sum += gc_char[ptr[(x+seq->seq_len) % seq->seq_len]];
+                                }
+                                for (int x = 0; x < seq->seq_len; x++) {
+                                    seq->recon_array[gc_row][x+1] = 100.0 * ((float) gc_sum / (float) gc_cnt);
+                                    // calculate the running sum of GC values in the window for the next iteration.
+                                    gc_sum = gc_sum - gc_char[ptr[(x+seq->seq_len-gc_delta)%seq->seq_len]] + gc_char[ptr[(x+gc_delta+1)%seq->seq_len]];                               
+                                }
+                           
+                            } else {  // Otherwise, the first (and last) gc_window/2 positions will each have the same value.
+                                // Spin-up
+                                for (int x = 0; x < gc_cnt; x++) {
+                                    gc_sum += gc_char[ptr[x]];
+                                }
+                                float end_val = 100.0 * ((float) gc_sum / (float) gc_cnt);
+                                for (int x = 0; x <= gc_delta; x++) {
+                                    seq->recon_array[gc_row][x+1] = end_val;
+                                }
+                                for (int x = gc_delta+1; x < seq->seq_len-gc_delta; x++) {
+                                    // calculate the running sum of GC values in the window
+                                    gc_sum = gc_sum - gc_char[ptr[x-gc_delta-1]] + gc_char[ptr[x+gc_delta]];                               
+                                    seq->recon_array[gc_row][x+1] = 100.0 * ((float) gc_sum / (float) gc_cnt);
+                                }
+                                end_val = 100.0 * ((float) gc_sum / (float) gc_cnt);
+                                for (int x = seq->seq_len-gc_delta; x < seq->seq_len; x++) {
+                                    seq->recon_array[gc_row][x+1] = end_val;
+                                }
+                            }
+                        }
+                    }
                 }
             }
             
@@ -3023,7 +3109,7 @@ int main(const int argc, char *argv[]) {
     
     if (selected && selected->bit_score >= bit_thresh) {
         
-#pragma omp parallel for default(none) private(seq) shared(num_sel,sel_list,total_abund,cov_window,mp_inserts,recon_array_size,detailed,mp_analysis) reduction(+ : num_selected, total_fractional_abundance) 
+#pragma omp parallel for default(none) private(seq) shared(stderr,num_sel,sel_list,total_abund,cov_window,mp_inserts,recon_array_size,detailed,mp_analysis) reduction(+ : num_selected, total_fractional_abundance) 
         for (int z = 0; z < num_sel; z++) {    // Walk through all sequences
             
             if (!(seq = sel_list[z])) continue;
@@ -3054,19 +3140,30 @@ int main(const int argc, char *argv[]) {
                         }
                         uncovered += (val == 0);
                     }
-                    
+
+                    seq->mp_insert_pos_stdev = 0.0;
+                    seq->mp_insert_pos_mean = 0.0;
+
                     if (mp_inserts->count || (detailed->count && mp_analysis->count)) {
-                        
+                        double ins_mean = 0.0;
                         for (int x = 1; x <= seq->seq_len; x++) {
                             double val = seq->recon_array[recon_array_size-1][x];
-                            
                             // Prenormalize the per position insert size
-                            
-                            seq->recon_array[recon_array_size-2][x] = val ? (seq->recon_array[recon_array_size-2][x] / val) : 0.0;
-                            
+                            if (val != 0.0) {
+                                seq->recon_array[recon_array_size-2][x] /= val;
+                                ins_mean += seq->recon_array[recon_array_size-2][x];
+                            } else {
+                                seq->recon_array[recon_array_size-2][x] = 0.0;
+                            }
                         }
+                        seq->mp_insert_pos_mean = ins_mean / (double)seq->seq_len;
+                        double ins_stdev = 0.0;
+                        for (int x = 1; x <= seq->seq_len; x++) {
+                            ins_stdev += pow((seq->recon_array[recon_array_size-2][x] - seq->mp_insert_pos_mean), 2.0);
+                        }
+                        seq->mp_insert_pos_stdev = sqrt(ins_stdev/(double)seq->seq_len);
                     }
-                    
+
                     // Don't let the sequence ends skew the statistics
                     // Reads won't map at the ends...
                     
@@ -3074,7 +3171,7 @@ int main(const int argc, char *argv[]) {
                     
                     for (int x = cov_window; x < seq->seq_len-cov_window; x++) {
                         seq->recon_array[0][x];
-                        stddev += pow((seq->recon_array[0][x] - mean),2.0);
+                        stddev += pow((seq->recon_array[0][x] - mean), 2.0);
                     }
                     stddev = sqrt(stddev/(double)(seq->seq_len - 2*cov_window));
                     seq->uncovered = (double)uncovered / seq->seq_len;
@@ -3091,17 +3188,16 @@ int main(const int argc, char *argv[]) {
         fprintf(stderr, "\nWARNING: No taxa met the bit threshold limit!\n");
     }
 
-    
     ////////////////////////////////////////////////////////////////////////////
     // Search for assembly problems within contig stats
     
     double mean_coverage = 0.0;
-    float cov_threshold = 0.0;
-    
+    double cov_threshold = 0.0;
+        
     if (mp_analysis->count) {
         
         unsigned int total_length = 0;
-        
+    
         // Now, write all of the nodes up front
         if (selected && selected->bit_score >= bit_thresh) {
             
@@ -3124,7 +3220,7 @@ int main(const int argc, char *argv[]) {
                 }
             }
 
-#pragma omp parallel for default(none) private(seq) shared(cov_threshold,num_sel,sel_list,detect_dups,mean_coverage,stderr,mp_inserts,recon_array_size,detailed,mp_analysis)
+#pragma omp parallel for default(none) private(seq) shared(v,cov_threshold,num_sel,sel_list,detect_dups,mean_coverage,stderr,mp_inserts,recon_array_size,detailed,mp_analysis)
             for (int i = 0; i < num_sel; i++) {
                 seq = sel_list[i];
                 if (seq->recon_array) {
@@ -3170,7 +3266,6 @@ int main(const int argc, char *argv[]) {
                                     x = max_end + 1;  // Start looking at the end of the last segment
                                     max_seen = 0.0;
                                     max_start = max_end = 0;
-                                    
                                 }
                             }
                             // Update the max segment
@@ -3197,7 +3292,7 @@ int main(const int argc, char *argv[]) {
                     // Look for misassemblies by inspecting the mate-pair analysis, if used
                     
                     if ((mp_inserts->count || (detailed->count && mp_analysis->count)) && seq->mp_good_pairs) {
-                        
+                                                 
                         float *physical_cov = seq->recon_array[recon_array_size-1];
                         
                         // This detects any regions of "physical coverage" where there is a dip below the moving average,
@@ -3236,7 +3331,9 @@ int main(const int argc, char *argv[]) {
                             float back_max_val = physical_cov[back_max_pos];
                             phys_cov_threshold = (front_max_val + back_max_val) * 0.25;  // 50% of the mean of front and back maxima
                             
-                            fprintf(stderr, "DIAG: %s pairing min/max %f %d %f %d thresh: %f\n",utstring_body(&seq->seq_id),front_max_val,front_max_pos,back_max_val,back_max_pos,(front_max_val + back_max_val) * 0.25);
+                            if (v->count) {
+                                fprintf(stderr, "DIAG: %s pairing min/max %f %d %f %d thresh: %f\n",utstring_body(&seq->seq_id),front_max_val,front_max_pos,back_max_val,back_max_pos,(front_max_val + back_max_val) * 0.25);
+                            }
                             
                             // Now find problem regions
                             float max_seen = 0.0;
@@ -3249,7 +3346,7 @@ int main(const int argc, char *argv[]) {
                             for (int x = front_max_pos+1; x < back_max_pos; x++) {
                                 next_val = ((physical_cov[x] <= phys_cov_threshold) ? 1.0 : -10.0);
                                 
-                                // Is this a continuation of the current segmemt?
+                                // Is this a continuation of the current segment?
                                 if (next_val + current_max > next_val) {
                                     
                                     current_max += next_val;
@@ -3293,6 +3390,65 @@ int main(const int argc, char *argv[]) {
                                 pp->type = 'F';
                                 LL_PREPEND(seq->mp_issues, pp);
                             }
+                        }
+                        
+                        // Detect physical coverage probs (extra/missing sequence) by looking for 
+                        // anomalys in the mean insert size at each location
+                        
+                        if (phys_cov_threshold > 50.0) {  // This method doesn't work if the physical coverage is really thin
+							// Find problem regions by inspecting per base mapped insert size 
+							float max_seen = 0.0;
+							float current_max = 0.0;
+							unsigned int current_start = 0;
+							unsigned int max_start = 0;
+							unsigned int max_end = 0;
+							float next_val = 0.0;
+							float upper_thresh = seq->mp_insert_pos_mean + 2.0 * seq->mp_insert_pos_stdev;
+							float lower_thresh = seq->mp_insert_pos_mean - 2.0 * seq->mp_insert_pos_stdev;
+							float *insert_size = seq->recon_array[recon_array_size-2];
+
+							for (int x = 1; x <= seq->seq_len; x++) {
+								next_val = (((insert_size[x] <= lower_thresh) || (insert_size[x] >= upper_thresh)) ? 1.0 : -10.0);
+								// Is this a continuation of the current segmemt?
+								if (next_val + current_max > next_val) {
+									current_max += next_val;
+								} else {  // Or is it a reset to a possible new segment?
+									current_max = next_val;
+									current_start = x;
+									if (max_seen > 60) {  // Was the previous segment a significant region?
+										pairing_problem *pp = malloc(sizeof(pairing_problem));
+										if (!pp) {
+											fprintf(stderr, "ERROR: malloc failure: pairing_problem\n");
+											exit(EXIT_FAILURE);
+										}
+										pp->start = max_start;
+										pp->end = max_end;
+										pp->type = 'E';
+										LL_PREPEND(seq->mp_issues, pp);
+										max_seen = 0.0;
+										x = max_end + 1;  // Start looking at the end of the last segment
+										max_start = max_end = 0;
+									}
+								}
+								// Update the max segment
+								if (current_max > max_seen) {
+									max_seen = current_max;
+									max_start = current_start;
+									max_end = x;
+								}
+							}
+							// Get the last region if there was one
+							if (max_seen > 60) {  // Was this a substantial region?
+								pairing_problem *pp = malloc(sizeof(pairing_problem));
+								if (!pp) {
+									fprintf(stderr, "ERROR: malloc failure: pairing_problem\n");
+									exit(EXIT_FAILURE);
+								}
+								pp->start = max_start;
+								pp->end = max_end;
+								pp->type = 'E';
+								LL_PREPEND(seq->mp_issues, pp);
+							}
                         }
                         
                         // This detects "uncovered ends", which are misassemblies that are relatively short end sequences
@@ -3480,27 +3636,31 @@ int main(const int argc, char *argv[]) {
     JSON_INT_PROP("cov_window", cov_window);  JSON_COMMA;
 
     if (detail->count) {
-        JSON_N_STR_ARRAY_OBJ("detail_list",detail,sval);
+        JSON_N_STR_ARRAY_OBJ("detail_list",detail,sval,1);
     }
     if (detail_file->count) { JSON_STR_PROP("detail_file",detail_file->filename[0]); JSON_COMMA; }
 
     if (seq_recon->count) { 
         JSON_FLT_PROP("ambig_tol",ambig_tol->count ? ambig_tol->dval[0] : 0.2);  JSON_COMMA;
     }
+
+    if (gc_window->count) {
+        JSON_INT_PROP("gc_window", gc_window->ival[0]);  JSON_COMMA;
+    }
     
     if (seq_ref->count) {
         JSON_STR_PROP("ref", seq_ref->filename[0]);  JSON_COMMA;
     }
     
-    JSON_N_STR_ARRAY_OBJ("read_files",read_files,filename);
-    JSON_N_STR_ARRAY_OBJ("rev_read_files",rev_read_files,filename);
+    JSON_N_STR_ARRAY_OBJ("read_files",read_files,filename,1);
+    JSON_N_STR_ARRAY_OBJ("rev_read_files",rev_read_files,filename,1); 
     if (read_out->count) { 
         JSON_STR_PROP("read_out",read_out->sval[0]); JSON_COMMA;
         JSON_LIT_PROP("output_nonmatch", read_out_nomap->count ? "true" : "false");  JSON_COMMA;
         JSON_LIT_PROP("read_output_gzip", read_out_gz->count ? "true" : "false");  JSON_COMMA;
     }
     if (exclude->count) {
-        JSON_N_STR_ARRAY_OBJ("exclude_list",exclude,sval);
+        JSON_N_STR_ARRAY_OBJ("exclude_list",exclude,sval,1);
     }
     if (exclude_file->count) { JSON_STR_PROP("exclude_file",exclude_file->filename[0]); JSON_COMMA; }
     JSON_LIT_PROP("invert_ex",invert_ex->count ? "true" : "false"); JSON_COMMA;
@@ -3522,8 +3682,8 @@ int main(const int argc, char *argv[]) {
     JSON_LIT_PROP("old_bwa_samse", f_bwa_samse->count ? "true" : "false");  JSON_COMMA;
     JSON_INT_PROP("seed", seed->count ? seed->ival : 12345);  JSON_COMMA;
     JSON_LIT_PROP("no_rand", no_rand->count ? "true" : "false");  JSON_COMMA;
-    JSON_N_STR_ARRAY_OBJ("rev_align_files",fr,filename);
-    JSON_N_STR_ARRAY_OBJ("align_files",f,filename);
+    JSON_N_STR_ARRAY_OBJ("rev_align_files",fr,filename,1); 
+    JSON_N_STR_ARRAY_OBJ("align_files",f,filename,1);  
     JSON_LIT_PROP("rollup", rollup->count ? "true" : "false");
 
     JSON_END_OBJ;
@@ -3574,6 +3734,9 @@ int main(const int argc, char *argv[]) {
                             case 'F' :
                                 JSON_STR_PROP("type", "Physical coverage break");
                                 break;
+                            case 'E' :
+                                JSON_STR_PROP("type", "Insert size anomaly");
+                                break;                                
                             case 'D' :
                                 JSON_STR_PROP("type", "Collapsed duplication");
                                 break;
@@ -3605,19 +3768,33 @@ int main(const int argc, char *argv[]) {
                     JSON_LIT_PROP("short_seq", "true");  JSON_COMMA;
                 }
             }
-            if (seq->recon_array && (detailed->count || seq->mp_issues)) {
-                JSON_N_FLT_ARRAY_OBJ("per_nt_cov",seq->recon_array[0],seq->seq_len);  
-                if (mp_inserts->count || (detailed->count && mp_analysis->count)) {        
-                    JSON_N_FLT_ARRAY_OBJ("per_nt_phys_cov",seq->recon_array[recon_array_size-1],seq->seq_len);  
-                    JSON_N_FLT_ARRAY_OBJ("per_nt_mp_ins",seq->recon_array[recon_array_size-2],seq->seq_len);  
+            JSON_LIT_PROP("circular", mp_circ->count ? "true" : "false");  JSON_COMMA;
+            if (seq->recon_array && (seq_recon->count || seq_ref->count)) {
+                JSON_STR_PROP("seq", (char *) &(seq->recon_array[1][0]));  JSON_COMMA;
+            }
+            if (seq->recon_array && (detailed->count || seq->mp_issues || gc_window->count)) {
+                JSON_SUB_PROP("per_nt");
+                JSON_BEG_OBJ;
+                int need_comma = 0;
+                if (detailed->count || seq->mp_issues) {
+                    need_comma |= 1;
+                    JSON_N_FLT_ARRAY_OBJ("cov",seq->recon_array[0],seq->seq_len,0); 
+                    if (mp_inserts->count || (detailed->count && mp_analysis->count)) {
+                        JSON_COMMA;
+                        JSON_N_FLT_ARRAY_OBJ("phys_cov",seq->recon_array[recon_array_size-1],seq->seq_len,1);
+                        JSON_N_FLT_ARRAY_OBJ("mp_ins",seq->recon_array[recon_array_size-2],seq->seq_len,0);
+                    }
                 }
+                if (gc_window->count) {
+                    if (need_comma) {
+                        JSON_COMMA;
+                    }
+                    JSON_N_FLT_ARRAY_OBJ("mean_gc", seq->recon_array[gc_row], seq->seq_len,0);  
+                }
+                JSON_END_OBJ;  JSON_COMMA;
             }
             JSON_STR_PROP("name", utstring_body(&seq->ref_seq->seq_name));  JSON_COMMA;
             JSON_STR_PROP("desc", utstring_body(&seq->ref_seq->seq_desc));
-            if ((seq_recon->count || seq_ref->count) && seq->recon_array) {
-                JSON_COMMA;
-                JSON_STR_PROP("recon_seq", (char *) &(seq->recon_array[1][0]));
-            }
             JSON_END_OBJ;
         }
         

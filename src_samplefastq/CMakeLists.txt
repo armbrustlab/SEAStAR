@@ -1,6 +1,6 @@
 # -------------------------------------------------------------------------- #
 # Center for Environmental Genomics
-# Copyright (C) 2009-2013 University of Washington.
+# Copyright (C) 2009-2014 University of Washington.
 #
 # Authors:
 # Vaughn Iverson
@@ -23,7 +23,7 @@
 # -------------------------------------------------------------------------- #
 
 # CMake file for samplefastq
-cmake_minimum_required (VERSION 2.8)
+cmake_minimum_required (VERSION 2.8.5)
 
 project (samplefastq C)
 

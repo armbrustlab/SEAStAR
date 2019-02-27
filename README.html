@@ -1,9 +1,10 @@
 <link href="style.css" media="screen" rel="stylesheet" type="text/css" />
 
-<h2>SEAStAR - A framework for the analysis of next-generation metagenomes (and more)</h2>
-<h3>The Basics</h3>
-<h4>SEAStAR is a package of tools supporting the construction of complete analysis pipelines for next-generation (Illumina&reg;, SOLiD&trade;) sequencing data generated from environmental samples.</h4>
-<h5>It includes high-performance tools for dealing with:</h5>
+<p><a href="https://travis-ci.org/armbrustlab/SEAStAR"><img src="https://travis-ci.org/armbrustlab/SEAStAR.svg?branch=master" alt="Build Status"></a></p>
+<h2 id="seastar---a-framework-for-the-analysis-of-next-generation-metagenomes">SEAStAR - A framework for the analysis of next-generation metagenomes</h2>
+<h3 id="the-basics">The Basics</h3>
+<h4 id="seastar-is-a-package-of-tools-supporting-the-construction-of-complete-analysis-pipelines-for-next-generation-illumina-solid-sequencing-data-generated-from-environmental-samples">SEAStAR is a package of tools supporting the construction of complete analysis pipelines for next-generation (Illumina&reg;, SOLiD&trade;) sequencing data generated from environmental samples.</h4>
+<h5 id="it-includes-high-performance-tools-for-dealing-with">It includes high-performance tools for dealing with:</h5>
 <ul>
 <li>Converting between file formats (CSFASTA -&gt; FASTQ)</li>
 <li>Trimming raw reads for quality (with tuning support)</li>
@@ -14,45 +15,54 @@
 <li>Connecting assembled contigs together via paired reads (constructing an assembly graph)</li>
 <li>Splitting complicated metagenomic assembly graphs into well-supported scaffolds</li>
 <li>Binning scaffolds by organism using tetra-nucleotide statistics</li>
+<li>Identifying small circular scaffolds that are likely virus or plasmid genomes</li>
 </ul>
-<h5>SEAStAR works with, but does not supply:</h5>
+<h5 id="seastar-works-with-but-does-not-supply">SEAStAR works with, but does not supply:</h5>
 <ul>
 <li>Short-read sequence aligners (e.g. <a href="http://bio-bwa.sourceforge.net">BWA</a>, <a href="http://bowtie-bio.sourceforge.net/index.shtml">Bowtie</a>)</li>
 <li>De novo contig assemblers (e.g. <a href="http://www.ebi.ac.uk/~zerbino/velvet/">Velvet</a>)</li>
 <li>Tools for visualizing assembly graphs (e.g. <a href="http://www.graphviz.org/">GraphViz</a>, <a href="http://zvtm.sourceforge.net/zgrviewer.html">ZGRViewer</a>)</li>
-<li>16S Taxonomic classifiers (e.g. <a href="http://sourceforge.net/projects/rdp-classifier/">RDP Classifier</a>) </li>
+<li>16S Taxonomic classifiers (e.g. <a href="http://sourceforge.net/projects/rdp-classifier/">RDP Classifier</a>)</li>
 </ul>
-<p>You can find out more about SEAStAR on its <a href="http://armbrustlab.ocean.washington.edu/SEAStAR">Armbrust Lab Homepage</a> and obtain news regarding updates and related info by following <a href="https://twitter.com/SEAStAR_meta">@SEAStAR_meta</a> on Twitter. </p>
+<p>You can find out more about SEAStAR on its <a href="http://armbrustlab.ocean.washington.edu/SEAStAR">Armbrust Lab Homepage</a> and obtain news regarding updates and related info by following <a href="https://twitter.com/SEAStAR_meta">@SEAStAR_meta</a> on Twitter.</p>
 <p>This file contains information on how to build and install the SEAStAR tools. For information on using the tools themselves, please see the included SEAStAR User Guide file.</p>
-<h3>License</h3>
+<h3 id="license">License</h3>
 <p>SEAStAR is released under the GPLv3 license, a copy of which is provided in the included file &quot;COPYING&quot;. By using this software, you are agreeing to be bound by the terms of this license.</p>
-<h3>Installation</h3>
-<p>The instructions that follow are for building the SEAStAR tools from source code. However, if you&#39;d initially like to try out SEAStAR by working through our &quot;Quick Start&quot; tutorial, we provide a &quot;ready-to-go&quot; <a href="http://armbrustlab.ocean.washington.edu/node/305">SEAStAR Virtual Machine appliance</a> image that includes all of the necessary tools and a working sample dataset that can be run within VirtualBox without the need to compile any of the tools on your computer. This pre-built VM is intended as an aid to learning and we strongly advise against (and will not provide any help for) trying to use it for analysis of real datasets.</p>
-<p>SEAStAR is designed to build and run on any 64-bit Unix-like system, including Linux and Mac OS X version 10.7 or later. Many components of SEAStAR are optimized for multiple CPU cores and require substantial memory. We recommend a machine with a minimum of 4 CPU cores and 32 GB of RAM to run these tools.  Depending on your datasets and what you are trying to do (e.g. de novo assembly) you may require a substantially more powerful machine than this minimum recommendation. </p>
+<h3 id="installation">Installation</h3>
+<p>The instructions that follow are for building the SEAStAR tools from source code.</p>
+<p>SEAStAR is designed to build and run on any 64-bit Unix-like system, including Linux and Mac OS X version 10.7 or later. Many components of SEAStAR are optimized for multiple CPU cores and require substantial memory. We recommend a machine with a minimum of 4 CPU cores and 32 GB of RAM to run these tools.  Depending on your datasets and what you are trying to do (e.g. de novo assembly) you may require a substantially more powerful machine than this minimum recommendation.</p>
 <p>The SEAStAR package has dependencies on a small number of software packages that you (or your system administrator) may need to install or update. The process described in the next section will notify you if your system is missing any of these components.</p>
-<h4>Required Tools:</h4>
+<h4 id="required-tools">Required Tools:</h4>
 <ul>
-<li><a href="http://gcc.gnu.org">gcc</a> -- version 4.2 or newer, supporting <a href="http://openmp.org">OpenMP</a> (version 4.7.3 recommended) </li>
-<li><a href="http://www.cmake.org">cmake</a> -- version 2.8 or newer</li>
+<li><a href="http://gcc.gnu.org">gcc</a> -- version 4.2 or newer, supporting <a href="http://openmp.org">OpenMP</a> (version 4.7 recommended)</li>
+<li><a href="http://www.cmake.org">cmake</a> -- version 2.8.5 or newer</li>
 <li><a href="http://nodejs.org">node.js</a> -- version 0.10 or newer</li>
 <li><a href="http://www.gnu.org/software/gawk/">gawk</a> -- version 3.1.5 or newer (version 4.0.2 recommended)</li>
 </ul>
 <p>Additional instructions are available below for fulfilling these requirements for Mac OS X, and for programmers wishing to make modifications to the included source code.</p>
-<p>Once you have the above packages: To build SEAStAR using Unix style command line tools, run the following commands from the directory where all files generated in the build process should be placed (including executables). This is your &quot;destination tree&quot;. </p>
-<pre><code>cmake [dir] 
-make</code></pre>
-<p>Where [dir] is the path to the root of the SEASTAR source tree (where this README file is found). </p>
-<p>If the path &quot;.&quot; is used for [dir] above (run from the &quot;source tree&quot;), then the binary and source tree will be the same (an &quot;in-source build&quot;). After a successful make, executables will be found in the bin/ subdirectory. </p>
+<p>Once you have the above packages: To build SEAStAR using Unix style command line tools, run the following commands from the directory where all files generated in the build process should be placed (including executables). This is your &quot;destination tree&quot;.</p>
+<pre><code>cmake [dir]
+make</code></pre><p>Where [dir] is the path to the root of the SEASTAR source tree (where this README file is found).</p>
+<p>If the path &quot;.&quot; is used for [dir] above (run from the &quot;source tree&quot;), then the binary and source tree will be the same (an &quot;in-source build&quot;). After a successful make, executables will be found in the bin/ subdirectory.</p>
 <p>This directory (the bin subdirectory of the destination tree) should be added to your PATH environment variable, so that newly built tools can be found from your data analysis directories:</p>
-<pre><code>export PATH=$PATH:[dest_dir]/bin   # Where [dest_dir] is the fully qualified path to your destination tree directory </code></pre>
-<p>To test the newly built components:</p>
-<pre><code>make test</code></pre>
-<p>If any tests fail, do not use the executables!</p>
+<pre><code>export PATH=$PATH:[dest_dir]/bin   # Where [dest_dir] is the fully qualified path to your destination tree directory</code></pre><p>To test the newly built components:</p>
+<pre><code>make test</code></pre><p>If any tests fail, do not use the executables!</p>
 <p>To clean all files generated in the source directory for an in-source build (this will only work for git checked-out repositories):</p>
-<pre><code>git clean -fxd</code></pre>
-<p>For an out-of-source build you can simply delete the destination tree directory and start again.</p>
-<h3>Additional installation details for Mac OS X</h3>
-<p>For Mac OS X users: To fulfill the above requirements, you will first need to download and install Apple&#39;s Xcode developer package (using the <a href="https://developer.apple.com/xcode/index.php">App store</a>), and then we recommend installing the other required packages using <a href="http://www.macports.org/">MacPorts</a>.</p>
+<pre><code>git clean -fxd</code></pre><p>For an out-of-source build you can simply delete the destination tree directory and start again.</p>
+<h3 id="additional-installation-details-for-mac-os-x">Additional installation details for Mac OS X</h3>
+<p>For Mac OS X users: To fulfill the above requirements, you will first need to download and install Apple&#39;s &quot;Command Line Developer Tools&quot;.</p>
+<pre><code>xcode-select --install</code></pre><p>And then we recommend installing the other required packages using <a href="https://brew.sh/">HomeBrew</a> or <a href="http://www.macports.org/">MacPorts</a>.</p>
+<h4 id="homebrew-preferred">HomeBrew (preferred)</h4>
+<p>Visit the link below to download and install HomeBrew.</p>
+<blockquote>
+<p><a href="https://brew.sh/">https://brew.sh/</a></p>
+</blockquote>
+<p>Then run the following commands to install the required packages:</p>
+<pre><code>brew update
+brew install cmake
+brew install node   # Node may also optionally be installed using nvm
+brew install gawk
+brew install gcc@8</code></pre><h4 id="macports">MacPorts</h4>
 <p>Visit the link below to download and install MacPorts.</p>
 <blockquote>
 <p><a href="http://www.macports.org/install.php">http://www.macports.org/install.php</a></p>
@@ -60,28 +70,15 @@ make</code></pre>
 <p>Then run the following commands to install the required packages:</p>
 <pre><code>sudo port selfupdate
 sudo port install cmake
-sudo port install node
+sudo port install node  # Node may also optionally be installed using nvm
 sudo port install gawk
-sudo port install gcc47</code></pre>
-<p>Note, it is possible to use other versions of gcc (versions 4.2 or newer) if you already have it installed or for some other reason. However, most of our OS X testing has been performed with gcc version 4.7.</p>
-<p>It may be possible to use <a href="http://mxcl.github.com/homebrew/">HomeBrew</a> instead of Macports to install these packages, but we haven&#39;t tested it.</p>
-<p>You will need to define an environment variable to explicitly tell cmake which compiler to use. Note that this must be done each time you start a command line session where you wish to run cmake again (or add it to your shell startup file, e.g. .bashrc in your home directory).  For example:</p>
-<pre><code>export CC=/opt/local/bin/gcc-mp-4.7  # change this if you are using a different version!</code></pre>
-<h4>An important note about compilers on Mac OS X (starting with Xcode 4.2 on OS X 10.7 and later versions):</h4>
-<p>There are known bugs in OpenMP (multi-core processor support) in the gcc compiler Apple supplies with Xcode 4.x on OS X 10.7+ (gcc support has been completely dropped in Xcode 5). Xcode&#39;s default Clang-based compiler does not support OpenMP; this is why we specify above that you must install the gcc compiler using MacPorts. The cmake script provided checks OS X systems to see if the OpenMP support is working correctly with the default (or specified) C compiler. If you receive an error when trying to build that says &quot;You need to install gcc (version 4.4 or later) from MacPorts&quot; it is because our build system is attempting to use the Xcode gcc compiler, and not the one you installed from MacPorts.</p>
-<h3>For Developers</h3>
+sudo port install gcc8  # or whatever version you may prefer</code></pre><h3 id="an-important-note-about-compilers-on-mac-os-x-">An important note about compilers on Mac OS X :</h3>
+<p>Xcode&#39;s default Clang-based compiler does not support OpenMP (a standard for writing efficiently parallelized C code); this is why we specify above that you must install the gcc compiler. The cmake script provided checks OS X systems to see if the OpenMP support is working correctly with the default (or specified) C compiler. If you receive an error when trying to build that says &quot;You need to install gcc (version 4.4 or later)&quot; it is because our build system is attempting to use the Xcode compiler, and not the one you installed using HomeBrew or MacPorts.</p>
+<p>You will need to define an environment variable to explicitly tell cmake which compiler to use. Note that this must be done each time you start a command line session where you wish to run cmake again (or add it to your shell startup file, e.g. .bash_profile in your home directory).  For example:</p>
+<pre><code>export CC=/usr/local/bin/gcc-8  # Homebrew</code></pre><p>or</p>
+<pre><code>export CC=/opt/local/bin/gcc-8  # MacPorts</code></pre><p>Change the numbers above if you are using a different version!</p>
+<p>Note: It may also be possible, with some more work, to use a newer version of clang than provided by Apple to compile with OpenMP support, but we mave not tested this. Both HomeBrew and MacPorts enable installation of LLVM 7 (which includes the clang C compiler). Have fun with that!</p>
+<h3 id="for-developers">For Developers</h3>
 <p>Some of the included JavaScript (.js) files are automatically generated from <a href="http://coffeescript.org">CoffeeScript</a> source files (CoffeeScript is a <a href="http://en.wikipedia.org/wiki/Source-to-source_compiler">transcompiled</a> dialect of JavaScript with Python-like syntax.) If you wish to modify these components, please edit the .coffee files in the scripts/ subdirectory of the source tree. The make system will automatically regenerate the .js files in the bin/ subdirectory of the destination tree. To successfully transcompile these files, you will need the to install the CoffeeScript package for node.js:</p>
-<pre><code>sudo npm install -g coffee-script</code></pre>
-<p>It is sometimes useful to build with GCC debug flags turned on.  To achieve this follow the normal cmake build procedure with one additional user defined cmake cache entry:</p>
+<pre><code>sudo npm install -g coffee-script</code></pre><p>It is sometimes useful to build with GCC debug flags turned on.  To achieve this follow the normal cmake build procedure with one additional user defined cmake cache entry:</p>
 <pre><code>cmake -D DEBUG=ON [dir]</code></pre>
-<h3>For Mac OS X Developers</h3>
-<h4>Important note!  The instructions below only work with Xcode 4.x</h4>
-<p>Beginning with Xcode 5, Apple has removed all support for GNU compilers and with that decision all support for OpenMP in Xcode has been dropped. SEAStAR executables built with Xcode 5 tools will NOT run correctly, and sadly there is nothing we can do to fix this (short of re-writing all of our parallel threaded code to use something other than OpenMP, which is not worth the effort simply to maintain compatability with Xcode 5). There are <a href="http://clang-omp.github.io/">efforts to add OpenMP support to the Clang compiler</a> that Apple now exclusively uses, but it remains to be seen if these efforts will be widely adopted. While that is being sorted out, using Xcode 4.x is the only workable option.  </p>
-<p>The following section covers using cmake to build Xcode project files. However, we do not recommend using executables built by Xcode for &quot;production use&quot; due to the aforementioned bugs in the Xcode compilers.</p>
-<p>To make Xcode project files (for Mac OS X only):</p>
-<pre><code>cmake -G Xcode [dir] </code></pre>
-<p>Where [dir] is the path to the root of the destination binary tree. If the path &#39;.&#39; is used, then the binary and source tree will be the same (i.e. an in-source build). You may then load the SEAStAR project file into Xcode to build, debug, etc.</p>
-<p>Alternatively, an xcode project may be built on the command line as (choosing Debug or Release as appropriate):</p>
-<pre><code>xcodebuild -alltargets -configuration [Debug|Release] </code></pre>
-<p>A word of Warning: once the project is imported into Xcode, the destination tree will not be backed-up by Time Machine on OS X. For in-source builds, the binary and source trees are the same directory, so Time Machine will not back up your source code changes if you develop and build within the source tree. For this reason, it is highly advisable to do out-of-source builds when developing in Xcode, unless you back up your local git repository via a mechanism other than Time Machine.</p>
-

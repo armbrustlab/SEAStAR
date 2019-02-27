@@ -87,6 +87,9 @@ typedef struct reject_list_st {
 static const char c[] = 
 "NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN\x00N\x01NNN\x02NNNNNN\x00NNNNN\x03NNNNNNNNNNNN\x00N\x01NNN\x02NNNNNN\x00NNNNN\x03NNNNNNNNNNN";
 
+// Colorspace fastq flag
+int colorspace_flag = 0;
+
 /////////////////////////
 // Function prototypes
 /////////////////////////
@@ -358,6 +361,12 @@ int main(int argc, char *argv[]) {
         exit(EXIT_FAILURE);
     }
     
+    // Check if colorspace data
+    colorspace_flag = ss_check_fastq_files(utstring_body(in_read1_fq_fn),
+                                           utstring_body(in_read2_fq_fn),
+                                           utstring_body(in_single1_fq_fn),
+                                           utstring_body(in_single2_fq_fn));
+
     // Begin processing!
     
 #ifdef _OPENMP    
@@ -989,7 +998,11 @@ unsigned long int fq_stream_rejecter(UT_string *fq_fn, int pipe_fd, UT_string *o
                     *start = '\0';
                     utstring_printf(new_head_data, "@%s|%s:%s",utstring_body(head_data)+1,utstring_body(out_prefix),end);
                 } else {
-                    utstring_printf(new_head_data, "@%.2s+%s:%s",utstring_body(head_data)+1,utstring_body(out_prefix),end);
+                    if (colorspace_flag) {
+                        utstring_printf(new_head_data, "@%.2s+%s:%s",utstring_body(head_data)+1,utstring_body(out_prefix),end);
+                    } else {
+                        utstring_printf(new_head_data, "@%s:%s",utstring_body(out_prefix),end);
+                    }
                 } 
             }
             
@@ -1120,7 +1133,11 @@ unsigned long int fq_stream_singlet_rejecter(UT_string *fq_fn, int pipe_fd, UT_s
                     *start = '\0';
                     utstring_printf(new_head_data, "@%s|%s:%s",utstring_body(head_data)+1,utstring_body(out_prefix),end);
                 } else {
-                    utstring_printf(new_head_data, "@%.2s+%s:%s",utstring_body(head_data)+1,utstring_body(out_prefix),end);
+                    if (colorspace_flag) {
+                        utstring_printf(new_head_data, "@%.2s+%s:%s",utstring_body(head_data)+1,utstring_body(out_prefix),end);
+                    } else {
+                        utstring_printf(new_head_data, "@%s:%s",utstring_body(out_prefix),end);
+                    }
                 } 
             }
             

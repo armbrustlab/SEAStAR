@@ -1,6 +1,6 @@
 # -------------------------------------------------------------------------- #
 # Center for Environmental Genomics
-# Copyright (C) 2009-2012 University of Washington.
+# Copyright (C) 2009-2014 University of Washington.
 #
 # Authors:
 # Vaughn Iverson
@@ -23,7 +23,7 @@
 # -------------------------------------------------------------------------- #
 
 # CMake file for fastq_nodup
-cmake_minimum_required (VERSION 2.8)
+cmake_minimum_required (VERSION 2.8.5)
 
 project (fastq_nodup C)
 
@@ -52,4 +52,8 @@ add_test(NAME fastq_nodup_test_data COMMAND bash -c "$<TARGET_FILE:fastq_nodup> 
 
 set_tests_properties(fastq_nodup_test_data PROPERTIES PASS_REGULAR_EXPRESSION "c4c8331dd1ffbe372ffe326617854ade" TIMEOUT 90)
 
+# Test proper handling of read prefixes for nucleotide data
+# Using nucleotide synced fastq output from solid2fastq test
+add_test(NAME fastq_nodup_nt_test_data COMMAND bash -c "$<TARGET_FILE:fastq_nodup> -z --prefix=lambda_tst.d -l 13 -d 2 -e 3 ${CMAKE_BINARY_DIR}/output_test_data/lambda_reads_nt ${CMAKE_BINARY_DIR}/output_test_data/lambda_reads_nt_d; gunzip -c ${CMAKE_BINARY_DIR}/output_test_data/lambda_reads_nt_d.{read1,read2,single}.fastq.gz | openssl md5 ")
 
+set_tests_properties(fastq_nodup_nt_test_data PROPERTIES PASS_REGULAR_EXPRESSION "43ed88f6adef50093de1878fcd28e733" TIMEOUT 90)

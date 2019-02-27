@@ -1,3 +1,55 @@
+### 0.5.0 ###
+
+- Added -x/--no_suffix option to solid2fastq tool
+
+- Added --force_rev option to trimfastq tool
+
+- Added --gc_window option to ref_select tool
+
+- Added ability to detect assembly issues from physical coverage
+anomalies in ref_select
+
+- Added CIRCLE command and associated options to graph_ops tool
+
+- Added capability to LOAD and merge from multiple JSON files in
+graph_ops
+
+- Added capability to LOAD an optional separate edge file in
+graph_ops
+
+- Added capability to flag problem nodes in DOT file outoputs in
+graph_ops
+
+- Added capability to add "external" contigs using the INSERT command
+in graph_ops
+
+- Added capability to finely control removal of contigs with the soft
+option to the SELCC command in graph_ops
+
+- Added capability to link a subset of scaffolds by name using the
+"scaff_names" and "exclusive" options of the SCAFLNK command in graph_ops
+
+- Added capability for SCRIPT files to recursively call themselves
+in graph_ops
+
+- Changes to the graph_ops JSON schema to support the above features
+
+- Updated nodewrap.sh script to use --max_semi_space option instead
+of obsolete --max_new_space with newer versions of node.js
+
+- Updated coffeescript files to correctly identify newer versions of
+node.js
+
+- Added a requirement for cmake version 2.8.5 or later to handle
+an issue with out-of-order execution of tests that occurs in cmake
+2.8.4
+
+- Updated README with modern build instructions on MacOS
+
+- Assorted minor bug fixes and performance improvements
+
+- Documentation improvements.
+
 ### 0.4.18 ###
 
 - Fixed a formatting bug in the --z_stats option of the tetracalc

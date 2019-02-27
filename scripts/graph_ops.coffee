@@ -51,7 +51,8 @@
 #
 ###
 
-unless process.version.split('.')[1] >= 10   # Require node version v0.x.y to be x >= 10
+ver = process.version[1..].split('.')
+unless ver[1] >= 10 or ver[0] > 0   # Require node version >= 0.10.x
    console.error("ERROR: nodejs version v0.10.0 or greater required.")
    process.exit(1)
 
@@ -119,7 +120,7 @@ read_input_stream = (fn, parse, cb) ->  # fn = Filename, cb = callback passing o
 # Treat return like a stream, implements on, write and end methods. Smoothes-over the differences
 # between the different output possibilities.
 ###
-open_output_stream = (fn, tag = '') ->   # fn = Filename, returns open stream to write to
+open_output_stream = (fn, tag) ->   # fn = Filename, returns open stream to write to
 
    out = {}
 
@@ -143,8 +144,12 @@ open_output_stream = (fn, tag = '') ->   # fn = Filename, returns open stream to
       # The tag functionality substitutes all discrete runs of @ symbols with an optional tag
       # passed in from outside of a script, etc.
       if tag_rep = fn.match(/(@+)/)
-         console.warn("INFO: Substituting '#{tag}' for '#{tag_rep[1]}' in file #{fn}")
-         fn = fn.replace(/@+/g,tag)
+         unless tag?
+            console.warn("ERROR: NULL tag cannot be used for substitution in output file: #{fn}")
+            return null
+         else
+            console.warn("INFO: Substituting '#{tag}' for '#{tag_rep[1]}' in file #{fn}")
+            fn = fn.replace(/@+/g,tag)
 
       # The renumber functionality below triggers special file renaming logic when the
       # passed name contains one or more '#' characters in a row.  In this case, these
@@ -168,6 +173,7 @@ open_output_stream = (fn, tag = '') ->   # fn = Filename, returns open stream to
          return null
 
       if fout
+         out.fn = fn  # Return the actual filename
          if fn.slice(-3) is '.gz'  # If the filename ends in .gz, then pipe output through gzip
             gz = zlib.createGzip()
             gz.pipe(fout)
@@ -179,6 +185,7 @@ open_output_stream = (fn, tag = '') ->   # fn = Filename, returns open stream to
       else
          out = null
    else  # Otherwise STDOUT is ready to go
+      out.fn = "/dev/stdout"  # Return STDOUT as the output file for logging
       out.o = process.stdout
 
    out   # Return the output object
@@ -658,7 +665,7 @@ edge_director = (prev_n, n, e) ->
    # performed later based on the .ref_str property of each node.
 
    # In this case, this edge is already properly directed so there's no work to do
-   if e.dir is "forward" or e.dir is "pos"
+   if e.dir is "forward" or e.dir is "pos" or e.dir is "contig"
       return e
 
    e.org_dir = e.dir      # Save the original direction of this edge.
@@ -818,8 +825,8 @@ make_directed = (j) ->
                throw new Error("make_directed: Improper edge type detected between nodes: #{n.id} and #{l[2].id}")
 
             # Reverse compliment this node's sequence if it's not on the reference strand
-            unless n.ref_str or not n.recon_seq?
-               n.recon_seq = reverse_comp(n.recon_seq)
+            unless n.ref_str or not n.seq?
+               n.seq = reverse_comp(n.seq)
 
    j.digraph = true
 
@@ -1538,6 +1545,8 @@ ccdetail : true -- Write connected component details\n
          console.error("ERROR: open_output_stream could not write to file '#{args.file}'.")
          callback?(err, null))
 
+   args.output = o.fn if args.file isnt o.fn
+
    calc_ccomps(j) unless j.connected_comps?  # Make sure there are ccomps
 
    num_nodes = Object.keys(j.nodes).length
@@ -1553,6 +1562,12 @@ ccdetail : true -- Write connected component details\n
       [n50, seq_tot, cov, gc] = calc_seq_stats(j.nodes)
       o.write("\nTotal sequence length: #{seq_tot}  N50: #{n50}\n")
       o.write("Mean coverage: #{cov.toFixed(1)}  GC content: #{gc.toFixed(1)}%\n")
+
+   # Now do the same for removed nodes
+   if j.removed_nodes? and Object.keys(j.removed_nodes).length
+      [n50, seq_tot, cov, gc] = calc_seq_stats(j.removed_nodes)
+      o.write("\nTotal unselected sequence length: #{seq_tot}  N50: #{n50}\n")
+      o.write("Mean unselected coverage: #{cov.toFixed(1)}  GC content: #{gc.toFixed(1)}%\n")
 
    if j.clusters? and j.scaffolds?
       o.write("\nScaffold Clusters: #{j.clusters.length}\n")
@@ -1691,9 +1706,17 @@ const_edge : true -- Draw connection arrow lines at constant width\n
         Example: #{args.help} {\"const_edge\":true} -- Draw edge arrows of constant width\n
         regardless of bitscore.\n
 \n
-colored_edges : true -- Draw edges colored by the GC% of the connected contigs\n
+colored_edges : true -- Draw edges colored by the GC% of the connected contigs. Note that\n
+                        this overrides any other edge coloring that would have otherwise\n
+                        have been applied.\n
 \n
         Example: #{args.help} {\"colored_edges\":true} -- Draw colored arrows\n
+\n
+problems : true -- Draw nodes with potential assembly problems as red double circles with\n
+                   the node label text inside. Note that this overrides the normal node\n
+                   text that would otherwise have been rendered.\n
+\n
+        Example: #{args.help} {\"problems\":true} -- Highlight problem nodes\n
 ")
       callback?(null, j)
       return
@@ -1708,6 +1731,9 @@ colored_edges : true -- Draw edges colored by the GC% of the connected contigs\n
       o.on("error", (err)->
           console.error("ERROR: open_output_stream could not write to file '#{args.file}'.")
           callback?(err, null))
+
+   args.output = o.fn if args.file isnt o.fn
+
    try
       build_graph_refs(j)
    catch err
@@ -1760,20 +1786,21 @@ colored_edges : true -- Draw edges colored by the GC% of the connected contigs\n
  fillcolor = \"#{h},1.0,0.8\"
  color = \"#{h},1.0,0.5\"
  label = \"#{(if ((args.detail is 2) and (node.desc?)) then node.desc else name)}\"
- #{if node.contig_problems? then doublecircle else ""}
+ #{if node.contig_problems? and args.problems then doublecircle else ""}
 ];\n")
 
       for edge in j.edges
-          edge_type = if edge.dir is "pos" or edge.dir is "forward" then "->" else "--"
-          if edge.dir is "pos" or edge.interscaffold
-             o.write("\"#{edge.n1}\" #{edge_type} \"#{edge.n2}\"
+         edge_type = if edge.dir is "pos" or edge.dir is "forward" then "->" else "--"
+         unless args.colored_edges
+            if edge.dir is "pos" or edge.interscaffold
+               o.write("\"#{edge.n1}\" #{edge_type} \"#{edge.n2}\"
  [type = DEP,
  dir = #{edge.dir},
  penwidth = #{(args.pen_scale*Math.sqrt((if ((not args.const_edge) and (edge.score > 0)) then edge.score else 5)))},
  color = red
 ];\n")
-          else unless args.colored_edges
-             o.write("\"#{edge.n1}\" #{edge_type} \"#{edge.n2}\"
+            else
+               o.write("\"#{edge.n1}\" #{edge_type} \"#{edge.n2}\"
  [type = MP,
  dir = #{edge.dir},
  bits = #{edge.bits.toFixed(3)},
@@ -1784,11 +1811,19 @@ colored_edges : true -- Draw edges colored by the GC% of the connected contigs\n
  arrowsize = #{0.1*(Math.log((if ((not args.const_edge) and (edge.score > 0)) then edge.score else 1), 2))},
  color = black
 ];\n")
-          else
-             h = ((((edge.src.pct_gc ? 0) + (edge.tar.pct_gc ? 0)) / 2) - 30.0) / 30.0
-             h = 0.0 if h < 0.0
-             h = 1.0 if h > 1.0
-             o.write("\"#{edge.n1}\" #{edge_type} \"#{edge.n2}\"
+         else
+            h = ((((edge.src.pct_gc ? 0) + (edge.tar.pct_gc ? 0)) / 2) - 30.0) / 30.0
+            h = 0.0 if h < 0.0
+            h = 1.0 if h > 1.0
+            if edge.dir is "pos" or edge.interscaffold
+               o.write("\"#{edge.n1}\" #{edge_type} \"#{edge.n2}\"
+ [type = DEP,
+ dir = #{edge.dir},
+ penwidth = #{(args.pen_scale*Math.sqrt((if ((not args.const_edge) and (edge.score > 0)) then edge.score else 5)))},
+ color = \"#{h},1.0,0.5\"
+];\n")
+            else
+               o.write("\"#{edge.n1}\" #{edge_type} \"#{edge.n2}\"
  [type = MP,
  dir = #{edge.dir},
  bits = #{edge.bits.toFixed(3)},
@@ -1800,7 +1835,7 @@ colored_edges : true -- Draw edges colored by the GC% of the connected contigs\n
  color = \"#{h},1.0,0.5\"
 ];\n")
 
-         o.write("}\n")
+      o.write("}\n")
 
    remove_graph_refs(j)
 
@@ -1880,15 +1915,17 @@ abundance : true -- append relative abundance values to the FASTA sequence IDs\n
           console.error(err)
           callback?(err, null))
 
+   args.output = o.fn if args.file isnt o.fn
+
    # Here, just write out the sequences, with optional relative abundance
    unless args.scaff
       for name, node of j.nodes
-         if node.recon_seq?
+         if node.seq?
             if args.abundance?
                o.write(">#{name}_#{(node.rel_ab*100).toFixed(6)}\n")
             else
                o.write(">#{name}\n")
-            o.write("#{node.recon_seq}\n")
+            o.write("#{node.seq}\n")
       o.end((err)->
          if err
             callback?(err, null)
@@ -1912,9 +1949,9 @@ abundance : true -- append relative abundance values to the FASTA sequence IDs\n
          for scaf_name, scaf of j.scaffolds
             for nid in scaf.nodes
                node = j.nodes[nid]
-               if node.recon_seq?
+               if node.seq?
                   out.write(">#{node.id} #{scaf_name}\n")
-                  out.write("#{node.recon_seq}\n")
+                  out.write("#{node.seq}\n")
 
       # In this case the stream is a file
       if args.no_merge_scaffs
@@ -2030,6 +2067,8 @@ header : true -- write a header row with labels for each column\n
           console.error("ERROR: open_output_stream could not write to file '#{args.file}'.")
           callback?(err, null))
 
+   args.output = o.fn if args.file isnt o.fn
+
    if args.header
       o.write("id\t
 bitscore\t
@@ -2066,8 +2105,12 @@ desc\n
 
 ###
 # Reduces the graph to nodes in the object containing node_ids
+# soft = false : Only neighbors of selected nodes are retained as removed. All others are
+#                deleted (along with any edges linking to them).  Default.
+# soft = true  : nodes not selected are moved (along with their edges) to the removed
+#                pool, no data is deleted.
 ###
-execute_selection = (j, nodes) ->
+execute_selection = (j, nodes, soft = false) ->
 
    edges_kept = []
    removed_edges_kept = []
@@ -2081,37 +2124,58 @@ execute_selection = (j, nodes) ->
       callback?(err, null)
       return
 
-   for id, n of nodes
-      for e in n.inlinks
-         if nodes[e[1].id]?
-            edges_kept.push(e[0])
+   if soft  # Keep all edges/nodes as either selected or removed
 
-      for e in n.links
-         unless nodes[e[1].id]?
-            removed_edges_kept.push(e[0])
-            removed_nodes_kept[e[1].id] = e[1]
+      removed_edges_kept = j.removed_edges   # Keep existing removed edges
+      for e in j.edges
+         if nodes[e.n1]? and nodes[e.n2]?
+            edges_kept.push(e)               # Edges between selected nodes are kept selected
+         else
+            removed_edges_kept.push(e)       # Others are kept removed
 
-      for e in n.rem_inlinks
-         if nodes[e[1].id]?
-            removed_edges_kept.push(e[0])
+      removed_nodes_kept = j.removed_nodes   # Keep existing removed nodes
+      for id, n of j.nodes when not nodes[id]?
+         removed_nodes_kept[id] = n
 
-      for e in n.rem_links
-         unless nodes[e[1].id]?
-            removed_edges_kept.push(e[0])
-            removed_nodes_kept[e[1].id] = e[1]
+   else # Default: Keep only nodes/edges that are one step away from members of nodes.
 
-   for id, n of removed_nodes_kept
-      for e in n.rem_inlinks
-         if removed_nodes_kept[e[1].id]?
-            removed_edges_kept.push(e[0])
+      for id, n of nodes
+
+         # Keep currently selected edges between kept nodes
+         for e in n.inlinks
+            if nodes[e[1].id]?
+               edges_kept.push(e[0])
+
+         # Keep edges between kept nodes and other nodes (as removed)
+         for e in n.links
+            unless nodes[e[1].id]?
+               removed_edges_kept.push(e[0])
+               removed_nodes_kept[e[1].id] = e[1]
+
+         # Keep removed edges between kept nodes (as removed)
+         for e in n.rem_inlinks
+            if nodes[e[1].id]?
+               removed_edges_kept.push(e[0])
+
+         # Keep removed edges between kept nodes and other nodes (as removed)
+         for e in n.rem_links
+            unless nodes[e[1].id]?
+               removed_edges_kept.push(e[0])
+               removed_nodes_kept[e[1].id] = e[1]
+
+      # Keep removed edges between nodes that are being kept as removed nodes
+      for id, n of removed_nodes_kept
+         for e in n.rem_inlinks
+            if removed_nodes_kept[e[1].id]?
+               removed_edges_kept.push(e[0])
+
+      j.shared_seq_edges = (e for e in j.shared_seq_edges when nodes[e.n1]? or nodes[e.n2]? or removed_nodes_kept[e.n1]? or removed_nodes_kept[e.n2]?)
+      j.internal_edges = (e for e in j.internal_edges when nodes[e.n1]? or removed_nodes_kept[e.n1]?)
 
    j.nodes = nodes
    j.edges = edges_kept
    j.removed_edges = removed_edges_kept
    j.removed_nodes = removed_nodes_kept
-
-   j.shared_seq_edges = (e for e in j.shared_seq_edges when nodes[e.n1]? or nodes[e.n2]? or removed_nodes_kept[e.n1]? or removed_nodes_kept[e.n2]?)
-   j.internal_edges = (e for e in j.internal_edges when nodes[e.n1]? or removed_nodes_kept[e.n1]?)
 
    j
 
@@ -2128,6 +2192,7 @@ execute_selection = (j, nodes) ->
 #     min_nodes = minimum number of nodes in cc
 #     min_seqlen = minimum amount of sequence in nodes in cc
 #     sequence = sequence to search for
+#     soft = move unselected nodes/edges to removed pool, do not delete
 #
 ###
 grab_ccomps = (j, args={}, callback) ->
@@ -2213,11 +2278,24 @@ sequences : [<string>, ...] -- Like 'sequence' parameter, but takes a list of se
         Example: #{args.help} {\"sequences\":[\"AGACTAGCAGATATAC\",\"GATAACGATACGATACGAT\"]}\n
         Select connected components containing any of the provided sequences (or their\n
         reverse complements).\n
-")
+\n
+soft : true -- Determines whether unselected ccomp nodes are deleted or kept as \"removed\"\n
+\n
+        Example: #{args.help} {\"soft\":true}\n
+        The contigs of first connected component will remain selected, all others are\n
+        retained as unselected.\n
+\n
+        Default: #{args.help} {\"soft\":false}\n
+        The contigs of first connected component will remain selected, neighboring contigs\n
+        (one hop away) are unselected and added to the \"removed\" pool. All others are\n
+        permanently deleted.\n
+ ")
       callback?(null, j)
       return
 
    calc_ccomps(j) unless j.connected_comps?  # Make sure there are ccomps
+
+   args.soft ?= false
 
    try
       build_graph_refs(j)
@@ -2254,7 +2332,7 @@ sequences : [<string>, ...] -- Like 'sequence' parameter, but takes a list of se
       all_seqs = args.sequences.map(reverse_comp).concat(args.sequences)
       for i in ccnums
          c = j.connected_comps[i]
-         for nid in c when (seq = j.nodes[nid].recon_seq) and not (i in args.ccnums)
+         for nid in c when (seq = j.nodes[nid].seq or '') and not (i in args.ccnums)
             for s in all_seqs when seq.indexOf(s) isnt -1
                args.ccnums.push(i)
                break
@@ -2294,7 +2372,7 @@ sequences : [<string>, ...] -- Like 'sequence' parameter, but takes a list of se
       for nid in j.connected_comps[cc]
          nodes[nid] = j.nodes[nid]
 
-   execute_selection(j, nodes)
+   execute_selection(j, nodes, args.soft)
 
    j.connected_comps = new_cclist  # Set new connected components
 
@@ -2396,7 +2474,7 @@ sequences : [<string>, ...] -- Like 'sequence' parameter, but takes a list of se
    if args.sequences
       args.names = []
       all_seqs = args.sequences.map(reverse_comp).concat(args.sequences)
-      for nid, n of j.nodes when seq = n.recon_seq
+      for nid, n of j.nodes when seq = n.seq or ''
          for s in all_seqs when seq.indexOf(s) isnt -1
             args.names.push(nid)
             break
@@ -2404,7 +2482,7 @@ sequences : [<string>, ...] -- Like 'sequence' parameter, but takes a list of se
    if args.sequence
       args.names = []
       revseq = reverse_comp(args.sequence)
-      for nid, n of j.nodes when seq = n.recon_seq
+      for nid, n of j.nodes when seq = n.seq or ''
          if seq.indexOf(args.sequence) isnt -1 or seq.indexOf(revseq) isnt -1
             args.names.push(nid)
 
@@ -2452,7 +2530,7 @@ find_direct_connection = (head, tail, thresh = 0) ->
    select_head = null
    select_tail = null
 
-   if (edge = try_dir_links(head, tail)) and edge[0]?.bits > thresh
+   if (edge = try_dir_links(head, tail)) and (edge[0]?.bits > thresh or edge[0]?.dir is "contig")
       select_head = head
       select_tail = tail
       select_edge = edge
@@ -2537,14 +2615,230 @@ find_indirect_connection = (head, tail, thresh = 0) ->
 find_connection = (head, tail, thresh = 0) ->
    direct = find_direct_connection(head, tail, thresh)
 
-   thresh = direct[3] if direct[0]
-
-   indirect = find_indirect_connection(head, tail, thresh)
-
-   if indirect[0]
-      indirect
+   unless direct[0]?[0]?.dir is "contig"
+      console.warn "Trying indirect: #{head.name} -- #{tail.name}"
+      thresh = direct[3] if direct[0]
+      indirect = find_indirect_connection(head, tail, thresh)
+      if indirect[0]
+         indirect
+      else
+         direct
    else
       direct
+
+###
+# Circle detect
+###
+circles = (j, args={}, callback) ->
+# j = json graph object, args = arguments from command, callback = function to call when done
+
+   if args.help?
+      console.warn("
+#{args.help} -- Find circular sequences among scaffolds
+")
+      if args.detailed_help?
+         console.warn("
+\n
+Parameters:\n
+\n
+circular : true -- return circularized scaffolds\n
+\n
+        Example: #{args.help} {\"circular\":true} -- Produce circular scaffolds.\n
+\n
+        Default (false): Produce linear scaffolds placing the ends within the largest\n
+        contig of each connected component. The node with the longest sequence will be\n
+        divided equally into two and the mate-pair connections also divided, such that\n
+        they form two clean ends for the new scaffold.\n
+\n
+thresh : <float> -- minimum bitscore of end-connecting pairing information\n
+\n
+        Example: #{args.help} {\"thresh\":0.0} -- Default. Circle completing end\n
+        connections must have a positive bit score to qualify\n
+")
+      callback?(null, j)
+      return
+
+   args.circular ?= false   # Return circular scaffolds?
+
+   args.thresh ?= 0.0
+
+   args.min_nodes ?= 3
+   args.min_seqlen ?= 10000
+
+   grab_ccomps(j,{'min_seqlen' : args.min_seqlen, 'min_nodes' : args.min_nodes})
+
+   try
+      build_graph_refs(j)
+      build_removed_graph_refs(j)
+   catch err
+      callback?(err, null)
+      return
+
+   circle_ccs = []
+   preexisting = {}
+
+   remove_head_node = (hn, jj, cc) ->
+      jj.removed_edges.push(hn.outlinks[0][0])
+      delete jj.edges[hn.outlinks[0][0].index]
+      cc.splice(cc.indexOf(hn.id),1)
+      hn.outlinks[0][1]
+
+   remove_tail_node = (tn, jj, cc) ->
+      jj.removed_edges.push(tn.inlinks[0][0])
+      delete jj.edges[tn.inlinks[0][0].index]
+      cc.splice(cc.indexOf(tn.id),1)
+      tn.inlinks[0][1]
+
+   for c, i in j.connected_comps
+      # Find the "head" and "tail" nodes for this scaffold
+      try
+         [[head_node], [tail_node]] = find_ends(j, c, true)
+      catch err
+         remove_graph_refs(j)
+         callback?(err, null)
+         return
+
+      console.warn "Trying: #{head_node.id} #{tail_node.id}"
+
+      [e, new_head, new_tail] = find_connection(head_node, tail_node, args.thresh)
+
+      if e
+         if e.length is 1   # Direct connection (one edge)
+            edge = e[0]
+            console.warn "Found edge: #{edge.dir}"
+            if edge.dir is "contig"
+               console.warn "Found existing circle in CC_#{i}.  Largest node: #{c[0]}"
+               preexisting[c[0]] = true
+               circle_ccs.push(i)
+               if args.circular
+                  j.edges.push(edge)
+                  delete j.removed_edges[edge.index]
+            else
+               console.warn "Found potential circle in CC_#{i}"
+               head_node = remove_head_node(head_node, j, c) if new_head isnt head_node
+               tail_node = remove_tail_node(tail_node, j, c) if new_tail isnt tail_node
+               if head_node isnt tail_node and new_head is head_node and new_tail is tail_node
+                  edge.circle_connect = true
+                  j.edges.push(edge)
+                  delete j.removed_edges[edge.index]
+                  circle_ccs.push(i)
+               else
+                  console.warn("CIRCLE: Strange case in Direct Connection: #{head_node.id} -- #{tail_node.id}")
+
+         else # Indirect connection (two edges and an in-between node)
+
+            head_node = remove_head_node(head_node, j, c) if new_head isnt head_node
+            tail_node = remove_tail_node(tail_node, j, c) if new_tail isnt tail_node
+            if head_node isnt tail_node and new_head is head_node and new_tail is tail_node
+               [edge_tail, edge_head] = e
+               edge_tail.circle_connect = true
+               edge_head.circle_connect = true
+               j.edges.push(edge_tail)
+               delete j.removed_edges[edge_tail.index]
+               j.nodes[edge_head.n1] = edge_head.src
+               delete j.removed_nodes[edge_head.n1]
+               c.push(edge_head.n1)
+               j.edges.push(edge_head)
+               delete j.removed_edges[edge_head.index]
+               if (j.nodes[edge_head.n1]?)
+                  console.warn("CIRCLE: Indirect connection node: #{j.nodes[edge_head.n1].id} is placed in another scaffold.")
+               circle_ccs.push(i)
+            else
+               console.warn("CIRCLE: Strange case in Indirect Connection: #{head_node.id} -- #{tail_node.id}")
+
+   remove_graph_refs(j)
+
+   if circle_ccs.length
+      console.warn "#{circle_ccs.length} circles still in play."
+      grab_ccomps(j,{'ccnums' : circle_ccs})
+      console.warn "After select: #{j.connected_comps.length} ccomps."
+
+      if args.circular
+         delete j.scaffolds
+      else
+         # Build a list of the largest nodes, for RELINKing
+         relink_nodes = (c[0] for c in j.connected_comps unless preexisting[c[0]])
+
+         if relink_nodes
+            console.warn "#Relinking...", JSON.stringify(relink_nodes)
+            relink(j, {"names" : relink_nodes, "complete" : false, "existing" : false})
+
+         calc_ccomps(j)
+
+         try
+            build_graph_refs(j)
+         catch err
+            callback?(err, null)
+            return
+
+         edit_work = []
+
+         console.warn "Preexisting circles: ", JSON.stringify(preexisting)
+
+         for cc, i in j.connected_comps
+
+            sn = j.nodes[cc[0]]  # node to split
+
+            if preexisting[cc[0]]
+               console.warn "FOUND: #{cc[0]}"
+            else
+               split_pos =  Math.round(sn.seq_len / 2)
+               console.warn("Splitting largest node: #{sn.name} length: #{sn.seq_len}, split at: #{split_pos}")
+
+               # Build lists of linking nodes, discarding any that link bidirectionally
+               inlink_nodes = {}
+               for e in sn.inlinks
+                  inlink_nodes[e[1].id] = true
+               outlink_nodes = []
+               for e in sn.outlinks
+                  unless e[1].id in inlink_nodes
+                     outlink_nodes.push(e[1].id)
+                  else
+                     delete inlink_nodes[e[1].id]
+               inlink_nodes = Object.keys(inlink_nodes)
+               edit_work.push [sn.name, split_pos, inlink_nodes, outlink_nodes]
+
+         remove_graph_refs(j)
+
+         for [name, split_pos, inlink_nodes, outlink_nodes], i in edit_work
+            cc = j.connected_comps[i]
+            cut_node(j, {"name" : name, "new_name" : "#{name}_splitA", "end" : split_pos - 1, "include" : inlink_nodes })
+            j.nodes["#{name}_splitA"].circle_end = true
+            cut_node(j, {"name" : name, "new_name" : "#{name}_splitB", "begin" : split_pos, "include" : outlink_nodes })
+            j.nodes["#{name}_splitB"].circle_begin = true
+            perform_edits(j, {"rem_nodes" : [name]})
+            cc.shift()  # This assumes that the largest node is first, that the CC is sorted by length!
+            cc.push("#{name}_splitA")
+            cc.push("#{name}_splitB")
+            # Add a removed position dependent edge from the end to the beginning
+            j.removed_edges.push(
+                  n1  :  "#{name}_splitA"
+                  n2  :  "#{name}_splitB"
+                  dir :  "contig"
+                  score : 0.0
+               )
+
+         remove_graph_refs(j)
+         console.warn "Rescaffolding circles."
+         scaffold(j)  # Need to rescaffold to ensure linear chain of contigs in output
+         console.warn "Verifying scaffolds #{Object.keys(j.scaffolds).length}"
+         good_scaffs = []
+         for s, scaff of j.scaffolds when j.nodes[scaff.nodes[0]].circle_begin and j.nodes[scaff.nodes[scaff.nodes.length-1]].circle_end
+            good_scaffs.push scaff.ccnum
+         console.warn "Good scaffolds remaining: #{good_scaffs.length}"
+         if good_scaffs.length
+            grab_ccomps(j,{'ccnums' : good_scaffs})
+            console.warn "Done processing circles."
+         else
+            console.warn("CIRCLE command produced no output. (No circles found)")
+            callback?(null, undefined)
+            return
+   else
+      console.warn("CIRCLE command produced no output. (No circles found)")
+      callback?(null, undefined)
+      return
+
+   callback?(null, j)
 
 ###
 # Scaffold end-link
@@ -2560,6 +2854,18 @@ scaff_link = (j, args={}, callback) ->
          console.warn("
 \n
 Parameters:\n
+\n
+scaff_names : [\"Scaffold_name1\",\"Scaffold_name2\",...] -- Select the scaffolds\n
+        to attempt to link to each other. Default: use all scaffolds.\n
+\n
+        Example: #{args.help} {\"scaff_names\":[\"Scaffold_1234\",\"Scaffold_5678\"]}\n
+        -- Select the scaffolds named Scaffold_1234 and Scaffold_5678 for processing.\n
+\n
+exclusive : true -- Only look for connections within the scaff_names list.\n
+        Default: look for connections between those in scaff_names and all other scaffolds.\n
+\n
+        Example: #{args.help} {\"exclusive\":true,\"scaff_names\":[\"Scaffold_1234\",\"Scaffold_5678\"]}\n
+        -- Only look for connections between Scaffold_1234 and Scaffold_5678.\n
 \n
 thresh : <float> -- Bitscore threshold\n
 \n
@@ -2580,80 +2886,114 @@ thresh : <float> -- Bitscore threshold\n
       callback?(err, null)
       return
 
-   # Add ccnums to nodes for later reference
-   for c, i in j.connected_comps
-      for n in c
-         j.nodes[n].ccnum = i
+   if args.scaff_names?
+      scaffolds = {}
+      for s in args.scaff_names when j.scaffolds[s]?
+         scaffolds[s] = j.scaffolds[s]
+   else
+      scaffolds = j.scaffolds
+
+   if args.exclusive
+      scaffolds2 = scaffolds
+   else
+      scaffolds2 = j.scaffolds
+
+   find_node_scaff = (n) ->
+      for scaff, scafflst of scaffolds2 when n in scafflst.nodes
+         return scaff
+      return null
 
    # Try all pairs of scaffolds
-   for c, i in j.connected_comps
-      for cc, ii in j.connected_comps when ii >= i
+   for s, sl of scaffolds
 
-         # Find the "head" and "tail" nodes for these scaffold
+      edge_cache = []
 
-         try
-            [[h1], [t1]] = find_ends(j, c, true)
-            [[h2], [t2]] = find_ends(j, cc, true)
-         catch err
-            remove_graph_refs(j, ((n) -> delete n.ccnum))
-            callback?(err, null)
-            return
+      for ss, ssl of scaffolds2 when (sl.ccnum >= ssl.ccnum) or not ((scaffolds2 is scaffolds) or (ss of scaffolds))
+         c = j.connected_comps[sl.ccnum]
+         cc = j.connected_comps[ssl.ccnum]
 
-         [e1] = find_connection(h1, t2, args.thresh)
+         unless args.full_length   # Default: only check for connections at scaffold ends
 
-         if e1
-            if e1.length is 1   # Direct connection (one edge)
-               unless e1[0].interscaffold
-                  e1[0].interscaffold = true
-                  j.edges.push(e1[0])
-                  delete j.removed_edges[e1[0].index]
+            # Find the "head" and "tail" nodes for these scaffold
+            try
+               [[h1], [t1]] = find_ends(j, c, true)
+               [[h2], [t2]] = find_ends(j, cc, true)
+            catch err
+               remove_graph_refs(j)
+               callback?(err, null)
+               return
 
-               console.warn("Scaffold #{ii} #{e1[0].n1} --> Scaffold #{i} #{e1[0].n2} -- #{e1[0].bits} bits")
+            [e1] = find_connection(h1, t2, args.thresh)
 
-            else # Indirect connection (two edges and an inbetween node)
-               unless e1[0].interscaffold
-                  e1[0].interscaffold = true
-                  j.edges.push(e1[0])
-                  delete j.removed_edges[e1[0].index]
-               unless e1[1].interscaffold
-                  e1[1].interscaffold = true
-                  j.edges.push(e1[1])
-                  delete j.removed_edges[e1[1].index]
+            if e1
+               if e1.length is 1   # Direct connection (one edge)
+                  unless e1[0].interscaffold
+                     e1[0].interscaffold = true
+                     j.edges.push(e1[0])
+                     delete j.removed_edges[e1[0].index]
 
-               unless j.nodes[e1[1].n1]?
-                  j.nodes[e1[1].n1] = e1[1].src
-                  delete j.removed_nodes[e1[1].n1]
+                  console.warn("#{ss} #{e1[0].n1} --> #{s} #{e1[0].n2} -- #{e1[0].bits} bits")
 
-               console.warn("Scaffold #{ii} #{e1[0].n1} --> Scaffold #{e1[1].src.ccnum} #{e1[1].n1} --> Scaffold #{i} #{e1[1].n2} -- #{e1[0].bits} + #{e1[1].bits} bits")
+               else # Indirect connection (two edges and an in between node)
+                  unless e1[0].interscaffold
+                     e1[0].interscaffold = true
+                     j.edges.push(e1[0])
+                     delete j.removed_edges[e1[0].index]
+                  unless e1[1].interscaffold
+                     e1[1].interscaffold = true
+                     j.edges.push(e1[1])
+                     delete j.removed_edges[e1[1].index]
 
-         unless i == ii
-            [e2] = find_connection(h2, t1, args.thresh)
+                  unless j.nodes[e1[1].n1]?
+                     j.nodes[e1[1].n1] = e1[1].src
+                     delete j.removed_nodes[e1[1].n1]
 
-            if e2
-               if e2.length is 1   # Direct connection (one edge)
-                  unless e2[0].interscaffold
-                     e2[0].interscaffold = true
-                     j.edges.push(e2[0])
-                     delete j.removed_edges[e2[0].index]
+                  console.warn("#{ss} #{e1[0].n1} --> #{find_node_scaff(e1[1].n1)} #{e1[1].n1} --> #{s} #{e1[1].n2} -- #{e1[0].bits} + #{e1[1].bits} bits")
 
-                  console.warn("Scaffold #{i} #{e2[0].n1} --> Scaffold #{ii} #{e2[0].n2} -- #{e2[0].bits} bits")
+            unless s is ss
+               [e2] = find_connection(h2, t1, args.thresh)
+
+               if e2
+                  if e2.length is 1   # Direct connection (one edge)
+                     unless e2[0].interscaffold
+                        e2[0].interscaffold = true
+                        j.edges.push(e2[0])
+                        delete j.removed_edges[e2[0].index]
+
+                     console.warn("#{s} #{e2[0].n1} --> #{ss} #{e2[0].n2} -- #{e2[0].bits} bits")
+                  else
+                     unless e2[0].interscaffold
+                        e2[0].interscaffold = true
+                        j.edges.push(e2[0])
+                        delete j.removed_edges[e2[0].index]
+                     unless e2[1].interscaffold
+                        e2[1].interscaffold = true
+                        j.edges.push(e2[1])
+                        delete j.removed_edges[e2[1].index]
+
+                     unless j.nodes[e2[1].n1]?
+                        j.nodes[e2[1].n1] = e2[1].src
+                        delete j.removed_nodes[e2[1].n1]
+
+                     console.warn("#{s} #{e2[0].n1} --> #{find_node_scaff(e2[1].n1)} #{e2[1].n1} --> #{ss} #{e2[1].n2} -- #{e2[0].bits} + #{e2[1].bits} bits")
+
+         else  # args.full_length is true!
+            continue if s is ss
+            unless edge_cache.length > 0
+               console.warn("Checking #{s}...")
+               for e in j.removed_edges when (e?.bits >= args.thresh) and (e.n1 in c or e.n2 in c)
+                  edge_cache.push(e)
+
+            for e in edge_cache when ((e.n1 in cc) or (e.n2 in cc))
+               delete j.removed_edges[e.index]
+               e.interscaffold = true
+               j.edges.push(e)
+               if e.n1 in c
+                  console.warn("#{s} #{e.n1} --> #{ss} #{e.n2} -- #{e.bits} bits")
                else
-                  unless e2[0].interscaffold
-                     e2[0].interscaffold = true
-                     j.edges.push(e2[0])
-                     delete j.removed_edges[e2[0].index]
-                  unless e2[1].interscaffold
-                     e2[1].interscaffold = true
-                     j.edges.push(e2[1])
-                     delete j.removed_edges[e2[1].index]
+                  console.warn("#{s} #{e.n2} --> #{ss} #{e.n1} -- #{e.bits} bits")
 
-                  unless j.nodes[e2[1].n1]?
-                     j.nodes[e2[1].n1] = e2[1].src
-                     delete j.removed_nodes[e2[1].n1]
-
-                  console.warn("Scaffold #{i} #{e2[0].n1} --> Scaffold #{e2[1].src.ccnum} #{e2[1].n1} --> Scaffold #{ii} #{e2[1].n2} -- #{e2[0].bits} + #{e2[1].bits} bits")
-
-   remove_graph_refs(j, ((n) -> delete n.ccnum))
+   remove_graph_refs(j)
 
    delete j.connected_comps
    delete j.scaffolds if j.scaffolds?
@@ -2887,6 +3227,15 @@ dup_thresh : <float> -- Fraction of kmers from a contig with hits to scaffold ba
         for a contig hit kmers from the scaffold backbone contigs, then do not insert\n
         that contig.\n
 \n
+external : true -- Controls whether contigs may be inserted outside of an input scaffold.\n
+\n
+        Default: #{args.help} {\"external\":false} -- Contigs will not be added outside of\n
+        first and last contigs in the input scaffold; that is, the only inserts performed\n
+        will be between existing connected contigs.\n
+\n
+        Example: #{args.help} {\"external\":true} -- Contigs may be added to\n
+        the scaffold before the first, or after the last, contig in an input scaffold.\n
+\n
 verbose : true -- output diagnostics on STDERR\n
 \n
         Example: #{args.help} {\"verbose\":true} -- Generate extra output information\n
@@ -2907,6 +3256,7 @@ verbose : true -- output diagnostics on STDERR\n
 
    args.thresh ?= 250.0
    args.min_pos_diff ?= 75
+   args.external ?= false
 
    args.dup_kmer ?= 14
    args.dup_thresh ?= 0.15
@@ -2976,8 +3326,8 @@ verbose : true -- output diagnostics on STDERR\n
 
       if args.dup_kmer
          all_mers = {}
-         for n, l in chain_levels when n.recon_seq?.length >= args.dup_kmer
-            all_mers = calc_mers(args.dup_kmer, n.recon_seq, all_mers)
+         for n, l in chain_levels when n.seq?.length >= args.dup_kmer
+            all_mers = calc_mers(args.dup_kmer, n.seq, all_mers)
          unless Object.keys(all_mers).length
             console.warn("INSERT parameter dup_kmer = #{args.dup_kmer} but graph has no sequence. Disabling INSERT kmer checking.") if args.verbose
             args.dup_kmer = 0
@@ -2987,8 +3337,8 @@ verbose : true -- output diagnostics on STDERR\n
 
             other = if n.id is edge.n1 then edge.n2 else edge.n1
 
-            if args.dup_kmer and e[1].recon_seq?.length >= args.dup_kmer
-               contig_mers = calc_mers(args.dup_kmer, e[1].recon_seq)
+            if args.dup_kmer and e[1].seq?.length >= args.dup_kmer
+               contig_mers = calc_mers(args.dup_kmer, e[1].seq)
                all_mers_shared = shared_mers(all_mers, contig_mers)
 
             if all_mers_shared > args.dup_thresh
@@ -3072,7 +3422,7 @@ verbose : true -- output diagnostics on STDERR\n
             nodes_added[node_id] = node
             node.slot = [chain_minmax.ins.min, chain_minmax.outs.max]
             node.ccnum = idx
-         else if (not (tail.terminal) and
+         else if (args.external and
                   (chain_minmax.ins.min > chain_minmax.outs.max) and
                   (chain_minmax.outs.max - chain_minmax.outs.min < 4) and
                   (chain_minmax.ins.max - chain_minmax.ins.min < 4) and
@@ -3381,7 +3731,7 @@ Parameters: NONE.\n
          return
 
       while node
-         if node.recon_seq?
+         if node.seq?
             j.scaffolds[scaf_name].nodes.push(node.id)
          node = node.outlinks[0]?[1]
 
@@ -3615,17 +3965,25 @@ end : <int> -- Ending sequence coordinate for the new node within the original\n
 
    delete new_node.contig_problems
 
-   if new_node.per_nt_cov?
-      new_node.per_nt_cov = new_node.per_nt_cov.slice(args.begin,args.end)
+   if new_node.seq?
+      new_node.seq = new_node.seq.substring(args.begin,args.end)
 
-   if new_node.per_nt_phys_cov?
-      new_node.per_nt_phys_cov = new_node.per_nt_phys_cov.slice(args.begin,args.end)
+   if new_node.per_nt?
 
-   if new_node.per_nt_mp_ins?
-      new_node.per_nt_mp_ins = new_node.per_nt_mp_ins.slice(args.begin,args.end)
+      if new_node.per_nt.cov?
+         new_node.per_nt.cov = new_node.per_nt.cov.slice(args.begin,args.end)
 
-   if new_node.recon_seq?
-      new_node.recon_seq = new_node.recon_seq.substring(args.begin,args.end)
+      if new_node.per_nt.phys_cov?
+         new_node.per_nt.phys_cov = new_node.per_nt.phys_cov.slice(args.begin,args.end)
+
+      if new_node.per_nt.mp_ins?
+         new_node.per_nt.mp_ins = new_node.per_nt.mp_ins.slice(args.begin,args.end)
+
+      if new_node.per_nt.gc_mean?
+         new_node.per_nt.gc_mean = new_node.per_nt.gc_mean.slice(args.begin,args.end)
+
+   if new_node.merge_stats?.per_nt?.cov?
+      new_node.merge_stats.per_nt.cov = new_node.merge_stats.per_nt.cov.slice(args.begin,args.end)
 
    if args.auto_include
       args.include.push(e[1].id) for e in new_node.inlinks when args.begin <= e[0].p2 <= args.end
@@ -3695,6 +4053,8 @@ detail : true -- Provide extra per contig detail\n
           console.error("ERROR: open_output_stream could not write to file '#{args.file}'.")
           callback?(err, null))
 
+   args.output = o.fn if args.file isnt o.fn
+
    args.detail ?= false
    node_cnt = 0
    total = 0
@@ -3708,13 +4068,23 @@ detail : true -- Provide extra per contig detail\n
          prob_types[problem.type]++
          if args.detail
             if problem.type is "Physical coverage break"
-               if node.per_nt_phys_cov?
-                  min = node.per_nt_phys_cov[problem.start]
+               if node.per_nt?.phys_cov?
+                  min = node.per_nt.phys_cov[problem.start]
                   pos = problem.start
-                  for x in [problem.end...problem.start] when node.per_nt_phys_cov[x] < min
-                     min = node.per_nt_phys_cov[x]
+                  for x in [problem.end...problem.start] when node.per_nt.phys_cov[x] < min
+                     min = node.per_nt.phys_cov[x]
                      pos = x
                o.write("\t#{problem.type}\t#{problem.start}\t#{problem.end}\t#{pos}\n")
+            else if problem.type is "Insert size anomaly"
+               if node.per_nt?.mp_ins?
+                  sign = if (node.per_nt.mp_ins[problem.start] < node.per_nt.mp_ins[Math.round((problem.start+problem.end)/2)]) then 1 else -1
+                  minmax = node.per_nt.mp_ins[problem.start]
+                  pos = problem.start
+                  for x in [problem.end...problem.start] when sign * (node.per_nt.mp_ins[x] - minmax) > 0
+                     minmax = node.per_nt.mp_ins[x]
+                     pos = x
+                  magnitude = minmax - (node.per_nt.mp_ins[problem.start] + node.per_nt.mp_ins[problem.end]) / 2
+               o.write("\t#{problem.type}\t#{problem.start}\t#{problem.end}\t#{pos}\t#{magnitude}\n")
             else
                o.write("\t#{problem.type}\t#{problem.start}\t#{problem.end}\n")
 
@@ -3964,6 +4334,8 @@ file : \"filename.json[.gz]\" -- Specify a file name to write the JSON format se
           console.error("ERROR: open_output_stream could not write to file '#{args.file}'.")
           callback?(err, null))
 
+   args.output = o.fn if args.file isnt o.fn
+
    # Check if there are scaffolds / clusters but no ccomps. If so, remove them.
    unless j.connected_comps?
       delete j.scaffolds if j.scaffolds?
@@ -4010,26 +4382,209 @@ file : \"filename.json[.gz]\" -- Specify the name of a JSON format sequence grap
         NOTE: On the command line, if the first parameter isn't a valid command string,\n
         and it ends in `.json[.gz]`, then it is assmued to be the name of a JSON file,\n
         and an implicit `LOAD` command will be run using that filename.\n
+\n
+files : [\"filename1.json[.gz]\", ...] -- Specify the names of multiple JSON format sequence\n
+        graph files. The files must have uniquely named sequence nodes (contigs) with no\n
+        nodes in common among the multiple files being loaded. Only the processing history\n
+        from the first JSON file is retained (the other histories may still be found in their\n
+        original files.)\n
+\n
+        Example: #{args.help} {\"files\":[\"my_assembly_1.json\",\"my_assembly_2.json\"]}\n
+        -- Read data from the files my_assembly_1.json and my_assembly_2.json\n
+\n
+edges : \"edge_file.json[.gz]\" -- Specify the name of a JSON format sequence graph file to\n
+        load edges and mate-pair statistics from. This option works with the 'file' option,\n
+        and requires that the edge_file contain a graph with a subset of the nodes of the\n
+        main graph being loaded with 'file'. Any edges and mate-pair statisics present in\n
+        the main graph are discarded in favor of those from the edge_file.\n
+\n
+        Example: #{args.help} {\"file\":\"main_file.json\",\"edge_file\":\"edge_file.json\"}\n
+        -- Read nodes and sequence data from main_file.json, and edges and connection data\n
+        from edge_file.json\n
 ")
       callback?(null, j)
       return
 
+   # If no args.file, use the first entry in args.files as the first graph
+
+   if args.files?.length and not args.file?
+      args.file = args.files.shift()
+
+   # Detect 0.4.x JSON format and automatically convert to newest version
+   update_json = (old_json) ->
+      console.warn "Checking version of JSON input..."
+      warn_flag = false
+      for nid, n of old_json.nodes
+         if n.per_nt?.seq?    # This case existed only in 0.5 dev versions
+            n.seq = n.per_nt.seq
+            delete n.per_nt.seq
+         if n.recon_seq? or n.per_nt_cov?
+            unless warn_flag
+               console.warn "Version 0.4 JSON format detected.  Upgrading to newest version."
+               warn_flag = true
+            n.per_nt ?= {}
+            if n.recon_seq?
+               n.seq = n.recon_seq
+               delete n.recon_seq
+            if n.per_nt_cov?
+               n.per_nt.cov = n.per_nt_cov
+               delete n.per_nt_cov
+            if n.per_nt_phys_cov?
+               n.per_nt.phys_cov = n.per_nt_phys_cov
+               delete n.per_nt_phys_cov
+            if n.per_nt_mp_ins?
+               n.per_nt.mp_ins = n.per_nt_mp_ins
+               delete n.per_nt_mp_ins
+            if n.per_nt_mean_gc?
+               n.per_nt.mean_gc = n.per_nt_mean_gc
+               delete n.per_nt_mean_gc
+
+   # Handle the merging of multiple graphs
+   merge_graphs = (err, graph) ->
+      filename = args.files.shift()
+      read_input_stream(filename, true, (error, read_buffer) ->
+         if error or not read_buffer
+            console.error("ERROR: Empty buffer returned for file: #{filename}")
+            callback?(error or new Error("Empty buffer returned for file: #{filename}"), null)
+            return
+         else
+            update_json read_buffer
+            merge_graph = read_buffer
+            merge_graph.nodes ?= {}
+            merge_graph.removed_nodes ?= {}
+            merge_graph.edges ?= []
+            merge_graph.internal_edges ?= []
+            merge_graph.removed_edges ?= []
+            merge_graph.shared_edges ?= []
+
+            # Copy over the nodes and removed nodes from the merge graph
+            for nid of merge_graph.nodes
+               if graph.nodes[nid]?
+                  console.error("ERROR: merge graph node #{nid} already exists in main graph.")
+                  callback?(new Error("ERROR: merge graph node #{nid} already exists in main graph."), null)
+                  return
+               else
+                  graph.nodes[nid] = merge_graph.nodes[nid]
+
+            for nid of merge_graph.removed_nodes
+               if graph.removed_nodes[nid]?
+                  console.error("ERROR: merge graph removed node #{nid} already exists in main graph.")
+                  callback?(new Error("ERROR: merge graph removed node #{nid} already exists in main graph."), null)
+                  return
+               else
+                  graph.removed_nodes[nid] = merge_graph.removed_nodes[nid]
+
+            # Copy over the edge lists from the merge graph
+            graph.edges = graph.edges.concat(merge_graph.edges)
+            graph.internal_edges = graph.internal_edges.concat(merge_graph.internal_edges)
+            graph.removed_edges = graph.removed_edges.concat(merge_graph.removed_edges)
+            graph.shared_seq_edges = graph.shared_seq_edges.concat(merge_graph.shared_seq_edges)
+
+            # Are there more files to merge?
+
+            if args.files.length
+               merge_graphs(null,graph)
+               return
+            else  # We're done merging
+               # Clean up some stuff that is no longer valid
+               delete graph.connected_comps if graph.connected_comps?
+               delete graph.scaffolds if graph.scaffolds?
+               delete graph.clusters if graph.clusters?
+               delete graph.run_stats if graph.run_stats?
+               delete graph.rollup_stats if graph.rollup_stats?
+               callback?(null,graph))
+
+   # Handle the merging of edges from another graph
+   merge_edges = (err, graph) ->
+      read_input_stream(args.edges, true, (error, read_buffer) ->
+         if error or not read_buffer
+            console.error("ERROR: Empty buffer returned for file: #{args.edges}")
+            callback?(error or new Error("Empty buffer returned for file: #{args.edges}"), null)
+            return
+         else
+            update_json read_buffer
+            edge_graph = read_buffer
+            edge_graph.edges ?= []
+            edge_graph.internal_edges ?= []
+            graph.merged_edges = true
+
+            # Now, walk the node list of the edge graph and copy over the pairing information
+            # from the edge graph, while ensuring that all edge_graph nodes also exist in the
+            # main graph. Note, it is fine for the main graph to have nodes without counterparts
+            # in the edge graph, which is why we don't check for that case below.
+
+            missing_nodes = {}
+
+            for nid, en of edge_graph.nodes
+               unless graph.nodes[nid]?
+                  missing_nodes[nid] = true
+                  console.warn("WARNING: edge graph node #{nid} does not exist in main graph.")
+                  # callback?(new Error("ERROR: edge graph node #{nid} does not exist in main graph."), null)
+                  # return
+               else
+                  gn = graph.nodes[nid]
+                  gn.mp_pairs = en.mp_pairs if en.mp_pairs?
+                  gn.mp_fwd = en.mp_fwd if en.mp_fwd?
+                  gn.mp_bwd = en.mp_bwd if en.mp_bwd?
+                  gn.mp_ins_mean = en.mp_ins_mean if en.mp_ins_mean?
+                  gn.mp_ins_stdev = en.mp_ins_stdev if en.mp_ins_stdev?
+                  gn.per_nt ?= {} if en.per_nt?
+                  gn.per_nt.phys_cov = en.per_nt.phys_cov if en.per_nt?.phys_cov?
+                  gn.per_nt.mp_ins = en.per_nt.mp_ins if en.per_nt?.mp_ins?
+
+                  # These attributes preserve the edge graph non-mp stats along side the
+                  # main graph stats. Their presence is signalled by graph.merged_edges
+                  # Note: sequence, contig_problems and %GC stats are not transferred/preserved.
+
+                  gn.merge_stats = {}
+                  gn.merge_stats.bits = en.bits if en.bits?
+                  gn.merge_stats.rd_cnt = en.rd_cnt if en.rd_cnt?
+                  gn.merge_stats.int_cov = en.int_cov if en.int_cov?
+                  gn.merge_stats.rel_ab = en.rel_ab if en.rel_ab?
+                  gn.merge_stats.cov = en.cov if en.cov?
+                  gn.merge_stats.pct_uncov = en.pct_uncov if en.pct_uncov?
+                  gn.merge_stats.rd_len = en.rd_len if en.rd_len?
+                  gn.merge_stats.adj_cov = en.adj_cov if en.adj_cov?
+                  gn.merge_stats.adj_cov_stddev = en.adj_cov_stddev if en.adj_cov_stddev?
+                  gn.merge_stats.adj_cov_min = en.adj_cov_min if en.adj_cov_min?
+                  gn.merge_stats.adj_cov_max = en.adj_cov_max if en.adj_cov_max?
+                  if en.per_nt?.cov?
+                     gn.merge_stats.per_nt =
+                        cov : en.per_nt.cov
+
+            # Remove edges associated with nodes in the edge graph but not in the main
+            graph.edges = (e for e in edge_graph.edges when not (missing_nodes[e.n1]? or missing_nodes[e.n2]?))
+            graph.internal_edges = (e for e in edge_graph.internal_edges when not (missing_nodes[e.n1]? or missing_nodes[e.n2]?))
+            graph.removed_edges = []
+            callback?(null, graph))
+
+   # Control what gets called after the initial graph is successfully loaded
+   if args.files?.length
+      cb = merge_graphs
+   else if args.edges?
+      cb = merge_edges
+   else
+      cb = callback
+
+   # Load the main graph
    read_input_stream(args.file, true, (error, read_buffer) ->
-           if error or not read_buffer
-                 console.error("ERROR: Empty buffer returned for file: #{args.file}")
-                 callback?(error or new Error("Empty buffer returned for file: #{args.file}"), null)
-                 return
-           else
-              j = read_buffer
-              j.processing ?= []
-              j.nodes ?= {}
-              j.removed_nodes ?= {}
-              j.edges ?= []
-              j.internal_edges ?= []
-              j.shared_seq_edges ?= []
-              j.removed_edges ?= []
-              j.processing.push(["$",ss_version,'LOAD',clone_object(args)])
-              callback?(null, j))
+      if error or not read_buffer
+         console.error("ERROR: Empty buffer returned for file: #{args.file}")
+         callback?(error or new Error("Empty buffer returned for file: #{args.file}"), null)
+         return
+      else
+         update_json read_buffer
+         j = read_buffer
+         j.processing ?= []
+         j.nodes ?= {}
+         j.removed_nodes ?= {}
+         j.edges ?= []
+         j.internal_edges ?= []
+         j.shared_seq_edges ?= []
+         j.removed_edges ?= []
+         j.merged_edges = false
+         j.processing.push(["$",ss_version,'LOAD',clone_object(args)])
+         cb?(null, j))
 
 ###
 # command_file -- Implementation of the SCRIPT command
@@ -4054,6 +4609,12 @@ file : \"filename[.gz]\" -- Read commands from the named file\n
 \n
         Example: #{args.help} -- Enter an interactive (command line) session at this point\n
         typing commands one at a time\n
+\n
+self : true -- Causes a SCRIPT file to recursively call itself.\n
+\n
+        Example: #{args.help} {\"self\":true} -- Read and run commands from\n
+        the same file that this command was invoked from. So that file was my_script.go\n
+        this command behaves identically to using: {\"file\":\"my_script.go\"}\n
 \n
 tag : \"filename_part\" -- Part of a filename to include in files written from this script\n
           NOTE: tag renaming is not used within interactive SCRIPT command sessions.\n
@@ -4081,8 +4642,10 @@ tag : \"filename_part\" -- Part of a filename to include in files written from t
       lines = read_buffer.split("\n")
       script_cmds = []
       for l in lines
-         [cmd, argstr] = l.trim().replace(/\t/," ").split(" ",2)
+         cmdparts = l.trim().replace(/\t/," ").split(" ")
+         cmd = cmdparts[0]
          cmd = cmd.toUpperCase()
+         argstr = if cmdparts.length > 1 then cmdparts.slice(1).join(" ") else null
          if typeof(commands[cmd]) is 'function'
             if argstr
                try
@@ -4097,11 +4660,28 @@ tag : \"filename_part\" -- Part of a filename to include in files written from t
             if cmd_args?.file? and args.tag? and not (cmd is 'LOAD')
                cmd_args.tag ?= args.tag
 
-            if (cmd is 'SCRIPT') and not cmd_args?.file?
-               callback?(new Error("Invalid command: You may not launch an interactive SCRIPT session from within a SCRIPT."), null)
-               return
-            else
-               script_cmds.push([commands[cmd], cmd_args, cmd])
+            if (cmd is 'SCRIPT')
+               unless (cmd_args?.file? or cmd_args?.self?)
+                  callback?(new Error("Invalid command: You may not launch an interactive SCRIPT session from within a SCRIPT."), null)
+                  return
+
+               # If a SCRIPT is invoking itself.
+               if (cmd_args?.self)
+                  cmd_args.file = args.file
+                  cmd_args.tag ?= args.tag if args.tag?
+                  console.warn("INFO: SCRIPT '#{args.file}' recursively calling itself with tag '#{cmd_args.tag}'")
+
+               # If a SCRIPT is being invoked inside another SCRIPT, perform the tag substitution on its tag string.
+               if (cmd_args?.tag?) and (tag_rep = cmd_args.tag.match(/(@+)/))
+                  unless args.tag?
+                     callback?(new Error("SCRIPT: Couldn't substitute for '#{tag_rep[1]}' in tag '#{cmd_args.tag}' because caller didn't provide a tag."), null)
+                     return
+                  else
+                     console.warn("INFO: Substituting '#{args.tag}' for '#{tag_rep[1]}' in tag '#{cmd_args.tag}'")
+                     cmd_args.tag = cmd_args.tag.replace(/@+/g,args.tag)
+
+            script_cmds.push([commands[cmd], cmd_args, cmd])
+
          else if cmd and cmd[0] isnt '#'
             callback?(new Error("Invalid command: '#{cmd}'"), null)
             return
@@ -4147,7 +4727,9 @@ tag : \"filename_part\" -- Part of a filename to include in files written from t
          console.warn("NOTE: You appear to be redirecting the output of this session, no interactive command results will be visible.\n")
 
       repl.start({prompt:">> ", output:process.stderr, input:process.stdin, terminal:true, ignoreUndefined:true, eval:(l,cx,fn,cb) ->
-         [cmd, argstr...] = l[1..-2].trim().replace(/\t|\n/," ").split(" ")
+         if l[0] is '(' and l[-1..] is ')'  # Early versions of node wrapped the line in "()"
+            l = l[1..-2]  # This is for node 0.8.x and 0.10.x to remove the parens
+         [cmd, argstr...] = l.trim().replace(/\t|\n/," ").split(" ")
          argstr = argstr.join(' ').replace(/^['"]|["']$/g,"")
          cmd = cmd.toUpperCase()
          if cmd is 'HELP'
@@ -4402,15 +4984,16 @@ For examples and/or detailed help with specific commands, type:  HELP <command>\
    'INSERT'   : full_order
    'SCAFF'    : scaffold
    'CLUST'    : tetracalc
-   'SELCLUST' : grab_clusts
    'spacer3'  : '\n==============================='
    'text6'    : 'Assembly graph filter/edit utilities\n'
+   'CIRCLE'   : circles
    'CCOMPS'   : calc_ccomps
    'SELCC'    : grab_ccomps
-   'EDGFLT'   : filter_edges
-   'RELINK'   : relink
+   'SELCLUST' : grab_clusts
    'SELND'    : grab_neighbors
    'SCAFLNK'  : scaff_link
+   'RELINK'   : relink
+   'EDGFLT'   : filter_edges
    'PROBS'    : node_problems
    'EDIT'     : perform_edits
    'CUTND'    : cut_node

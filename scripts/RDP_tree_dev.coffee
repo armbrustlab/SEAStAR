@@ -26,7 +26,7 @@
 # This script reads in an RDP classifier taxonomic heirarchy file and converts
 # it to a JSON tree formatted output file.
 #
-# Inputs: input modified RDP classifier output on stdin 
+# Inputs: input modified RDP classifier output on stdin
 #         JSON formatted RDP heirarchy in the file named in RDP_heir_fn (or RDP_expand.json by default)
 #         percent abundance below which a genus will be filtered out [0.10]
 #
@@ -49,9 +49,10 @@
 # }
 ###
 
-unless process.version.split('.')[1] >= 10   # Require node version v0.x.y to be x >= 10
+ver = process.version[1..].split('.')
+unless ver[1] >= 10 or ver[0] > 0   # Require node version >= 0.10.x
    console.error("ERROR: nodejs version v0.10.0 or greater required.")
-   process.exit(1) 
+   process.exit(1)
 
 fs = require('fs')
 
@@ -63,14 +64,18 @@ minperc = parseFloat(process.argv[3] ? 0.10)
 out_tree = JSON.parse(fs.readFileSync(RDP_heir_fn,'utf8'))
 
 # Default exception handler
-process.on 'uncaughtException', (err) -> 
+process.on 'uncaughtException', (err) ->
    console.log 'Caught exception: ' + err
 
 # Get stdin ready for reading
 process.stdin.setEncoding('utf8')
 process.stdin.resume()
 
-# levels present in RDP taxonomic hierarchy
+# Levels present in RDP taxonomic hierarchy.  They correspond to
+# root, domain, phylum, class, subclass, order, suborder, family,
+# subfamily, supergenus, genus.  They don't match taxonomic level
+# numbers provided by the RDP project itself.  This numbering
+# convention is introduced in RDP_train_to_tree.coffee.
 levels = [0, 1, 2, 3, 3.5, 4, 4.5, 5, 5.5, 5.75, 6]
 
 # lookup table of next levels
@@ -80,46 +85,27 @@ while i < levels.length - 1
    level_after[levels[i]] = levels[i+1]
    i++
 
-# level name to number lookup
-level_name2num = 
-   norank     : 0       # trainset 6 hierarchy convention
-   rootrank   : 0       # trainset 9+ hierarchy convention
-   domain     : 1
-   phylum     : 2
-   class      : 3 
-   subclass   : 3.5
-   order      : 4
-   suborder   : 4.5
-   family     : 5
-   subfamily  : 5.5
-   supergenus : 5.75 
-   genus      : 6
-
-# level number to name lookup
-for level_name, level_num in level_name2num
-   level_num2name[level_num] = level_name
-
 # Method for branch objects that calculates summary stats for conf, cnt and cum
 # And prunes branches from the tree with no representative sequences.
 out_tree.walk = (tree, prev_cnt, prev_cum) ->
    if tree.sub? and Object.keys(tree.sub).length > 0   # Make sure there is something to do
       # Shuffle sort child elements by pop (largest, smallest, second largest, second smallest...)
-      
+
       # Create an array and reverse sort it by population.
-      tmp = (z for y,z of tree.sub) 
+      tmp = (z for y,z of tree.sub)
       tmp.sort((b,a) -> a.pop-b.pop)
-      
+
       # Now replace the original sub object
       tree.sub = {}
       # This performs the "shuffle" on the sorted array
-      
+
       while tmp.length
          c = tmp.shift()   # grab first element
          tree.sub[c.name] = c
          c = tmp.pop()     # then last
          tree.sub[c.name] = c if c
-         
-   for c of tree.sub 
+
+   for c of tree.sub
       if tree.sub[c].num != 0
          sub_tree = tree.sub[c]
          sub_tree.conf = sub_tree.conf / sub_tree.num
@@ -128,17 +114,17 @@ out_tree.walk = (tree, prev_cnt, prev_cum) ->
          sub_tree.cum = prev_cum
          if sub_tree?.gapfill
             delete sub_tree.gapfill
-         out_tree.walk(sub_tree, prev_cnt, prev_cum)	
+         out_tree.walk(sub_tree, prev_cnt, prev_cum)
          prev_cnt += sub_tree.num
          prev_cum += sub_tree.pop
       else
          delete tree.sub[c]
 
-# Walk all of the lines in the RDP classifier output 
+# Walk all of the lines in the RDP classifier output
 build = (line) ->
    fields = parse_line line
-   
-   # Walk down the branches of the RDP taxonomy tree and fill in the 
+
+   # Walk down the branches of the RDP taxonomy tree and fill in the
    # information for this sequence.  tax_names array can be used to find the
    # next child node to move down to in the tree.
    prev = null
@@ -147,12 +133,16 @@ build = (line) ->
       # Add info for this sequence to any incertae sedis entries this script
       # already created for previous lines
       prev = cur
-      start = prev  # start is where parent of possible incertae_sedis entries
-      
+
       # Check if next node down is an incertae_sedis layer added by
       # fill_lineage_gap.  If yes, fill missing data in incertae_sedis layer.
       # The check is: If no sub-node matches tax_name, or if it matches but has
-      # true gapfill property, then the next node must be custom incertae_sedis
+      # true gapfill property, then the next node must be custom incertae_sedis.
+      #
+      # The check for a true gapfill property is necessary because sometimes
+      # incertae_sedis taxonomy names are placed in the tree by RDP, not by this
+      # script.  We only want to fill in data in this loop if the incertae_sedis
+      # layer was added by fill_lineage_gap.
       while (not (tax_name of cur.sub)) or (cur.sub[tax_name].gapfill)
          cur = cur.sub["#{next_incertae_sedis_name(cur)}"]
          prev = cur
@@ -160,39 +150,40 @@ build = (line) ->
          cur.conf += fields.tax_pvals[i]
          cur.w_conf += fields.tax_pvals[i] * fields.percent
          cur.pop += fields.percent
-      
+
       # cur.sub should contain tax_name now
       cur = cur.sub[tax_name]
-      
+
       # Insert incertae sedis entries into lineage for missing levels
       fill_lineage_gap(prev, cur)
-      
+
       # Update this taxon
       cur.num++
       cur.conf += fields.tax_pvals[i]
       cur.w_conf += fields.tax_pvals[i] * fields.percent
       cur.pop += fields.percent
-   
-   # Now add the sequence itself as a leaf of the lowest taxon level (usually genus, level 6)		
+
+   # Now add the sequence itself as a leaf of the lowest taxon level (usually genus, level 6)
    cur.sub[fields.sequence] =
       pop : fields.percent
       cum : 0.0
       cnt : 0
       num : 1
-      conf : fields.tax_pvals[fields.tax_pvals.length-1] 
+      conf : fields.tax_pvals[fields.tax_pvals.length-1]
       w_conf : fields.percent * fields.tax_pvals[fields.tax_pvals.length-1]
       level : 7.0
       length : 1.0
       name : fields.sequence
 
+# Parse a line from RDP classifier output
 parse_line = (line) ->
    fields = {}
-   parts = line.split('\t')                         # Split on semicolons
+   parts = line.split('\t')                                       # Split on tabs
    [fields.sequence, fields.percent] = parts.shift().split('_')   # Split first field on "_" (remove 1st & 2nd)
    fields.percent = parseFloat(fields.percent)                    # This is its estimated abundance
-   
+
    # Parsed taxonomic names
-   parts.shift()
+   parts.shift()  # remove extra tab
    fields.tax_names = (p.replace(/"/g,'').trim() for p in parts by 3)
    # Parsed taxonomic levels
    parts.shift()
@@ -203,37 +194,73 @@ parse_line = (line) ->
    fields
 
 # Fill in missing taxonomic levels between begin and end with incertae sedis
-# copies of begin
+# copies of begin.  Redistribute children of displaced nodes appropriately.
 fill_lineage_gap = (begin, end) ->
-   if not begin?.level? or not end?.level?   # begin or end is not valid taxon
+   if not begin.level? or not end.level?   # begin is parent of root or end is leaf.  Skip.
       return
    if begin.level > end.level
-      console.log("ERROR: Out of order input tree detected.  Level of #{begin.name} (#{begin.level}) > #{end.name} (#{end.level})")
-      process.exit(1)
-   if level_after[begin.level] == end.level  # no gap to fill
+      console.error("ERROR: Out of order input tree detected.  Level of #{begin.name} (#{begin.level}) > #{end.name} (#{end.level})")
+
+   if level_after[begin.level] == end.level  # no gap to fill, the next level is consecutive
       return
-   level = level_after[begin.level]
-   cur = begin
+   level = level_after[begin.level]  # current incertae_sedis level
+   cur = begin                       # parent of nodes at current incertae_sedis level
    insert_name = next_incertae_sedis_name(begin)
-   
+
    # Now insert taxa to fill gaps between levels
    while level != end.level
-      save = cur.sub  # save original sub
-      cur.sub = {}
+      # First determine properties of siblings of this new node
+      sibnum = 0
+      sibpop = 0
+      sibw_conf = 0
+      sibconf = 0
+      for name, child of cur.sub
+         sibnum += child.num
+         sibpop += child.pop
+         sibw_conf += child.w_conf
+         sibconf += child.conf
+
+      savesub = cur.sub  # save original sub
+      cur.sub = {}    # clear subs
+      # Create new incertae_sedis node.  Make sure to remove components of properties
+      # that were added by this node's siblings.
       cur.sub[insert_name] =
-            name : insert_name
-            pop    : begin.pop
-            cum    : begin.cum
-            cnt    : begin.cnt
-            num    : begin.num
-            conf   : begin.conf
-            w_conf : begin.w_conf
-            level  : level
-            length : level - cur.level
-            gapfill: true  # to distinguish as manually inserted incertate_sedis, rather than pre-existing incertae_sedis. Remove before output
+         name   : insert_name
+         pop    : cur.pop - sibpop
+         cum    : 0
+         cnt    : 0
+         num    : cur.num - sibnum
+         conf   : cur.conf - sibconf
+         w_conf : cur.w_conf - sibw_conf
+         level  : level
+         length : level - cur.level
+         gapfill: true  # to distinguish as manually inserted incertate_sedis, rather than pre-existing incertae_sedis. Remove before output
+
+
+      # In some cases there may be a mixture of levels within one sub,
+      # one of which triggered this fill_lineage_gap() work, and some of
+      # which are already at the level that fill_lineage_gap() will create.
+      #
+      # E.g. The sub for Actinobacteria (level 3) contains
+      # => Acidimicrobidae (3.5)
+      # => Actinobacteridae (3.5)
+      # => Coriobacteridae (3.5)
+      # => Nitriliruptoridae (3.5)
+      # => Rubrobacteridae (3.5)
+      # => marine Actinobacteria group (4)
+      #
+      # We may be in this function because we're moving to marine Actinobacteria
+      # next (4), and will fill in a level 3.5 incertae_sedis node.  We have to
+      # make sure to only move the level 4 marine Actinobacteria group forward and
+      # to not discard the other 3.5 level nodes in sub
+      for savename, savechild of savesub
+         if savechild.level == level
+            cur.sub[savename] = savechild  # if not the end node we're filling to, put node back in sub where it started
+            delete savesub[savename]
+
       level = level_after[level]
-      cur = cur.sub[insert_name]
-      cur.sub = save  # put original sub back
+      cur = cur.sub[insert_name]       # move down one node in tree
+      cur.sub = savesub                # put original sub back
    end.length = end.level - cur.level  # recalculate end's length
 
 next_incertae_sedis_name = (node) ->
@@ -265,6 +292,16 @@ filter = (line_list, minperc) ->
          Array::push.apply retlines, data.lines
    retlines
 
+# pretty print a node and children for debugging purposes
+pp = (cur, descend, message="") ->
+   process.stderr.write "************* " + message + "\n"
+   taxstring = "#{cur.name} (#{cur.level}) (#{cur.pop}) #{cur.cum} #{cur.cnt} #{cur.num}"
+   for taxname, child of cur.sub
+      taxstring += "\n  => #{taxname} (#{child.level}) (#{child.pop}) #{child.cum} #{child.cnt} #{child.num}"
+   process.stderr.write taxstring + "\n"
+   if descend and cur?.sub
+      pp(cur.sub[Object.keys(cur.sub)[0]], true, "")
+
 orig_lines = []
 process.stdin.on 'data', do ->
    save = ''
@@ -280,5 +317,6 @@ process.stdin.on 'end', () ->     # Write the JSON structure to stdout.
    # Walk the tree, pruning empty branches and updating cumulative statistics
    out_tree.walk out_tree, 0, 0.0
    # Output JSON to stdout
+   process.stderr.write("\n\n")
    process.stdout.write JSON.stringify(out_tree, null, 1)+"\n"
    process.exit 0

@@ -43,20 +43,21 @@
 #      "w_conf" : <population weighted mean classifier p-value for sequences in this taxon>,
 #      "level" : <numeric level in heirarchy>,
 #      "length" : <branch length of this taxonomic level from parent>
-#      "samples" : <sample child nodes containing pop, cum, num, cnt and conf> 
+#      "samples" : <sample child nodes containing pop, cum, num, cnt and conf>
 #      "sub" : {<child nodes by name, or empty if a leaf>}
 # }
 #
 ###
 
-unless process.version.split('.')[1] >= 10   # Require node version v0.x.y to be x >= 10
+ver = process.version[1..].split('.')
+unless ver[1] >= 10 or ver[0] > 0   # Require node version >= 0.10.x
    console.error("ERROR: nodejs version v0.10.0 or greater required.")
-   process.exit(1) 
+   process.exit(1)
 
 fs = require('fs')
 path = require('path')
 
-# Handle default filename.  
+# Handle default filename.
 
 input_files = {}
 
@@ -65,7 +66,7 @@ input_files = {}
 for i in process.argv[2..]
    input_files[path.basename(i).split("_")[0]] = i
 
-# Quit without input.  
+# Quit without input.
 if Object.keys(input_files).length is 0
    process.stderr.write "No input files found!\n"
    process.exit 1
@@ -85,48 +86,48 @@ walk = (tree, prev_cnt, prev_cum) ->
 
 # Merge a sample into the existing output object
 merge = (out_tree, in_tree, sample, prev_cnt, prev_cum) ->
-   
+
    # Walk through all of the subtaxa at this level
    for c of in_tree.sub
       # If the output tree doesn't already have this taxon level
-      unless out_tree.sub[c]? 
+      unless out_tree.sub[c]?
          # Add it!
          out_tree.sub[c] = in_tree.sub[c]
-      
+
       out_tree.sub[c].samples ?= []
-      
+
       # Make a new object for this sample
-      out_tree.sub[c].samples[sample] =   
-         num : in_tree.sub[c].num 
+      out_tree.sub[c].samples[sample] =
+         num : in_tree.sub[c].num
          cnt : in_tree.sub[c].cnt
          pop : in_tree.sub[c].pop
-         cum : in_tree.sub[c].cum 
+         cum : in_tree.sub[c].cum
          conf : in_tree.sub[c].conf
          w_conf : in_tree.sub[c].w_conf
-      
+
       # Recurse
       merge(out_tree.sub[c], in_tree.sub[c], sample, prev_cnt, prev_cum)
-      
+
       # initialize summary stats properties
       out_tree.sub[c].num = 0
       out_tree.sub[c].cnt = 0
       out_tree.sub[c].pop = 0.0
       out_tree.sub[c].cum = 0.0
       out_tree.sub[c].conf = 0.0
-      out_tree.sub[c].w_conf = 0.0		
-      
+      out_tree.sub[c].w_conf = 0.0
+
       # Roll-up summary statistics from samples
       for k,s of out_tree.sub[c].samples
          out_tree.sub[c].num += s.num
          out_tree.sub[c].pop += s.pop
          out_tree.sub[c].conf += s.num * s.conf
-         out_tree.sub[c].w_conf += s.pop * s.w_conf		
-      
+         out_tree.sub[c].w_conf += s.pop * s.w_conf
+
       # Round the conf values
       out_tree.sub[c].conf = Math.round(
-         100.0 * out_tree.sub[c].conf / out_tree.sub[c].num) / 100.0 
+         100.0 * out_tree.sub[c].conf / out_tree.sub[c].num) / 100.0
       out_tree.sub[c].w_conf = Math.round(
-         100.0 * out_tree.sub[c].w_conf / out_tree.sub[c].pop) / 100.0 
+         100.0 * out_tree.sub[c].w_conf / out_tree.sub[c].pop) / 100.0
 
 for sample_name,sample_file of input_files
    # Read and parse the JSON RDP taxonomy

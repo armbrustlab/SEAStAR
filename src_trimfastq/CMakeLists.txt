@@ -1,6 +1,6 @@
 # -------------------------------------------------------------------------- #
 # Center for Environmental Genomics
-# Copyright (C) 2009-2013 University of Washington.
+# Copyright (C) 2009-2014 University of Washington.
 #
 # Authors:
 # Vaughn Iverson
@@ -23,7 +23,7 @@
 # -------------------------------------------------------------------------- #
 
 # CMake file for trimfastq
-cmake_minimum_required (VERSION 2.8)
+cmake_minimum_required (VERSION 2.8.5)
 
 project (trimfastq C)
 
@@ -61,3 +61,8 @@ set_tests_properties(trimfastq_2singlets_test_data PROPERTIES PASS_REGULAR_EXPRE
 add_test(NAME trimfastq_singlet_input_test_data COMMAND bash -c "$<TARGET_FILE:trimfastq> -z --prefix=lambda_tst.d70 -p 0.7 -l 34 -m 34 -e 3.0 --add_len ${CMAKE_BINARY_DIR}/output_test_data/lambda_reads_d50s2 ${CMAKE_BINARY_DIR}/output_test_data/lambda_reads_d70; (gunzip -c ${CMAKE_BINARY_DIR}/output_test_data/lambda_reads_d70.{read1,read2}.fastq.gz; for f in ${CMAKE_BINARY_DIR}/output_test_data/lambda_reads_d70.{single1,single2}.fastq.gz; do gunzip -c $f | ${GAWK_EXEC} 'NR %4 == 1 {cur=$0; next} {cur = cur $0} NR % 4 == 0 {x[i++] = cur} END {n = asort(x); for (j=1; j<=n; j++) {print x[j]}}'; done) | openssl md5")
 
 set_tests_properties(trimfastq_singlet_input_test_data PROPERTIES PASS_REGULAR_EXPRESSION "df84824a396d016689ca7a0e35085a15" TIMEOUT 30)
+
+# Test nucleotide data
+add_test(NAME trimfastq_test_nt_data COMMAND bash -c "$<TARGET_FILE:trimfastq> -z --prefix=lambda_tst.d90 -p 0.9 -l 34 -m 34 -e 3.0 --add_len ${CMAKE_BINARY_DIR}/output_test_data/lambda_reads_nt ${CMAKE_BINARY_DIR}/output_test_data/lambda_reads_nt_d90; gunzip -c ${CMAKE_BINARY_DIR}/output_test_data/lambda_reads_nt_d90.{read1,read2,single}.fastq.gz | openssl md5")
+
+set_tests_properties(trimfastq_test_nt_data PROPERTIES PASS_REGULAR_EXPRESSION "47380042ad0501f82e18cbcb639a5ec1" TIMEOUT 30)

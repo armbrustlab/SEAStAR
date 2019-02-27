@@ -27,7 +27,7 @@
 # This script reads in an RDP classifier taxonomic heirarchy file and converts
 # it to a JSON tree formatted output file.
 
-# Input: input RDP heirarchy on stdin 
+# Input: input RDP heirarchy on stdin
 # Output:  output JSON formatted heirarchy to stdout
 
 # Output file format:
@@ -47,50 +47,51 @@
 #      "sub" : {<child nodes by name, or empty if a leaf>}
 # }
 
-unless process.version.split('.')[1] >= 10   # Require node version v0.x.y to be x >= 10
+ver = process.version[1..].split('.')
+unless ver[1] >= 10 or ver[0] > 0   # Require node version >= 0.10.x
    console.error("ERROR: nodejs version v0.10.0 or greater required.")
-   process.exit(1) 
+   process.exit(1)
 
 taxa = [] # This is a working array of taxa records indexed by taxid
 
-levels = 
+levels =
   rootrank   : 0
   norank     : 0
   domain     : 1
   phylum     : 2
-  class      : 3 
+  class      : 3
   subclass   : 3.5
   order      : 4
   suborder   : 4.5
   family     : 5
   subfamily  : 5.5
-  supergenus : 5.75 
+  supergenus : 5.75
   genus      : 6
 
-error_codes = 
+error_codes =
   INVALID_INPUT_LINE : 1
 
-process.on 'uncaughtException', (err) -> 
+process.on 'uncaughtException', (err) ->
   console.log 'Caught exception: ' + err
 
 process.stdin.resume()
 process.stdin.setEncoding('utf8')
 
-# Now loop through lines, building the taxa table and making the heirarchy 
+# Now loop through lines, building the taxa table and making the heirarchy
 
 build = (line) ->
   return unless (line = line.trim())	# Remove whitespace from ends
   # Split on asterisks
   # process.exit error_codes.INVALID_INPUT_LINE if ([taxid, name, parentid, levnum, level] = line.split("*")).length isnt 5
   return if ([taxid, name, parentid, levnum, level] = line.split("*")).length isnt 5
-  taxid = parseInt(taxid)	# taxid and parentid 
+  taxid = parseInt(taxid)	# taxid and parentid
   parentid = parseInt(parentid)	# are each integers
   name = name.replace(/"/g,"")	# remove quotes from taxa names
   level = level.trim();		# be tolerant of whitespace
 
   return unless level of levels
 
-  # If this taxon has already been used 
+  # If this taxon has already been used
   # as a parent (it is out of order)
   # then copy the existing sub taxa
 
@@ -103,39 +104,39 @@ build = (line) ->
       child.length = child.level - taxa[taxid].level
   else  # otherwise make a whole new object
     taxa[taxid] =
-      name : name 
+      name : name
       pop : 0.0
-      cum : 0.0 
+      cum : 0.0
       cnt : 0
       num : 0
-      conf : 0.0 
-      w_conf : 0.0 
+      conf : 0.0
+      w_conf : 0.0
       level : levels[level]
       length : 0.0
-      # children : [] 
-      sub : {} 
+      # children : []
+      sub : {}
 
   # Look to see if this taxon's parent already has a record
-  if taxa[parentid]? 
+  if taxa[parentid]?
     taxa[parentid].sub[name] = taxa[taxid]	# Add this child
     # taxa[parentid].children.push(taxa[taxid])	# Add this child
     taxa[taxid].length = taxa[taxid].level - taxa[parentid].level
-  else 
+  else
     if parentid >= 0 			# If not the root
-      taxa[parentid] =  
+      taxa[parentid] =
         pop : 0.0
-        cum : 0.0 
+        cum : 0.0
         cnt : 0
         num : 0
-        conf : 0.0 
-        w_conf : 0.0 
+        conf : 0.0
+        w_conf : 0.0
         level : levels[level]
         length : 0.0
-        #  children : [ taxa[taxid] ] 
-        sub : {} 
-	
+        #  children : [ taxa[taxid] ]
+        sub : {}
+
       taxa[parentid].sub[name] = taxa[taxid]
-  return 
+  return
 
 process.stdin.on 'data', do ->
   save = ''
@@ -143,12 +144,10 @@ process.stdin.on 'data', do ->
     lines = c.split '\n'
     lines[0] = save + lines[0]
     save = lines.pop()
-    build i for i in lines when i 
+    build i for i in lines when i
 
 process.stdin.on 'end', () ->     # Write the JSON structure to stdout.
-  taxa[0].length = 1 
+  taxa[0].length = 1
   # print(JSON.stringify(taxa[0]))
   console.log(JSON.stringify({ sub : { Root : taxa[0] } }))
-  process.exit 0 
-
-
+  process.exit 0

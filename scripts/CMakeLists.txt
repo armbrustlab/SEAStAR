@@ -1,6 +1,6 @@
 # -------------------------------------------------------------------------- #
 # Center for Environmental Genomics
-# Copyright (C) 2009-2013 University of Washington.
+# Copyright (C) 2009-2014 University of Washington.
 #
 # Authors:
 # Vaughn Iverson
@@ -22,8 +22,8 @@
 # along with SEAStAR.  If not, see <http://www.gnu.org/licenses/>.
 # -------------------------------------------------------------------------- #
 
-# CMake file for scripts 
-cmake_minimum_required (VERSION 2.8)
+# CMake file for scripts
+cmake_minimum_required (VERSION 2.8.5)
 
 # Directory for all final scripts
 set(SCRIPT_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_RUNTIME_OUTPUT_DIRECTORY})

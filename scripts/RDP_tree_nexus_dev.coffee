@@ -36,15 +36,16 @@
 # And prunes branches from the tree with no representative sequences.
 #
 
-unless process.version.split('.')[1] >= 10   # Require node version v0.x.y to be x >= 10
+ver = process.version[1..].split('.')
+unless ver[1] >= 10 or ver[0] > 0   # Require node version >= 0.10.x
    console.error("ERROR: nodejs version v0.10.0 or greater required.")
-   process.exit(1) 
+   process.exit(1)
 
 norm = 1.0;		# This variable is used to normalize all releative populations to 100% total
 
 walk = (tree) ->
    outstr = ''
-   
+
    if tree.sub?	 # If this node in the tree has children
       children = []
       for c,child of tree.sub	# Recursively generate NEXUS strings for the children
@@ -66,7 +67,7 @@ process.stdin.on 'data', (c) ->
     inputJSON = inputJSON.concat(c)
 
 # Parse the JSON, modify the structre a bit to fit the NEXUS format and then output the NEXUS representation
-process.stdin.on 'end', () ->     
+process.stdin.on 'end', () ->
    input_tree = JSON.parse(inputJSON)
    input_tree.sub.Root.label = "Root";
    norm = input_tree.sub.Root.pop;
