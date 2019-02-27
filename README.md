@@ -28,7 +28,7 @@ SEAStAR - A framework for the analysis of next-generation metagenomes
 * Tools for visualizing assembly graphs (e.g. [GraphViz](http://www.graphviz.org/), [ZGRViewer](http://zvtm.sourceforge.net/zgrviewer.html))
 * 16S Taxonomic classifiers (e.g. [RDP Classifier](http://sourceforge.net/projects/rdp-classifier/))
 
-You can find out more about SEAStAR on its [Armbrust Lab Homepage](http://armbrustlab.ocean.washington.edu/SEAStAR) and obtain news regarding updates and related info by following [@SEAStAR_meta](https://twitter.com/SEAStAR_meta) on Twitter.
+You can find out more about SEAStAR on its [Armbrust Lab Homepage](https://armbrustlab.ocean.washington.edu/tools/seastar/).
 
 This file contains information on how to build and install the SEAStAR tools. For information on using the tools themselves, please see the included SEAStAR User Guide file.
 
